@@ -12,4 +12,9 @@ urlpatterns = [
     path("statuss/create/", StatusCreateView.as_view(), name="status_create"),
     path("statuss/<int:pk>/edit/", StatusUpdateView.as_view(), name="status_update"),
     path("statuss/<int:pk>/delete/", StatusDeleteView.as_view(), name="status_delete"),
+    path("comments/", CommentListView.as_view(), name="comment_list"),
+    path("comments/<int:pk>/", CommentDetailView.as_view(), name="comment_detail"),
+    path("comments/create/", CommentCreateView.as_view(), name="comment_create"),
+    path("comments/<int:pk>/edit/", CommentUpdateView.as_view(), name="comment_update"),
+    path("comments/<int:pk>/delete/", CommentDeleteView.as_view(), name="comment_delete"),
 ]

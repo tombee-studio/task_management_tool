@@ -64,3 +64,43 @@ class StatusUpdateView(LoginRequiredMixin, UpdateView):
 class StatusDeleteView(LoginRequiredMixin, DeleteView):
     model = Status
     success_url = reverse_lazy("status_list")
+
+
+class CommentListView(LoginRequiredMixin, ListView):
+    model = Comment
+    template_name = "task_app/comment_list.html"
+    context_object_name = "comments"
+
+
+class CommentDetailView(LoginRequiredMixin, DetailView):
+    model = Comment
+    template_name = "task_app/comment_detail.html"
+    context_object_name = "comment"
+
+
+class CommentCreateView(LoginRequiredMixin, CreateView):
+    model = Comment
+    fields = ["description", "task"]
+    template_name = "task_app/comment_form.html"
+    success_url = reverse_lazy("comment_list")
+    
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
+
+class CommentUpdateView(LoginRequiredMixin, UpdateView):
+    model = Comment
+    fields = ["description", "task"]
+    template_name = "task_app/comment_form.html"
+    success_url = reverse_lazy("comment_list")
+    
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
+
+class CommentDeleteView(LoginRequiredMixin, DeleteView):
+    model = Comment
+    success_url = reverse_lazy("comment_list")
+
