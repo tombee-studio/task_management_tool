@@ -42,6 +42,7 @@
     </thead>
     <tbody>
       {% for task in project.task_set.all %}
+        {% if task.parent == None %}
         <tr>
           <td>
             <a href="{% url 'task_detail' task.pk %}">
@@ -52,8 +53,10 @@
           <td>{{ task.status.name }}</td>
           <td>{{ task.deadline|date:"Y/m/d" }}</td>
         </tr>
+        {% include "task_app/task_list_item.html" with tasks=task.tasks.all nest_count=1 %}
+        {% endif %}
       {% endfor %}
-    </tbody>
+      </tbody>
   </table>
 {% else %}
   <p>プロジェクトはまだ登録されていません。</p>
