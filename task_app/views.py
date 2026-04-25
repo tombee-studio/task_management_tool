@@ -136,9 +136,13 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
         initial = super().get_initial()
 
         project = self.request.GET.get("project")
+        task = self.request.GET.get("task")
         initial["assignee"] = self.request.user
         if project:
             initial["project"] = project
+        if task:
+            initial["project"] = Task.objects.get(pk=task).project.pk
+            initial["parent"] = task
 
         return initial
     

@@ -25,6 +25,9 @@
   <a href="{% url 'task_delete' task.id %}">削除</a>
   <a href="{% url 'task_list' %}">一覧へ戻る</a>
 </p>
+<p>
+  <a href="{% url 'task_create' %}?task={{ task.id }}">新規タスク追加</a>
+</p>
 {% if task.comment_set %}
   <table>
     <thead>
