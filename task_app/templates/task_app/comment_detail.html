@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>タスク#{{ comment.task.id }} {{ comment.task }}へのコメント</h1>
+
+<table>
+  <tr>
+    <th>コメント</th>
+    <td>{{ comment.description }}</td>
+  </tr>
+
+  <tr>
+    <th>作成日</th>
+    <td>{{ comment.created_at|date:"Y/m/d" }}</td>
+  </tr>
+
+  <tr>
+    <th>更新日</th>
+    <td>{{ comment.updated_at|date:"Y/m/d" }}</td>
+  </tr>
+</table>
+
+<p>
+  <a href="{% url 'comment_update' comment.id %}">編集</a>
+  <a href="{% url 'comment_delete' comment.id %}">削除</a>
+  <a href="{% url 'comment_list' %}">一覧へ戻る</a>
+</p>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% block header_links%}
+{% endblock %}
+
+<form method="post">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <div>
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
+
+  {% for field in form %}
+    <div>
+      <label for="{{ field.id_for_label }}">
+        {{ field.label }}
+      </label>
+
+      {{ field }}
+
+      {% if field.help_text %}
+        <small>{{ field.help_text }}</small>
+      {% endif %}
+
+      {% if field.errors %}
+        <div>
+          {{ field.errors }}
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+  {% block form_button %}
+  {% endblock %}
+</form>
+{% endblock %}
