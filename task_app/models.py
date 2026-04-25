@@ -1,0 +1,68 @@
+from django.db import models
+from django.conf import settings
+
+
+class Project(models.Model):
+  created_at = models.DateField(auto_now_add=True)
+  updated_at = models.DateField(auto_now=True)
+  name = models.CharField(max_length=256, null=False, blank=False)
+
+  def __str__(self):
+    return self.name
+
+
+class Status(models.Model):
+  created_at = models.DateField(auto_now_add=True)
+  updated_at = models.DateField(auto_now=True)
+  name = models.CharField(max_length=128, null=False, blank=False)
+  is_done = models.BooleanField(default=False)
+  
+  def __str__(self):
+    return self.name
+
+
+class Comment(models.Model):
+  created_at = models.DateField(auto_now_add=True)
+  updated_at = models.DateField(auto_now=True)
+  author = models.ForeignKey(
+      settings.AUTH_USER_MODEL,
+      on_delete=models.CASCADE
+  )
+  description = models.TextField()
+  task = models.ForeignKey(
+      "Task",
+      on_delete=models.CASCADE,
+      null=True
+  )
+
+
+class Task(models.Model):
+  title = models.CharField(max_length=256, null=False)
+  project = models.ForeignKey(
+      Project,
+      on_delete=models.CASCADE
+  )
+  description = models.TextField(default="")
+  assignee = models.ForeignKey(
+      settings.AUTH_USER_MODEL,
+      on_delete=models.CASCADE
+  )
+  parent = models.ForeignKey(
+      "Task",
+      on_delete=models.CASCADE,
+      related_name='tasks',
+      null=True,
+      blank=True
+  )
+  status = models.ForeignKey(
+      Status,
+      on_delete=models.CASCADE,
+      null=False
+  )
+  created_at = models.DateField(auto_now_add=True)
+  updated_at = models.DateField(auto_now=True)
+  deadline = models.DateField(null=True, blank=True)
+  completed_at = models.DateField(null=True, blank=True)
+  
+  def __str__(self):
+    return self.title
