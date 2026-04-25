@@ -19,6 +19,30 @@
   {% endif %}
 </div>
 
+<p>
+  <a href="{% url 'task_create' %}?task={{ task.id }}">サブタスク追加</a>
+</p>
+{% if task.tasks %}
+  <table>
+    <thead>
+      <tr>
+        <th>タスク名</th>
+        <th>担当者</th>
+        <th>ステータス</th>
+        <th>期日</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% include "task_app/task_list_item.html" with tasks=task.tasks.all nest_count=0 %}
+    </tbody>
+  </table>
+{% else %}
+  <p>サブタスクはまだ登録されていません。</p>
+{% endif %}
+
+<p>
+  <a href="{% url 'comment_create' %}?task={{ task.id }}">コメント</a>
+</p>
 {% if task.comment_set %}
   <table>
     <thead>
@@ -47,8 +71,5 @@
 {% else %}
   <p>コメントはまだ登録されていません。</p>
 {% endif %}
-<p>
-  <a href="{% url 'comment_create' %}?task={{ task.id }}">コメント</a>
-</p>
 
 {% endblock %}
