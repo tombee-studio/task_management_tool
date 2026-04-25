@@ -84,6 +84,15 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
     template_name = "task_app/comment_form.html"
     success_url = reverse_lazy("comment_list")
     
+    def get_initial(self):
+        initial = super().get_initial()
+
+        task = self.request.GET.get("task")
+        if task:
+            initial["task"] = task
+
+        return initial
+    
     def form_valid(self, form):
         form.instance.author = self.request.user
         return super().form_valid(form)
@@ -122,6 +131,16 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
     fields = "__all__"
     template_name = "task_app/task_form.html"
     success_url = reverse_lazy("task_list")
+    
+    def get_initial(self):
+        initial = super().get_initial()
+
+        project = self.request.GET.get("project")
+        initial["assignee"] = self.request.user
+        if project:
+            initial["project"] = project
+
+        return initial
     
     def form_valid(self, form):
         form.instance.author = self.request.user

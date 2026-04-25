@@ -26,6 +26,36 @@
   <a href="{% url 'project_list' %}">一覧へ戻る</a>
 </p>
 
-<h2>{{ project.name }}であなたに割り当てられているタスク</h2>
-
+<h2>{{ project.name }}のタスク一覧</h2>
+<p>
+  <a href="{% url 'task_create' %}?project={{ project.id }}">タスク追加</a>
+</p>
+{% if project.task_set %}
+  <table>
+    <thead>
+      <tr>
+        <th>タスク名</th>
+        <th>担当者</th>
+        <th>ステータス</th>
+        <th>期日</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task in project.task_set.all %}
+        <tr>
+          <td>
+            <a href="{% url 'task_detail' task.pk %}">
+              {{ task.title }}
+            </a>
+          </td>
+          <td>{{ task.assignee.username }}</td>
+          <td>{{ task.status.name }}</td>
+          <td>{{ task.deadline|date:"Y/m/d" }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>プロジェクトはまだ登録されていません。</p>
+{% endif %}
 {% endblock %}
