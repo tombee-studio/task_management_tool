@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>タスク一覧</h1>
+
+<p>
+  <a href="{% url 'task_create' %}">新規タスク作成</a>
+</p>
+
+{% if tasks %}
+  <table>
+    <thead>
+      <tr>
+        <th>タスク名</th>
+        <th>担当者</th>
+        <th>状態</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task in tasks %}
+        <tr>
+          <td>
+            <a href="{% url 'task_detail' task.pk %}">
+              {{ task.title }}
+            </a>
+          </td>
+          <td>{{ task.assignee.username }}</td>
+          <td>{{ task.status.name }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>タスクはまだ登録されていません。</p>
+{% endif %}
+{% endblock %}

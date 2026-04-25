@@ -104,3 +104,37 @@ class CommentDeleteView(LoginRequiredMixin, DeleteView):
     model = Comment
     success_url = reverse_lazy("comment_list")
 
+
+class TaskListView(LoginRequiredMixin, ListView):
+    model = Task
+    template_name = "task_app/task_list.html"
+    context_object_name = "tasks"
+
+
+class TaskDetailView(LoginRequiredMixin, DetailView):
+    model = Task
+    template_name = "task_app/task_detail.html"
+    context_object_name = "task"
+
+
+class TaskCreateView(LoginRequiredMixin, CreateView):
+    model = Task
+    fields = "__all__"
+    template_name = "task_app/task_form.html"
+    success_url = reverse_lazy("task_list")
+    
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
+
+class TaskUpdateView(LoginRequiredMixin, UpdateView):
+    model = Task
+    fields = "__all__"
+    template_name = "task_app/task_form.html"
+    success_url = reverse_lazy("task_list")
+
+
+class TaskDeleteView(LoginRequiredMixin, DeleteView):
+    model = Task
+    success_url = reverse_lazy("task_list")
