@@ -1,7 +1,7 @@
 {% for task in tasks %}
 <tr>
   <td>
-    <a href="{% url 'task_detail' task.pk %}">
+    <a href="{% url 'task_detail' task.pk %}?{{ status_filter }}">
       {{ task.title }}
     </a>
   </td>
