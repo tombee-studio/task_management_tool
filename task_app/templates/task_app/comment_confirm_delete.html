@@ -7,7 +7,7 @@
 <table>
   <tr>
     <th>コメント</th>
-    <td>{{ comment.description|markdown|safe }}</td>
+    <td>{{ comment.description|markdown:task.project|safe }}</td>
   </tr>
 
   <tr>

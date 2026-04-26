@@ -12,7 +12,7 @@
 
   <tr>
     <th>説明</th>
-    <td>{{ task.description|markdown|safe }}</td>
+    <td>{{ task.description|markdown:task.project|safe }}</td>
   </tr>
 
   <tr>
@@ -52,7 +52,7 @@
             </a>
           </td>
           <td>
-            {{ comment.description|markdown|safe }}
+            {{ comment.description|markdown:task.project|safe }}
           </td>
           <td>{{ comment.author }}</td>
         </tr>

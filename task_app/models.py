@@ -6,6 +6,7 @@ class Project(models.Model):
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
   name = models.CharField(max_length=256, null=False, blank=False)
+  git_url = models.URLField(null=True, blank=True)
 
   def __str__(self):
     return self.name

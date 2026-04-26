@@ -67,7 +67,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
             ],
             'libraries': {
-                'markdown_extras': 'task_app.markdown_extras'
+                'markdown_extras': 'task_app.extras'
             }
         },
     },
