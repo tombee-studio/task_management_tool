@@ -2,67 +2,10 @@
 {% load markdown_extras %}
 
 {% block content %}
-<h1>{{ task.name }}</h1>
+<h1>#{{task.pk}} {{ task.title }}</h1>
 
-<table>
-  <tr>
-    <th>タスク名</th>
-    <td>{{ task.title }}</td>
-  </tr>
+{% include "task_app/components/task_detail_component.html" with task=task %}
 
-  <tr>
-    <th>説明</th>
-    <td>{{ task.description|markdown:task.project|safe }}</td>
-  </tr>
-
-  <tr>
-    <th>作成日</th>
-    <td>{{ task.created_at|date:"Y/m/d" }}</td>
-  </tr>
-
-  <tr>
-    <th>更新日</th>
-    <td>{{ task.updated_at|date:"Y/m/d" }}</td>
-  </tr>
-</table>
-
-<p>
-  <a href="{% url 'task_update' task.id %}">編集</a>
-  <a href="{% url 'task_delete' task.id %}">削除</a>
-  <a href="{% url 'task_list' %}">一覧へ戻る</a>
-</p>
-
-{% include "task_app/task_list_component.html" with tasks=tasks task=task status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
-
-{% if task.comment_set %}
-  <table>
-    <thead>
-      <tr>
-        <th>投稿日</th>
-        <th>コメント</th>
-        <th>投稿者</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for comment in task.comment_set.all %}
-        <tr>
-          <td>
-            <a href="{% url 'comment_detail' comment.pk %}">
-              {{ comment.created_at|date:"Y/m/d" }}
-            </a>
-          </td>
-          <td>
-            {{ comment.description|markdown:task.project|safe }}
-          </td>
-          <td>{{ comment.author }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-{% else %}
-  <p>コメントはまだ登録されていません。</p>
-{% endif %}
-<p>
-  <a href="{% url 'comment_create' %}?task={{ task.id }}">コメント</a>
-</p>
+{% include "task_app/components/task_list_component.html" with tasks=tasks task=object status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+{% include "task_app/components/comment_list_component.html" with comments=object.comment_set.all task=object %}
 {% endblock %}

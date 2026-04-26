@@ -3,29 +3,7 @@
 {% block content %}
 <h1>{{ project.name }}</h1>
 
-<table>
-  <tr>
-    <th>プロジェクト名</th>
-    <td>{{ project.name }}</td>
-  </tr>
+{% include "task_app/components/project_detail_component.html" with project=project %}
 
-  <tr>
-    <th>作成日</th>
-    <td>{{ project.created_at|date:"Y/m/d" }}</td>
-  </tr>
-
-  <tr>
-    <th>更新日</th>
-    <td>{{ project.updated_at|date:"Y/m/d" }}</td>
-  </tr>
-</table>
-
-<p>
-  <a href="{% url 'project_update' project.id %}">編集</a>
-  <a href="{% url 'project_delete' project.id %}">削除</a>
-  <a href="{% url 'project_list' %}">一覧へ戻る</a>
-</p>
-
-<h2>{{ project.name }}のタスク一覧</h2>
-{% include "task_app/task_list_component.html" with tasks=tasks project=project status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+{% include "task_app/components/task_list_component.html" with tasks=tasks project=project status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
 {% endblock %}

@@ -3,34 +3,6 @@
 {% block content %}
 <h1>ステータス一覧</h1>
 
-<p>
-  <a href="{% url 'project_create' %}">新規ステータス作成</a>
-</p>
+{% include "task_app/components/status_list_component.html" with status_list=status_list %}
 
-{% if status_list %}
-  <table>
-    <thead>
-      <tr>
-        <th>ステータス名</th>
-        <th>完了</th>
-        <th>作成日</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for status in status_list %}
-        <tr>
-          <td>
-            <a href="{% url 'status_detail' status.pk %}">
-              {{ status.name }}
-            </a>
-          </td>
-          <td>{{ status.is_done }}</td>
-          <td>{{ project.created_at|date:"Y/m/d" }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-{% else %}
-  <p>ステータスはまだ登録されていません。</p>
-{% endif %}
 {% endblock %}

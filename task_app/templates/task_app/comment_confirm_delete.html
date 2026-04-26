@@ -4,22 +4,7 @@
 {% block content %}
 <h1>タスク#{{ comment.task.id }} {{ comment.task }}へのコメント</h1>
 
-<table>
-  <tr>
-    <th>コメント</th>
-    <td>{{ comment.description|markdown:task.project|safe }}</td>
-  </tr>
-
-  <tr>
-    <th>作成日</th>
-    <td>{{ comment.created_at|date:"Y/m/d" }}</td>
-  </tr>
-
-  <tr>
-    <th>更新日</th>
-    <td>{{ comment.updated_at|date:"Y/m/d" }}</td>
-  </tr>
-</table>
+{% include "task_app/components/comment_detail_component.html" with comment=comment %}
 
 <p>
   <form method="POST" action="{% url 'comment_delete' comment.id %}">

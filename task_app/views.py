@@ -156,14 +156,23 @@ class TaskListView(LoginRequiredMixin, ListView):
     model = Task
     template_name = "task_app/task_list.html"
     context_object_name = "tasks"
+    
+    def get_context_data(self, **kwargs) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        selected_status_list = self.request.GET.getlist("status")
+        context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
+        context["status_list"] = Status.objects.all()
+        context["tasks"] = Task.objects.filter(
+            status__in=selected_status_list)
+        return context
 
 class TaskDetailView(LoginRequiredMixin, DetailView):
     model = Task
     template_name = "task_app/task_detail.html"
-    context_object_name = "task"
     
     def get_context_data(self, **kwargs) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
+        context["object"] = self.object
         selected_status_list = self.request.GET.getlist("status")
         context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
         context["status_list"] = Status.objects.all()
