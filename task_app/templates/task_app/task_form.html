@@ -19,26 +19,7 @@
   {% endif %}
 </div>
 
-<p>
-  <a href="{% url 'task_create' %}?task={{ task.id }}">サブタスク追加</a>
-</p>
-{% if task.tasks %}
-  <table>
-    <thead>
-      <tr>
-        <th>タスク名</th>
-        <th>担当者</th>
-        <th>ステータス</th>
-        <th>期日</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% include "task_app/task_list_item.html" with tasks=task.tasks.all nest_count=0 %}
-    </tbody>
-  </table>
-{% else %}
-  <p>サブタスクはまだ登録されていません。</p>
-{% endif %}
+{% include "task_app/task_list_component.html" with tasks=tasks task=task status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
 
 <p>
   <a href="{% url 'comment_create' %}?task={{ task.id }}">コメント</a>

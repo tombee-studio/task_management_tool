@@ -25,26 +25,9 @@
   <a href="{% url 'task_delete' task.id %}">削除</a>
   <a href="{% url 'task_list' %}">一覧へ戻る</a>
 </p>
-<p>
-  <a href="{% url 'task_create' %}?task={{ task.id }}">新規タスク追加</a>
-</p>
-{% if task.tasks %}
-  <table>
-    <thead>
-      <tr>
-        <th>タスク名</th>
-        <th>担当者</th>
-        <th>ステータス</th>
-        <th>期日</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% include "task_app/task_list_item.html" with tasks=task.tasks.all nest_count=0 %}
-    </tbody>
-  </table>
-{% else %}
-  <p>サブタスクはまだ登録されていません。</p>
-{% endif %}
+
+{% include "task_app/task_list_component.html" with tasks=tasks task=task status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+
 {% if task.comment_set %}
   <table>
     <thead>

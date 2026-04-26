@@ -27,38 +27,5 @@
 </p>
 
 <h2>{{ project.name }}のタスク一覧</h2>
-<p>
-  <a href="{% url 'task_create' %}?project={{ project.id }}">タスク追加</a>
-</p>
-{% if project.task_set %}
-  <table>
-    <thead>
-      <tr>
-        <th>タスク名</th>
-        <th>担当者</th>
-        <th>ステータス</th>
-        <th>期日</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for task in project.task_set.all %}
-        {% if task.parent == None %}
-        <tr>
-          <td>
-            <a href="{% url 'task_detail' task.pk %}">
-              {{ task.title }}
-            </a>
-          </td>
-          <td>{{ task.assignee.username }}</td>
-          <td>{{ task.status.name }}</td>
-          <td>{{ task.deadline|date:"Y/m/d" }}</td>
-        </tr>
-        {% include "task_app/task_list_item.html" with tasks=task.tasks.all nest_count=1 %}
-        {% endif %}
-      {% endfor %}
-    </tbody>
-  </table>
-{% else %}
-  <p>プロジェクトはまだ登録されていません。</p>
-{% endif %}
+{% include "task_app/task_list_component.html" with tasks=tasks project=project status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
 {% endblock %}
