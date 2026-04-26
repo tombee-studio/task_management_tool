@@ -1,3 +1,4 @@
+import datetime
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
@@ -178,6 +179,8 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
     
     def form_valid(self, form):
         form.instance.author = self.request.user
+        form.instance.completed_at = datetime.datetime.now() \
+            if form.instance.status.is_done else None
         return super().form_valid(form)
 
 
@@ -195,6 +198,11 @@ class TaskUpdateView(LoginRequiredMixin, UpdateView):
         context["tasks"] = self.object.tasks.filter(
             status__in=selected_status_list)
         return context
+
+    def form_valid(self, form):
+        form.instance.completed_at = datetime.datetime.now() \
+            if form.instance.status.is_done else None
+        return super().form_valid(form)
 
 
 class TaskDeleteView(LoginRequiredMixin, DeleteView):
