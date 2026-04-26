@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load markdown_extras %}
 
 {% block content %}
 <h1>{{ task.name }}</h1>
@@ -7,6 +8,11 @@
   <tr>
     <th>タスク名</th>
     <td>{{ task.title }}</td>
+  </tr>
+
+  <tr>
+    <th>説明</th>
+    <td>{{ task.description|markdown|safe }}</td>
   </tr>
 
   <tr>
@@ -46,7 +52,7 @@
             </a>
           </td>
           <td>
-            {{ comment.description }}
+            {{ comment.description|markdown|safe }}
           </td>
           <td>{{ comment.author }}</td>
         </tr>

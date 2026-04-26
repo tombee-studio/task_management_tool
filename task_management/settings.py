@@ -66,6 +66,9 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            'libraries': {
+                'markdown_extras': 'task_app.markdown_extras'
+            }
         },
     },
 ]

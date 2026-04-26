@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load markdown_extras %}
 
 {% block content %}
 <h1>タスク#{{ comment.task.id }} {{ comment.task }}へのコメント</h1>
@@ -6,7 +7,7 @@
 <table>
   <tr>
     <th>コメント</th>
-    <td>{{ comment.description }}</td>
+    <td>{{ comment.description|markdown|safe }}</td>
   </tr>
 
   <tr>
