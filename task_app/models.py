@@ -3,8 +3,8 @@ from django.conf import settings
 
 
 class Project(models.Model):
-  created_at = models.DateField(auto_now_add=True)
-  updated_at = models.DateField(auto_now=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
   name = models.CharField(max_length=256, null=False, blank=False)
 
   def __str__(self):
@@ -12,8 +12,8 @@ class Project(models.Model):
 
 
 class Status(models.Model):
-  created_at = models.DateField(auto_now_add=True)
-  updated_at = models.DateField(auto_now=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
   name = models.CharField(max_length=128, null=False, blank=False)
   is_done = models.BooleanField(default=False)
   
@@ -22,8 +22,8 @@ class Status(models.Model):
 
 
 class Comment(models.Model):
-  created_at = models.DateField(auto_now_add=True)
-  updated_at = models.DateField(auto_now=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
   author = models.ForeignKey(
       settings.AUTH_USER_MODEL,
       on_delete=models.CASCADE
@@ -59,10 +59,10 @@ class Task(models.Model):
       on_delete=models.CASCADE,
       null=False
   )
-  created_at = models.DateField(auto_now_add=True)
-  updated_at = models.DateField(auto_now=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
   deadline = models.DateField(null=True, blank=True)
-  completed_at = models.DateField(null=True, blank=True)
+  completed_at = models.DateTimeField(null=True, blank=True)
   
   def __str__(self):
     return self.title
