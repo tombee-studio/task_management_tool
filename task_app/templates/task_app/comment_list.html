@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load markdown_extras %}
 
 {% block content %}
 <h1>コメント一覧</h1>
@@ -20,7 +21,7 @@
         <tr>
           <td>
             <a href="{% url 'comment_detail' comment.pk %}">
-              {{ comment.description }}
+              {{ comment.description|markdown|safe }}
             </a>
           </td>
           <td>{{ comment.created_at|date:"Y/m/d" }}</td>
