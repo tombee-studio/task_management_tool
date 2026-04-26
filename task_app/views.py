@@ -41,25 +41,33 @@ class ProjectCreateView(LoginRequiredMixin, CreateView):
     model = Project
     fields = ["name"]
     template_name = "task_app/project_form.html"
-    success_url = reverse_lazy("project_list")
+    
+    def get_success_url(self):
+        return reverse_lazy("project_detail", kwargs={"pk": self.object.pk})
 
 
 class ProjectUpdateView(LoginRequiredMixin, UpdateView):
     model = Project
     fields = ["name"]
     template_name = "task_app/project_form.html"
-    success_url = reverse_lazy("project_list")
+    
+    def get_success_url(self):
+        return reverse_lazy("project_detail", kwargs={"pk": self.kwargs["pk"]})
 
 
 class ProjectDeleteView(LoginRequiredMixin, DeleteView):
     model = Project
-    success_url = reverse_lazy("project_list")
-
+    
+    def get_success_url(self):
+        return reverse_lazy("project_list")
 
 class StatusListView(LoginRequiredMixin, ListView):
     model = Status
     template_name = "task_app/status_list.html"
     context_object_name = "status_list"
+    
+    def get_success_url(self):
+        return reverse_lazy("project_list")
 
 
 class StatusDetailView(LoginRequiredMixin, DetailView):
@@ -67,31 +75,35 @@ class StatusDetailView(LoginRequiredMixin, DetailView):
     template_name = "task_app/status_detail.html"
     context_object_name = "status"
 
+    def get_success_url(self):
+        return reverse_lazy("project_list")
 
 class StatusCreateView(LoginRequiredMixin, CreateView):
     model = Status
     fields = ["name", "is_done"]
     template_name = "task_app/status_form.html"
-    success_url = reverse_lazy("status_list")
 
+    def get_success_url(self):
+        return reverse_lazy("project_list")
 
 class StatusUpdateView(LoginRequiredMixin, UpdateView):
     model = Status
     fields = ["name", "is_done"]
     template_name = "task_app/status_form.html"
-    success_url = reverse_lazy("status_list")
 
+    def get_success_url(self):
+        return reverse_lazy("project_list")
 
 class StatusDeleteView(LoginRequiredMixin, DeleteView):
     model = Status
-    success_url = reverse_lazy("status_list")
 
+    def get_success_url(self):
+        return reverse_lazy("project_list")
 
 class CommentListView(LoginRequiredMixin, ListView):
     model = Comment
     template_name = "task_app/comment_list.html"
     context_object_name = "comments"
-
 
 class CommentDetailView(LoginRequiredMixin, DetailView):
     model = Comment
@@ -103,7 +115,6 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
     model = Comment
     fields = ["description", "task"]
     template_name = "task_app/comment_form.html"
-    success_url = reverse_lazy("comment_list")
     
     def get_initial(self):
         initial = super().get_initial()
@@ -118,28 +129,33 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
         form.instance.author = self.request.user
         return super().form_valid(form)
 
+    def get_success_url(self):
+        return reverse_lazy("project_list")
+
 
 class CommentUpdateView(LoginRequiredMixin, UpdateView):
     model = Comment
     fields = ["description", "task"]
     template_name = "task_app/comment_form.html"
-    success_url = reverse_lazy("comment_list")
     
     def form_valid(self, form):
         form.instance.author = self.request.user
         return super().form_valid(form)
 
+    def get_success_url(self):
+        return reverse_lazy("project_list")
 
 class CommentDeleteView(LoginRequiredMixin, DeleteView):
     model = Comment
     success_url = reverse_lazy("comment_list")
 
+    def get_success_url(self):
+        return reverse_lazy("project_list")
 
 class TaskListView(LoginRequiredMixin, ListView):
     model = Task
     template_name = "task_app/task_list.html"
     context_object_name = "tasks"
-
 
 class TaskDetailView(LoginRequiredMixin, DetailView):
     model = Task
@@ -154,14 +170,12 @@ class TaskDetailView(LoginRequiredMixin, DetailView):
         context["tasks"] = self.object.tasks.filter(
             status__in=selected_status_list)
         return context
-    
 
 
 class TaskCreateView(LoginRequiredMixin, CreateView):
     model = Task
     fields = "__all__"
     template_name = "task_app/task_form.html"
-    success_url = reverse_lazy("task_list")
     
     def get_initial(self):
         initial = super().get_initial()
@@ -183,12 +197,14 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
             if form.instance.status.is_done else None
         return super().form_valid(form)
 
+    def get_success_url(self):
+        return reverse_lazy("project_list")
+
 
 class TaskUpdateView(LoginRequiredMixin, UpdateView):
     model = Task
     fields = "__all__"
     template_name = "task_app/task_form.html"
-    success_url = reverse_lazy("task_list")
     
     def get_context_data(self, **kwargs):
         selected_status_list = self.request.GET.getlist("status")
@@ -204,7 +220,12 @@ class TaskUpdateView(LoginRequiredMixin, UpdateView):
             if form.instance.status.is_done else None
         return super().form_valid(form)
 
+    def get_success_url(self):
+        return reverse_lazy("project_list")
+
 
 class TaskDeleteView(LoginRequiredMixin, DeleteView):
     model = Task
-    success_url = reverse_lazy("task_list")
+    
+    def get_success_url(self):
+        return reverse_lazy("project_list")
