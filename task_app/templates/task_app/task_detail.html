@@ -25,4 +25,38 @@
   <a href="{% url 'task_delete' task.id %}">削除</a>
   <a href="{% url 'task_list' %}">一覧へ戻る</a>
 </p>
+
+{% include "task_app/task_list_component.html" with tasks=tasks task=task status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+
+{% if task.comment_set %}
+  <table>
+    <thead>
+      <tr>
+        <th>投稿日</th>
+        <th>コメント</th>
+        <th>投稿者</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for comment in task.comment_set.all %}
+        <tr>
+          <td>
+            <a href="{% url 'comment_detail' comment.pk %}">
+              {{ comment.created_at|date:"Y/m/d" }}
+            </a>
+          </td>
+          <td>
+            {{ comment.description }}
+          </td>
+          <td>{{ comment.author }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>コメントはまだ登録されていません。</p>
+{% endif %}
+<p>
+  <a href="{% url 'comment_create' %}?task={{ task.id }}">コメント</a>
+</p>
 {% endblock %}

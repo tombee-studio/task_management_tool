@@ -1,0 +1,12 @@
+{% for task in tasks %}
+<tr>
+  <td>
+    <a href="{% url 'task_detail' task.pk %}">
+      {{ task.title }}
+    </a>
+  </td>
+  <td>{{ task.assignee.username }}</td>
+  <td>{{ task.status.name }}</td>
+  <td>{{ task.deadline|date:"Y/m/d" }}</td>
+</tr>
+{% endfor %}

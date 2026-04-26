@@ -1,0 +1,34 @@
+<p>
+  {% if project %}
+  <a href="{% url 'task_create' %}?project={{ project.id }}">タスク追加</a>
+  {% elif task %}
+  <a href="{% url 'task_create' %}?task={{ task.id }}">タスク追加</a>
+  {% endif %}
+</p>
+<form method="get">
+  {% for status in status_list %}
+  <input 
+    type="checkbox" 
+    name="status" 
+    value="{{ status.pk }}"
+    {% if status.pk in selected_status_list %}checked{% endif %}>{{ status.name }}</input>
+  {% endfor %}
+  <button type="submit">更新</button>
+</form>
+{% if tasks %}
+  <table>
+    <thead>
+      <tr>
+        <th>タスク名</th>
+        <th>担当者</th>
+        <th>ステータス</th>
+        <th>期日</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% include "task_app/task_list_item.html" with tasks=tasks nest_count=0 %}
+    </tbody>
+  </table>
+{% else %}
+  <p>タスクはまだ登録されていません。</p>
+{% endif %}

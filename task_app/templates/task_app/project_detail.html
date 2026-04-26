@@ -26,6 +26,6 @@
   <a href="{% url 'project_list' %}">一覧へ戻る</a>
 </p>
 
-<h2>{{ project.name }}であなたに割り当てられているタスク</h2>
-
+<h2>{{ project.name }}のタスク一覧</h2>
+{% include "task_app/task_list_component.html" with tasks=tasks project=project status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
 {% endblock %}
