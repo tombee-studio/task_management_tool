@@ -1,0 +1,22 @@
+<table class="table">
+  <tr>
+    <th>プロジェクト名</th>
+    <td>{{ project.name }}</td>
+  </tr>
+
+  <tr>
+    <th>作成日</th>
+    <td>{{ project.created_at|date:"Y/m/d" }}</td>
+  </tr>
+
+  <tr>
+    <th>更新日</th>
+    <td>{{ project.updated_at|date:"Y/m/d" }}</td>
+  </tr>
+</table>
+
+<p>
+  <a href="{% url 'project_update' project.id %}">編集</a>
+  <a href="{% url 'project_delete' project.id %}">削除</a>
+  <a href="{% url 'project_list' %}">一覧へ戻る</a>
+</p>

@@ -1,0 +1,24 @@
+{% if projects %}
+<table class="table">
+  <thead>
+    <tr>
+      <th>プロジェクト名</th>
+      <th>作成日</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for project in projects %}
+      <tr>
+        <td>
+          <a href="{% url 'project_detail' project.pk %}?{{ status_filter }}">
+            {{ project.name }}
+          </a>
+        </td>
+        <td>{{ project.created_at|date:"Y/m/d" }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+  <p>プロジェクトはまだ登録されていません。</p>
+{% endif %}

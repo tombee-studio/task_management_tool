@@ -1,24 +1,8 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>{{ task.name }}</h1>
 
-<table>
-  <tr>
-    <th>タスク名</th>
-    <td>{{ task.name }}</td>
-  </tr>
-
-  <tr>
-    <th>作成日</th>
-    <td>{{ task.created_at|date:"Y/m/d" }}</td>
-  </tr>
-
-  <tr>
-    <th>更新日</th>
-    <td>{{ task.updated_at|date:"Y/m/d" }}</td>
-  </tr>
-</table>
+{% include "task_app/components/task_detail_component.html" with task=task %}
 
 <p>
   <form method="POST" action="{% url 'task_delete' task.id %}">

@@ -2,34 +2,5 @@
 {% load markdown_extras %}
 
 {% block content %}
-<h1>コメント一覧</h1>
-
-<p>
-  <a href="{% url 'comment_create' %}">新規コメント作成</a>
-</p>
-
-{% if comments %}
-  <table>
-    <thead>
-      <tr>
-        <th>コメント</th>
-        <th>作成日</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for comment in comments %}
-        <tr>
-          <td>
-            <a href="{% url 'comment_detail' comment.pk %}">
-              {{ comment.description|markdown|safe }}
-            </a>
-          </td>
-          <td>{{ comment.created_at|date:"Y/m/d" }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-{% else %}
-  <p>コメントはまだ登録されていません。</p>
-{% endif %}
+{% include "task_app/components/comment_list_component.html" with comments=comments %}
 {% endblock %}

@@ -1,0 +1,29 @@
+{% load markdown_extras %}
+<table class="table">
+  <tr>
+    <th>タスクID</th>
+    <td><a href="/task_app/tasks/30">#{{ task.pk }}</a></td>
+  </tr>
+  <tr>
+    <th>タスク名</th>
+    <td>{{ task.title }}</td>
+  </tr>
+  <tr>
+    <th>説明</th>
+    <td>{{ task.description|markdown:task.project|safe }}</td>
+  </tr>
+  <tr>
+    <th>作成日</th>
+    <td>{{ task.created_at|date:"Y/m/d" }}</td>
+  </tr>
+  <tr>
+    <th>更新日</th>
+    <td>{{ task.updated_at|date:"Y/m/d" }}</td>
+  </tr>
+</table>
+
+<p>
+  <a href="{% url 'task_update' task.id %}">編集</a>
+  <a href="{% url 'task_delete' task.id %}">削除</a>
+  <a href="{% url 'task_list' %}">一覧へ戻る</a>
+</p>

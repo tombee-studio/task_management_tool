@@ -19,7 +19,7 @@
   {% endif %}
 </div>
 
-{% include "task_app/task_list_component.html" with tasks=tasks task=task status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+{% include "task_app/components/task_list_component.html" with tasks=tasks task=task status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
 
 <p>
   <a href="{% url 'comment_create' %}?task={{ task.id }}">コメント</a>

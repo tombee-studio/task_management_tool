@@ -1,11 +1,15 @@
 from django.db import models
 from django.conf import settings
+from auditlog.models import AuditlogHistoryField
+from auditlog.registry import auditlog
 
 
 class Project(models.Model):
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
   name = models.CharField(max_length=256, null=False, blank=False)
+  git_url = models.URLField(null=True, blank=True)
+  history = AuditlogHistoryField()
 
   def __str__(self):
     return self.name
@@ -16,6 +20,7 @@ class Status(models.Model):
   updated_at = models.DateTimeField(auto_now=True)
   name = models.CharField(max_length=128, null=False, blank=False)
   is_done = models.BooleanField(default=False)
+  history = AuditlogHistoryField()
   
   def __str__(self):
     return self.name
@@ -34,6 +39,7 @@ class Comment(models.Model):
       on_delete=models.CASCADE,
       null=True
   )
+  history = AuditlogHistoryField()
 
 
 class Task(models.Model):
@@ -63,6 +69,12 @@ class Task(models.Model):
   updated_at = models.DateTimeField(auto_now=True)
   deadline = models.DateField(null=True, blank=True)
   completed_at = models.DateTimeField(null=True, blank=True)
+  history = AuditlogHistoryField()
   
   def __str__(self):
     return self.title
+
+auditlog.register(Project)
+auditlog.register(Comment)
+auditlog.register(Status)
+auditlog.register(Task)

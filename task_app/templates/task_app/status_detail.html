@@ -3,26 +3,6 @@
 {% block content %}
 <h1>{{ status.name }}</h1>
 
-<table>
-  <tr>
-    <th>ステータス名</th>
-    <td>{{ status.name }}</td>
-  </tr>
+{% include "task_app/components/status_detail_component.html" with status=status %}
 
-  <tr>
-    <th>作成日</th>
-    <td>{{ status.created_at|date:"Y/m/d" }}</td>
-  </tr>
-
-  <tr>
-    <th>更新日</th>
-    <td>{{ status.updated_at|date:"Y/m/d" }}</td>
-  </tr>
-</table>
-
-<p>
-  <a href="{% url 'status_update' status.id %}">編集</a>
-  <a href="{% url 'status_delete' status.id %}">削除</a>
-  <a href="{% url 'status_list' %}">一覧へ戻る</a>
-</p>
 {% endblock %}

@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-3ui0=$(!tta5er2ren&9#6znn6cz(iotq2!u@l&h_%6@=or-8p
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [ "*" ]
 
 
 # Application definition
@@ -37,7 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django_bootstrap5',
+    'bootstrap3',
     "auditlog",
     'task_app'
 ]
@@ -67,7 +67,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
             ],
             'libraries': {
-                'markdown_extras': 'task_app.markdown_extras'
+                'markdown_extras': 'task_app.extras'
             }
         },
     },
