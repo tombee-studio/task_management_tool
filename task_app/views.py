@@ -2,6 +2,7 @@ import datetime
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.db.models import Prefetch
 from .models import *
 
 
@@ -31,8 +32,13 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
         context["status_filter"] = "&".join(status_list)
         context["status_list"] = Status.objects.all()
         context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
-        context["tasks"] = self.object.task_set.filter(
-            status__in=selected_status_list)
+        context["tasks"] = self.object.task_set.filter(status__in=selected_status_list).prefetch_related(
+            Prefetch(
+                "tasks",
+                queryset=Task.objects.filter(status__in=selected_status_list),
+                to_attr="filtered_tasks",
+            )
+        )
 
         return context
 
@@ -162,8 +168,13 @@ class TaskListView(LoginRequiredMixin, ListView):
         selected_status_list = self.request.GET.getlist("status")
         context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
         context["status_list"] = Status.objects.all()
-        context["tasks"] = Task.objects.filter(
-            status__in=selected_status_list)
+        context["tasks"] = Task.objects.filter(status__in=selected_status_list).prefetch_related(
+            Prefetch(
+                "tasks",
+                queryset=Task.objects.filter(status__in=selected_status_list),
+                to_attr="filtered_tasks",
+            )
+        )
         return context
 
 class TaskDetailView(LoginRequiredMixin, DetailView):
