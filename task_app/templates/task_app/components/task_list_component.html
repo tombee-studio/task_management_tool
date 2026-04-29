@@ -1,12 +1,10 @@
-<p>
+<div class="panel-body">
   {% if project %}
-  <h2>{{ project.name }}のタスク一覧</h2>
   <a href="{% url 'task_create' %}?project={{ project.id }}">タスク追加</a>
   {% elif task %}
-  <h2>{{ task.title }}のサブタスク一覧</h2>
   <a href="{% url 'task_create' %}?task={{ task.id }}">タスク追加</a>
   {% endif %}
-</p>
+</div>
 {% if tasks %}
 <form method="get">
   {% for status in status_list %}
@@ -18,7 +16,7 @@
   {% endfor %}
   <button type="submit">更新</button>
 </form>
-<table>
+<table class="table">
   <thead>
     <tr>
       <th>タスク名</th>
@@ -32,5 +30,5 @@
   </tbody>
 </table>
 {% else %}
-  <p>タスクはまだ登録されていません。</p>
+<p>タスクはまだ登録されていません。</p>
 {% endif %}

@@ -2,10 +2,19 @@
 {% load markdown_extras %}
 
 {% block content %}
-<h1>#{{task.pk}} {{ task.title }}</h1>
 
-{% include "task_app/components/task_detail_component.html" with task=task %}
-
-{% include "task_app/components/task_list_component.html" with tasks=tasks task=object status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
-{% include "task_app/components/comment_list_component.html" with comments=object.comment_set.all task=object %}
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h1 class="panel-title">#{{task.pk}} {{ task.title }}</h1>
+  </div>
+  {% include "task_app/components/task_detail_component.html" with task=task %}
+  <div class="panel-heading">
+    <h1 class="panel-title">{{ task.title }}のサブタスク一覧</h1>
+  </div>
+  {% include "task_app/components/task_list_component.html" with tasks=tasks task=object status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+  <div class="panel-heading">
+    <h1 class="panel-title">コメント一覧</h1>
+  </div>
+  {% include "task_app/components/comment_list_component.html" with comments=object.comment_set.all task=object %}
+</div>
 {% endblock %}

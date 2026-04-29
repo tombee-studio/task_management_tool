@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>プロジェクト一覧</h1>
-
-{% include "task_app/components/project_list_component.html" with projects=projects %}
+<div class="panel panel-default">
+  <div class="panel-heading">プロジェクト一覧</div>
+  <div class="panel-body">
+    <p>
+      <a href="{% url 'project_create' %}">新規プロジェクト作成</a>
+    </p>
+  </div>
+  {% include "task_app/components/project_list_component.html" with projects=projects %}
+</div>
 {% endblock %}
