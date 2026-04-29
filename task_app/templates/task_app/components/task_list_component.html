@@ -16,19 +16,13 @@
   </form>
 </div>
 {% if tasks %}
-<table class="table">
-  <thead>
-    <tr>
-      <th>タスク名</th>
-      <th>担当者</th>
-      <th>ステータス</th>
-      <th>期日</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% include "task_app/components/task_list_item.html" with tasks=tasks nest_count=0 %}
-  </tbody>
-</table>
+<div class="list-group">
+  {% for child_task in tasks %}
+  {% if child_task.parent == None or child_task.parent.pk == task.pk %}
+  {% include "task_app/components/task_list_item.html" with task=child_task nest=16 %}
+  {% endif %}
+  {% endfor %}
+</div>
 {% else %}
 <p>タスクはまだ登録されていません。</p>
 {% endif %}
