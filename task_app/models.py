@@ -4,13 +4,6 @@ from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
 from tree_queries.query import TreeQuerySet
 
-class TaskQuerySet(TreeQuerySet):
-    def active(self):
-        return self.exclude(status__in=[
-            Task.Status.DONE,
-            Task.Status.CANCELLED,
-        ])
-
 
 class Project(models.Model):
   created_at = models.DateTimeField(auto_now_add=True)
@@ -79,7 +72,7 @@ class Task(models.Model):
   completed_at = models.DateTimeField(null=True, blank=True)
   history = AuditlogHistoryField()
   
-  objects = TaskQuerySet.as_manager(with_tree_fields=True)
+  objects = TreeQuerySet.as_manager(with_tree_fields=True)
   
   def __str__(self):
     return self.title
