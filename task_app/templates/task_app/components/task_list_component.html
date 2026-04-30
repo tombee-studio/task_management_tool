@@ -1,3 +1,5 @@
+{% load tree_queries %}
+
 <div class="panel-body">
   {% if project %}
   <a href="{% url 'task_create' %}?project={{ project.id }}">タスク追加</a>
@@ -17,11 +19,16 @@
 </div>
 {% if tasks %}
 <div class="list-group">
-  {% for child_task in tasks %}
-  {% if child_task.parent == None or child_task.parent.pk == task.pk %}
-  {% include "task_app/components/task_list_item.html" with task=child_task nest=16 %}
-  {% endif %}
-  {% endfor %}
+{% recursetree tasks %}
+  <div class="list-group-item 
+    list-group-item-action" 
+    style="padding-left: {{ nest }}px;">
+    {% include "task_app/components/task_list_item.html" with task=node nest=0 %}
+    <div class="list-group" style="margin: 0;">
+    {{ children }}
+    </div>
+  </div>
+{% endrecursetree %}
 </div>
 {% else %}
 <p>タスクはまだ登録されていません。</p>

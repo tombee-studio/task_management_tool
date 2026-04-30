@@ -10,4 +10,10 @@
   </div>
   {% include "task_app/components/project_list_component.html" with projects=projects %}
 </div>
+
+<div class="panel panel-default">
+  <div class="panel-heading">{{user.username}}が割り当てられているタスク</div>
+  {% include "task_app/components/task_list_component.html" with tasks=tasks %}
+</div>
+
 {% endblock %}

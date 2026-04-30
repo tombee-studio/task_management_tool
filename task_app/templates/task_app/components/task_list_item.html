@@ -1,31 +1,19 @@
-<div class="list-group-item 
-  list-group-item-action" 
-  style="padding-left: {{ nest }}px;">
-  
-  <div class="d-flex border rounded p-2">
-    <div class="flex-grow-1">
-      <a href="{% url 'task_detail' task.pk %}?{{ status_filter }}">
-        <strong>{{ task.title }}</strong>
-      </a>
-    </div>
-    <div class="text-end" style="width: 120px;">
-      <span class="badge bg-primary">{{ task.status.name }}</span>
-    </div>
-    {% if task.deadline %}
-    <div class="text-end" style="width: 200px;">
-      期日：{{ task.deadline|date:"Y/m/d" }}
-    </div>
-    {% else %}
-    <div class="text-end" style="width: 200px;">
-      期日が設定されていません
-    </div>
-    {% endif %}
+<div class="d-flex border rounded p-2">
+  <div class="flex-grow-1">
+    <a href="{% url 'task_detail' task.pk %}?{{ status_filter }}">
+      <strong>{{ task.title }}</strong>
+    </a>
   </div>
+  <div class="text-end" style="width: 120px;">
+    <span class="badge bg-primary">{{ task.status.name }}</span>
+  </div>
+  {% if task.deadline %}
+  <div class="text-end" style="width: 200px;">
+    期日：{{ task.deadline|date:"Y/m/d" }}
+  </div>
+  {% else %}
+  <div class="text-end" style="width: 200px;">
+    期日が設定されていません
+  </div>
+  {% endif %}
 </div>
-{% if task.filtered_tasks %}
-<div class="list-group" style="margin: 0;">
-{% for child_task in task.filtered_tasks %}
-{% include "task_app/components/task_list_item.html" with task=child_task nest=nest|add:16 %}
-{% endfor %}
-</div>
-{% endif %}
