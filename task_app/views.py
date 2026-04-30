@@ -11,7 +11,7 @@ class ProjectListView(LoginRequiredMixin, ListView):
     template_name = "task_app/project_list.html"
     context_object_name = "projects"
     
-    def get_context_data(self, **kwargs) -> dict[str, Any]:
+    def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
         status_list = list(map(lambda status: f"status={status.pk}", Status.objects.filter(is_done=False)))
         context["status_filter"] = "&".join(status_list)
@@ -176,7 +176,7 @@ class TaskListView(LoginRequiredMixin, ListView):
     template_name = "task_app/task_list.html"
     context_object_name = "tasks"
     
-    def get_context_data(self, **kwargs) -> dict[str, Any]:
+    def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
         selected_status_list = self.request.GET.getlist("status")
         context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
@@ -197,14 +197,23 @@ class TaskDetailView(LoginRequiredMixin, DetailView):
     model = Task
     template_name = "task_app/task_detail.html"
     
-    def get_context_data(self, **kwargs) -> dict[str, Any]:
+    def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
         context["object"] = self.object
         selected_status_list = self.request.GET.getlist("status")
         context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
         context["status_list"] = Status.objects.all()
+        context["status_filter"] = "&".join(list(map(lambda status: f"status={status}", selected_status_list)))
         context["tasks"] = self.object.tasks.filter(
             status__in=selected_status_list)
+
+        parent_objects = []
+        current = self.object
+        while current != None:
+            parent_objects.insert(0, current)
+            current = current.parent
+        context["parent_objects"] = parent_objects
+        
         return context
 
 
