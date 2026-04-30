@@ -190,6 +190,9 @@ class TaskListView(LoginRequiredMixin, ListView):
         )
         return context
 
+    def get_queryset(self):
+        return Task.objects.with_tree_fields()
+
 class TaskDetailView(LoginRequiredMixin, DetailView):
     model = Task
     template_name = "task_app/task_detail.html"
