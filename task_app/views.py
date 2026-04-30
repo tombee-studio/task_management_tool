@@ -15,6 +15,19 @@ class ProjectListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         status_list = list(map(lambda status: f"status={status.pk}", Status.objects.filter(is_done=False)))
         context["status_filter"] = "&".join(status_list)
+        active_status_list = Status.objects.filter(is_done=False)
+        context["status_list"] = Status.objects.all()
+        context["tasks"] = Task.objects.filter(
+            status__in=active_status_list, 
+            assignee=self.request.user)\
+                .prefetch_related(
+                    Prefetch(
+                        "tasks",
+                        queryset=Task.objects.filter(
+                            status__in=active_status_list, 
+                            assignee=self.request.user),
+                        to_attr="filtered_tasks",
+                    ))
         return context
     
 
