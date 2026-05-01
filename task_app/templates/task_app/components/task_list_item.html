@@ -1,24 +1,26 @@
 {% load markdown_extras %}
 
-<div class="d-flex border rounded p-2">
-  <div class="flex-grow-1">
-    <a href="{% url 'task_detail' task.pk %}?{{ status_filter }}">
-      <strong>{{ task.title }}</strong>
-    </a>
-  </div>
-  <div>
+<tr>
+  <td class="flex-grow-1">
+    <span class="tree-item" style="--depth: {{ task.tree_depth }};" >
+      <a href="{% url 'task_detail' task.pk %}?{{ status_filter }}">
+        <strong>{{ task.title }}</strong>
+      </a>
+    </span>
+  </td>
+  <td>
     {{ task.progress_summary|markdown:task.project|safe }}
-  </div>
-  <div class="text-end" style="width: 120px;">
+  </td>
+  <td class="text-end" style="width: 120px;">
     <span class="badge bg-primary">{{ task.status.name }}</span>
-  </div>
+  </td>
   {% if task.deadline %}
-  <div class="text-end" style="width: 200px;">
+  <td class="text-end" style="width: 200px;">
     期日：{{ task.deadline|date:"Y/m/d" }}
-  </div>
+  </td>
   {% else %}
-  <div class="text-end" style="width: 200px;">
+  <td class="text-end" style="width: 200px;">
     期日が設定されていません
-  </div>
+  </td>
   {% endif %}
-</div>
+</tr>

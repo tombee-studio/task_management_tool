@@ -18,17 +18,17 @@
   </form>
 </div>
 {% if tasks %}
-<div class="list-group">
-{% recursetree tasks %}
-  <div class="list-group-item 
-    list-group-item-action" 
-    style="padding-left: {{ nest }}px;">
-    {% include "task_app/components/task_list_item.html" with task=node nest=0 %}
-    <div class="list-group" style="margin: 0;">
+<table class="table">
+  <tr>
+    <th style="width: 35%;">タイトル</th>
+    <th style="width: 35%;">進捗状況</th>
+    <th style="width: 10%;">ステータス</th>
+    <th style="width: 20%;">期日</th>
+  </tr>
+  {% recursetree tasks %}
+    {% include "task_app/components/task_list_item.html" with task=node %}
     {{ children }}
-    </div>
-  </div>
-{% endrecursetree %}
+  {% endrecursetree %}
 </div>
 {% else %}
 <p>タスクはまだ登録されていません。</p>
