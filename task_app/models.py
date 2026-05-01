@@ -62,6 +62,10 @@ class Task(models.Model):
       null=True,
       blank=True
   )
+  related_tasks = models.ManyToManyField(
+    "Task",
+    symmetrical=True,
+    blank=True)
   status = models.ForeignKey(
       Status,
       on_delete=models.CASCADE,

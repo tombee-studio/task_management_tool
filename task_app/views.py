@@ -206,6 +206,8 @@ class TaskDetailView(LoginRequiredMixin, DetailView):
         context["status_filter"] = "&".join(list(map(lambda status: f"status={status}", selected_status_list)))
         context["tasks"] = self.object.tasks.filter(
             status__in=selected_status_list)
+        context["related_tasks"] = self.object.related_tasks.filter(
+            status__in=selected_status_list)
 
         parent_objects = []
         current = self.object

@@ -1,4 +1,11 @@
 {% load markdown_extras %}
+<div class="panel-body">
+  <p>
+    <a href="{% url 'task_update' task.id %}">編集</a>
+    <a href="{% url 'task_delete' task.id %}">削除</a>
+    <a href="{% url 'task_list' %}">一覧へ戻る</a>
+  </p>
+</div>
 <table class="table">
   <tr>
     <th>タスクID</th>
@@ -21,9 +28,3 @@
     <td>{{ task.updated_at|date:"Y/m/d" }}</td>
   </tr>
 </table>
-
-<p>
-  <a href="{% url 'task_update' task.id %}">編集</a>
-  <a href="{% url 'task_delete' task.id %}">削除</a>
-  <a href="{% url 'task_list' %}">一覧へ戻る</a>
-</p>
