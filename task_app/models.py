@@ -50,6 +50,7 @@ class Task(models.Model):
       on_delete=models.CASCADE
   )
   description = models.TextField(default="")
+  progress_summary = models.CharField(default="", max_length=256, null=False, blank=True)
   assignee = models.ForeignKey(
       settings.AUTH_USER_MODEL,
       on_delete=models.CASCADE
