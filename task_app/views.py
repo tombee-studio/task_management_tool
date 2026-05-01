@@ -1,3 +1,4 @@
+import re
 import datetime
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -5,6 +6,22 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from django.db.models import Prefetch
 from .models import *
 
+
+def preprocess_description(project, task, form):
+    form.instance.description = re.sub(
+            r'(commit:\s*([0-9a-zA-Z]+))', 
+            f"[\g<1>]({project.git_url})", form.instance.description)
+    m_iter = re.finditer(r'\#([0-9]+)', form.instance.description)
+    for m in m_iter:
+        other = Task.objects.get(pk=m.group(1))
+        if other != None:
+            task.related_tasks.add(other)
+    task.save()
+    form.instance.description = re.sub(
+        r'\#([0-9]+)', 
+        "[\#\g<1>](/task_app/tasks/\g<1>/)", 
+        form.instance.description)
+        
 
 class ProjectListView(LoginRequiredMixin, ListView):
     model = Project
@@ -146,6 +163,10 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
     
     def form_valid(self, form):
         form.instance.author = self.request.user
+        preprocess_description(
+            form.instance.task.project, 
+            form.instance.task, 
+            form)
         return super().form_valid(form)
 
     def get_success_url(self):
@@ -159,6 +180,10 @@ class CommentUpdateView(LoginRequiredMixin, UpdateView):
     
     def form_valid(self, form):
         form.instance.author = self.request.user
+        preprocess_description(
+            self.object.task.project, 
+            self.object.task, 
+            form)
         return super().form_valid(form)
 
     def get_success_url(self):
@@ -242,6 +267,10 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
         form.instance.author = self.request.user
         form.instance.completed_at = datetime.datetime.now() \
             if form.instance.status.is_done else None
+        preprocess_description(
+            form.instance.project,
+            form.instance, 
+            form)
         return super().form_valid(form)
 
     def get_success_url(self):
@@ -265,6 +294,7 @@ class TaskUpdateView(LoginRequiredMixin, UpdateView):
     def form_valid(self, form):
         form.instance.completed_at = datetime.datetime.now() \
             if form.instance.status.is_done else None
+        preprocess_description(self.object.project, self.object, form)
         return super().form_valid(form)
 
     def get_success_url(self):
