@@ -38,8 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'bootstrap3',
-    "auditlog",
-    "tree_queries",
+    'auditlog',
+    'tree_queries',
     'task_app'
 ]
 
