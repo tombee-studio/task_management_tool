@@ -4,6 +4,9 @@ django-auditlog==3.4.1
 django-bootstrap3==26.1
 django-tree-queries==0.24.0
 Markdown==3.10.2
+pip-licenses==5.5.5
+prettytable==3.17.0
 python-dateutil==2.9.0.post0
 six==1.17.0
 sqlparse==0.5.5
+wcwidth==0.6.0
