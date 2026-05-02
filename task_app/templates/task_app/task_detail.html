@@ -14,15 +14,31 @@
     {% endfor %}
   </ol>
 </div>
+
 <div class="panel panel-default">
   <div class="panel-heading">
-    <h1 class="panel-title">#{{task.pk}} {{ task.title }}</h1>
+    <h1 class="panel-title">
+      <strong>#{{task.pk}} {{ task.title }}</strong>
+    </h1>
   </div>
   {% include "task_app/components/task_detail_component.html" with task=task %}
+</div>
+
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h1 class="panel-title">{{ task.title }}の関連するタスク一覧</h1>
+  </div>
+  {% include "task_app/components/task_list_component.html" with tasks=object.related_tasks task=object status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+</div>
+
+<div class="panel panel-default">
   <div class="panel-heading">
     <h1 class="panel-title">{{ task.title }}のサブタスク一覧</h1>
   </div>
   {% include "task_app/components/task_list_component.html" with tasks=tasks task=object status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+</div>
+
+<div class="panel panel-default">
   <div class="panel-heading">
     <h1 class="panel-title">コメント一覧</h1>
   </div>
