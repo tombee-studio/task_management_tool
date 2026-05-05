@@ -1,0 +1,18 @@
+{% load markdown_extras %}
+<h2>タスク#{{ comment.task.id }} {{ comment.task }}へのコメント</h2>
+<table>
+  <tr>
+    <th>コメント</th>
+    <td>{{ comment.description|markdown:comment.task.project|safe }}</td>
+  </tr>
+
+  <tr>
+    <th>作成日</th>
+    <td>{{ comment.created_at|date:"Y/m/d" }}</td>
+  </tr>
+
+  <tr>
+    <th>更新日</th>
+    <td>{{ comment.updated_at|date:"Y/m/d" }}</td>
+  </tr>
+</table>

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>タスク一覧</h1>
+
+<p>
+  <a href="{% url 'task_create' %}">新規タスク作成</a>
+</p>
+
+{% include "task_app/components/task_list_component.html" with tasks=tasks status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+{% endblock %}

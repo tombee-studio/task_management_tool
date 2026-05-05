@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>ステータス一覧</h1>
+
+{% include "task_app/components/status_list_component.html" with status_list=status_list %}
+
+{% endblock %}

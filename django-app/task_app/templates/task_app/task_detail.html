@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load markdown_extras %}
+
+{% block content %}
+<div aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item active" aria-current="page">
+      <a href="{% url "project_detail" task.project.pk %}?{{ status_filter }}">{{ task.project.name }}</a>
+    </li>
+    {% for parent in parent_objects %}
+    <li class="breadcrumb-item active" aria-current="page">
+      <a href="{% url "task_detail" parent.pk %}?{{ status_filter }}">#{{ parent.pk }} {{ parent.title }}</a>
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h1 class="panel-title">
+      <strong>#{{task.pk}} {{ task.title }}</strong>
+    </h1>
+  </div>
+  {% include "task_app/components/task_detail_component.html" with task=task %}
+</div>
+
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h1 class="panel-title">{{ task.title }}の関連するタスク一覧</h1>
+  </div>
+  {% include "task_app/components/task_list_component.html" with tasks=object.related_tasks task=object status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+</div>
+
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h1 class="panel-title">{{ task.title }}のサブタスク一覧</h1>
+  </div>
+  {% include "task_app/components/task_list_component.html" with tasks=tasks task=object status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+</div>
+
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h1 class="panel-title">コメント一覧</h1>
+  </div>
+  {% include "task_app/components/comment_list_component.html" with comments=object.comment_set.all task=object %}
+</div>
+{% endblock %}

@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% load markdown_extras %}
+
+{% block content %}
+{% include "task_app/components/comment_list_component.html" with comments=comments %}
+{% endblock %}

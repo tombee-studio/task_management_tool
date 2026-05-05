@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h3 class="panel-title">{{ project.name }}</h3>
+  </div>
+  {% include "task_app/components/project_detail_component.html" with project=project %}
+  <div class="panel-heading">{{ project.name }}のタスク一覧</div>
+  {% include "task_app/components/task_list_component.html" with tasks=tasks project=project status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+</div>
+{% endblock %}

@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{ status.name }}</h1>
+
+{% include "task_app/components/status_detail_component.html" with status=status %}
+
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="panel panel-default">
+  <div class="panel-heading">プロジェクト一覧</div>
+  <div class="panel-body">
+    <p>
+      <a href="{% url 'project_create' %}">新規プロジェクト作成</a>
+    </p>
+  </div>
+  {% include "task_app/components/project_list_component.html" with projects=projects %}
+</div>
+
+<div class="panel panel-default">
+  <div class="panel-heading">{{user.username}}が割り当てられているタスク</div>
+  {% include "task_app/components/task_list_component.html" with tasks=tasks %}
+</div>
+
+<div class="panel panel-default">
+  <div class="panel-heading">{{user.username}}がウォッチしているタスク</div>
+  {% include "task_app/components/task_list_component.html" with tasks=watching_tasks %}
+</div>
+
+{% endblock %}

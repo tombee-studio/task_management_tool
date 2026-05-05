@@ -1,0 +1,21 @@
+{% extends "base_form.html" %}
+
+{% block header_links %}
+{% if object %}
+  <h1>プロジェクト編集</h1>
+{% else %}
+  <h1>プロジェクト作成</h1>
+{% endif %}
+{% endblock %}
+
+{% block form_button %}
+<div>
+  <button type="submit">保存</button>
+
+  {% if object %}
+    <a href="{% url 'project_detail' object.pk %}">キャンセル</a>
+  {% else %}
+    <a href="{% url 'project_list' %}">キャンセル</a>
+  {% endif %}
+</div>
+{% endblock %}
