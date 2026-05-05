@@ -50,6 +50,7 @@ class ProjectListView(LoginRequiredMixin, ListView):
                             assignee=self.request.user),
                         to_attr="filtered_tasks",
                     ))
+        context["watching_tasks"] = self.request.user.watches.all()
         return context
     
 

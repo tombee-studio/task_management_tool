@@ -16,4 +16,9 @@
   {% include "task_app/components/task_list_component.html" with tasks=tasks %}
 </div>
 
+<div class="panel panel-default">
+  <div class="panel-heading">{{user.username}}がウォッチしているタスク</div>
+  {% include "task_app/components/task_list_component.html" with tasks=watching_tasks %}
+</div>
+
 {% endblock %}
