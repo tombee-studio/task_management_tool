@@ -81,7 +81,7 @@ class ProjectCreateView(LoginRequiredMixin, CreateView):
 
 class ProjectUpdateView(LoginRequiredMixin, UpdateView):
     model = Project
-    fields = ["name"]
+    fields = "__all__"
     template_name = "task_app/project_form.html"
     
     def get_success_url(self):
