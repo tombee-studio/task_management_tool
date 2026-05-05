@@ -157,3 +157,7 @@ if DEBUG:
         LOGGING['loggers'][logger]['handlers'] = ['console']
 
 AUDITLOG_INCLUDE_ALL_MODELS = True
+
+LOGIN_REDIRECT_URL = "project_list"
+LOGOUT_REDIRECT_URL = "project_list"
+LOGIN_URL = "login"
