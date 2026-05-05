@@ -81,6 +81,12 @@ class Task(models.Model):
   updated_at = models.DateTimeField(auto_now=True)
   deadline = models.DateField(null=True, blank=True)
   completed_at = models.DateTimeField(null=True, blank=True)
+  watched = models.ManyToManyField(
+    settings.AUTH_USER_MODEL,
+    related_name="watches",
+    symmetrical=True,
+    null=True,
+    blank=True)
   history = AuditlogHistoryField()
   
   objects = TreeQuerySet.as_manager(with_tree_fields=True)
