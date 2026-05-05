@@ -2,6 +2,7 @@ import re
 import datetime
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.models import User
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, View
 from django.db.models import Prefetch
 from .models import *
@@ -344,10 +345,10 @@ class SignUpView(CreateView):
 
 class TaskWatchView(View):
     def post(self, request, *args, **kwargs):
-        task_pk = kwargs["pk"]
-        task = Task.objects.get(pk=task_pk)
-        task.watched.add(self.request.user)
-        print(task.watched)
+        user = User.objects.get(pk=request.user.pk)
+        pk = kwargs["pk"]
+        task = Task.objects.get(pk=pk)
+        user.watches.add(task)
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
@@ -357,9 +358,10 @@ class TaskWatchView(View):
 class TaskUnwatchView(View):
 
     def post(self, request, *args, **kwargs):
-        task_pk = kwargs["pk"]
-        task = Task.objects.get(pk=task_pk)
-        task.watched.remove(self.request.user)
+        user = User.objects.get(pk=request.user.pk)
+        pk = kwargs["pk"]
+        task = Task.objects.get(pk=pk)
+        user.watches.remove(task)
         return HttpResponseRedirect(self.get_success_url())
     
     def get_success_url(self):
