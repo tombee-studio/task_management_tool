@@ -14,13 +14,24 @@
   <td class="text-end" style="width: 120px;">
     <span class="badge bg-primary">{{ task.status.name }}</span>
   </td>
-  {% if task.deadline %}
   <td class="text-end" style="width: 200px;">
+    {% if task.deadline %}
     期日：{{ task.deadline|date:"Y/m/d" }}
-  </td>
-  {% else %}
-  <td class="text-end" style="width: 200px;">
+    {% else %}
     期日が設定されていません
+    {% endif %}
   </td>
+  <td>
+  {% if task in user.watches.all %}
+    <form method="POST" action="{% url 'task_unwatch' task.pk %}" style="display: inline-block;">
+      {% csrf_token %}
+      <button type="submit">ウォッチを外す</button>
+    </form>
+  {% else %}
+    <form method="POST" action="{% url 'task_watch' task.pk %}" style="display: inline-block;">
+      {% csrf_token %}
+      <button type="submit">ウォッチする</button>
+    </form>
   {% endif %}
+  </td>
 </tr>

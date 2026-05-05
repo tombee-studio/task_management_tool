@@ -2,7 +2,7 @@ import re
 import datetime
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, View
 from django.db.models import Prefetch
 from .models import *
 
@@ -340,3 +340,27 @@ class SignUpView(CreateView):
         login(self.request, user) # 認証
         self.object = user 
         return HttpResponseRedirect(self.get_success_url())
+
+
+class TaskWatchView(View):
+    def post(self, request, *args, **kwargs):
+        task_pk = kwargs["pk"]
+        task = Task.objects.get(pk=task_pk)
+        task.watched.add(self.request.user)
+        print(task.watched)
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_success_url(self):
+        return reverse_lazy("project_list")
+
+
+class TaskUnwatchView(View):
+
+    def post(self, request, *args, **kwargs):
+        task_pk = kwargs["pk"]
+        task = Task.objects.get(pk=task_pk)
+        task.watched.remove(self.request.user)
+        return HttpResponseRedirect(self.get_success_url())
+    
+    def get_success_url(self):
+        return reverse_lazy("project_list")
