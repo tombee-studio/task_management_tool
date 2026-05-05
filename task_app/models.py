@@ -13,6 +13,7 @@ class Project(models.Model):
   history = AuditlogHistoryField()
   participants = models.ManyToManyField(
     settings.AUTH_USER_MODEL,
+    related_name="projects",
     symmetrical=True,
     null=True,
     blank=True)

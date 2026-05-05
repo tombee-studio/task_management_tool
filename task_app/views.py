@@ -25,6 +25,10 @@ class ProjectListView(LoginRequiredMixin, ListView):
     template_name = "task_app/project_list.html"
     context_object_name = "projects"
     
+    def get_queryset(self):
+        return self.request.user.projects.all()
+    
+    
     def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
         status_list = list(map(lambda status: f"status={status.pk}", Status.objects.filter(is_done=False)))
@@ -72,11 +76,17 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
 
 class ProjectCreateView(LoginRequiredMixin, CreateView):
     model = Project
-    fields = ["name"]
+    fields = "__all__"
     template_name = "task_app/project_form.html"
     
     def get_success_url(self):
         return reverse_lazy("project_detail", kwargs={"pk": self.object.pk})
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        self.request.user.projects.add(self.object)
+        self.request.user.save()
+        return response
 
 
 class ProjectUpdateView(LoginRequiredMixin, UpdateView):
