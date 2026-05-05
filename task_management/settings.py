@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     'bootstrap3',
     'auditlog',
     'tree_queries',
-    'task_app'
+    'task_app',
+    'users.apps.UsersConfig',
 ]
 
 MIDDLEWARE = [
@@ -157,3 +158,4 @@ if DEBUG:
         LOGGING['loggers'][logger]['handlers'] = ['console']
 
 AUDITLOG_INCLUDE_ALL_MODELS = True
+AUTH_USER_MODEL = 'users.User'

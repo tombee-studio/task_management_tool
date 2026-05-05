@@ -11,6 +11,12 @@ class Project(models.Model):
   name = models.CharField(max_length=256, null=False, blank=False)
   git_url = models.URLField(null=True, blank=True)
   history = AuditlogHistoryField()
+  participants = models.ManyToManyField(
+    settings.AUTH_USER_MODEL,
+    related_name="projects",
+    symmetrical=True,
+    null=True,
+    blank=True)
 
   def __str__(self):
     return self.name
