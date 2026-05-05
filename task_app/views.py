@@ -6,6 +6,10 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from django.db.models import Prefetch
 from .models import *
 
+from django.contrib.auth import login
+from django.http import HttpResponseRedirect
+from .forms import SignUpForm
+
 
 def preprocess_description(project, _, form):
     form.instance.description = re.sub(
@@ -323,3 +327,15 @@ class TaskDeleteView(LoginRequiredMixin, DeleteView):
     
     def get_success_url(self):
         return reverse_lazy("project_list")
+
+
+class SignUpView(CreateView):
+    form_class = SignUpForm
+    template_name = "task_app/signup.html" 
+    success_url = reverse_lazy('project_list')
+
+    def form_valid(self, form):
+        user = form.save() # formの情報を保存
+        login(self.request, user) # 認証
+        self.object = user 
+        return HttpResponseRedirect(self.get_success_url())
