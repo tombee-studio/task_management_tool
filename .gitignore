@@ -3,3 +3,7 @@ migrations/
 __pycache__
 db.sqlite3
 .env
+
+.terraform*
+terraform.*
+response.json
