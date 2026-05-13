@@ -86,6 +86,11 @@ variable "superuser_password" {
   sensitive = true
 }
 
+variable "db_ssl_use" {
+  type    = string
+  default = "require"
+}
+
 locals {
   name      = "${var.project}-${var.stage}"
   db_port   = 5432
@@ -249,6 +254,7 @@ resource "aws_lambda_function" "web" {
       DB_PASSWORD = random_password.db.result
       DB_HOST     = aws_db_instance.db.address
       DB_PORT     = tostring(local.db_port)
+      DB_SSL_USE  = var.db_ssl_use
     }
   }
 
@@ -291,6 +297,7 @@ resource "aws_lambda_function" "migrate" {
       DB_PASSWORD = random_password.db.result
       DB_HOST     = aws_db_instance.db.address
       DB_PORT     = tostring(local.db_port)
+      DB_SSL_USE  = var.db_ssl_use
     }
   }
 
@@ -331,6 +338,7 @@ resource "aws_lambda_function" "createsuperuser" {
       DB_PASSWORD = random_password.db.result
       DB_HOST = aws_db_instance.db.address
       DB_PORT = tostring(local.db_port)
+      DB_SSL_USE  = var.db_ssl_use
 
       DJANGO_SUPERUSER_USERNAME = var.superuser_username
       DJANGO_SUPERUSER_EMAIL    = var.superuser_email
