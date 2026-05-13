@@ -14,8 +14,6 @@ class Project(models.Model):
   participants = models.ManyToManyField(
     settings.AUTH_USER_MODEL,
     related_name="projects",
-    symmetrical=True,
-    null=True,
     blank=True)
 
   def __str__(self):
