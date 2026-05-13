@@ -97,7 +97,7 @@ DATABASES = {
         "CONN_MAX_AGE": 0,
 
         "OPTIONS": {
-            "sslmode": "require",
+            "sslmode": os.environ["DB_SSL_USE"],
         },
     }
 }
