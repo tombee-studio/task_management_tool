@@ -12,7 +12,14 @@
   <style>
     body { padding-top: 50px; }
     .tree-item {
-      padding-left: calc(var(--depth) * 16px);
+      margin-left: calc(var(--depth) * 16px);
+    }
+
+    .line-clamp-1 {
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
   </style>
 
