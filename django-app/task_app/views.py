@@ -13,16 +13,19 @@ from .forms import SignUpForm
 
 
 def preprocess_description(project, _, form):
-    form.instance.description = re.sub(
-            r'(commit:\s*([0-9a-zA-Z]+))', 
-            f"[\g<1>]({project.git_url})", form.instance.description)
-    m_iter = re.finditer(r'\#([0-9]+)', form.instance.description)
-    form.instance.description = re.sub(
-        r'\#([0-9]+)', 
-        "[\#\g<1>](/task_app/tasks/\g<1>/)", 
-        form.instance.description)
-    return list(filter(lambda item: item != None,
-        map(lambda m: Task.objects.get(pk=m.group(1)), m_iter)))
+    # 時々エラーが発生しているようでリロードに時間がかかっているようなので
+    # 一旦対応を削除
+    # form.instance.description = re.sub(
+    #         r'(commit:\s*([0-9a-zA-Z]+))', 
+    #         f"[\g<1>]({project.git_url})", form.instance.description)
+    # m_iter = re.finditer(r'\#([0-9]+)', form.instance.description)
+    # form.instance.description = re.sub(
+    #     r'\#([0-9]+)', 
+    #     "[\#\g<1>](/task_app/tasks/\g<1>/)", 
+    #     form.instance.description)
+    # return list(filter(lambda item: item != None,
+    #     map(lambda m: Task.objects.get(pk=m.group(1)), m_iter)))
+    return []
         
 
 class ProjectListView(LoginRequiredMixin, ListView):
