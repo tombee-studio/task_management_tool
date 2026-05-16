@@ -179,14 +179,7 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
     
     def form_valid(self, form):
         form.instance.author = self.request.user
-        related_tasks = preprocess_description(
-            form.instance.task.project, 
-            form.instance.task, 
-            form)
-        response = super().form_valid(form)
-        self.object.task.related_tasks.add(*related_tasks)
-        self.object.task.save()
-        return response
+        return super().form_valid(form)
 
     def get_success_url(self):
         return reverse_lazy("project_list")
@@ -199,14 +192,7 @@ class CommentUpdateView(LoginRequiredMixin, UpdateView):
     
     def form_valid(self, form):
         form.instance.author = self.request.user
-        related_tasks = preprocess_description(
-            self.object.task.project, 
-            self.object.task, 
-            form)
-        response = super().form_valid(form)
-        self.object.task.related_tasks.add(*related_tasks)
-        self.object.task.save()
-        return response
+        return super().form_valid(form)
 
     def get_success_url(self):
         return reverse_lazy("project_list")
@@ -289,13 +275,7 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
         form.instance.author = self.request.user
         form.instance.completed_at = datetime.datetime.now() \
             if form.instance.status.is_done else None
-        related_tasks = preprocess_description(
-            form.instance.project,
-            form.instance, 
-            form)
-        response = super().form_valid(form)
-        self.object.related_tasks.add(*related_tasks)
-        return response
+        return super().form_valid(form)
 
     def get_success_url(self):
         return reverse_lazy("project_list")
@@ -318,10 +298,7 @@ class TaskUpdateView(LoginRequiredMixin, UpdateView):
     def form_valid(self, form):
         form.instance.completed_at = datetime.datetime.now() \
             if form.instance.status.is_done else None
-        related_tasks = preprocess_description(form.instance.project, form.instance, form)
-        response = super().form_valid(form)
-        self.object.related_tasks.add(*related_tasks)
-        return response
+        return super().form_valid(form)
 
     def get_success_url(self):
         return reverse_lazy("project_list")
