@@ -4,6 +4,7 @@ from task_app.models import Project
 
 
 class Event(models.Model):
+  name = models.CharField(max_length=128, default="", blank=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
   event_date = models.DateField(blank=False)
@@ -13,12 +14,12 @@ class Event(models.Model):
     on_delete=models.CASCADE, 
     null=False, 
     blank=False)
-  next_event = models.ForeignKey(
+  previous_event = models.ForeignKey(
     "Event", 
     null=True, 
     blank=True,
     on_delete=models.SET_NULL,
-    related_name="previous_event")
+    related_name="next_event")
 
 
 class Inventory(models.Model):
@@ -35,13 +36,13 @@ class Inventory(models.Model):
     null=False, 
     blank=False)
   
-  event = models.ManyToManyField(
+  events = models.ManyToManyField(
     Event,
-    through="InventoryPerEvent",
+    through="EventInventoryRelation",
     related_name="inventory_history")
 
 
-class InventoryPerEvent(models.Model):
+class EventInventoryRelation(models.Model):
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
