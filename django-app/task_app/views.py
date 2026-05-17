@@ -175,7 +175,7 @@ class CommentDetailView(LoginRequiredMixin, DetailView):
         return Comment.objects.filter(
             Q(author=self.request.user) |
             Q(task__project__participants=self.request.user)
-        )
+        ).distinct()
 
 
 class CommentCreateView(LoginRequiredMixin, CreateView):
@@ -209,7 +209,7 @@ class CommentUpdateView(LoginRequiredMixin, UpdateView):
         return Comment.objects.filter(
             Q(author=self.request.user) |
             Q(task__project__participants=self.request.user)
-        )
+        ).distinct()
     
     def form_valid(self, form):
         form.instance.author = self.request.user
@@ -225,7 +225,7 @@ class CommentDeleteView(LoginRequiredMixin, DeleteView):
         return Comment.objects.filter(
             Q(author=self.request.user) |
             Q(task__project__participants=self.request.user)
-        )
+        ).distinct()
 
     def get_success_url(self):
         return reverse_lazy("project_list")
