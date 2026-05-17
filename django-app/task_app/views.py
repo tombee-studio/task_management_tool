@@ -4,7 +4,7 @@ from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, View
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from .models import *
 
 from django.contrib.auth import login
@@ -63,6 +63,9 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
     model = Project
     template_name = "task_app/project_detail.html"
     context_object_name = "project"
+
+    def get_queryset(self):
+        return self.request.user.projects.all()
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -102,13 +105,19 @@ class ProjectUpdateView(LoginRequiredMixin, UpdateView):
     model = Project
     fields = "__all__"
     template_name = "task_app/project_form.html"
+
+    def get_queryset(self):
+        return self.request.user.projects.all()
     
     def get_success_url(self):
-        return reverse_lazy("project_detail", kwargs={"pk": self.kwargs["pk"]})
+        return reverse_lazy("project_detail", kwargs={"pk": self.object.pk})
 
 
 class ProjectDeleteView(LoginRequiredMixin, DeleteView):
     model = Project
+
+    def get_queryset(self):
+        return self.request.user.projects.all()
     
     def get_success_url(self):
         return reverse_lazy("project_list")
@@ -162,6 +171,12 @@ class CommentDetailView(LoginRequiredMixin, DetailView):
     template_name = "task_app/comment_detail.html"
     context_object_name = "comment"
 
+    def get_queryset(self):
+        return Comment.objects.filter(
+            Q(author=self.request.user) |
+            Q(task__project__participants=self.request.user)
+        )
+
 
 class CommentCreateView(LoginRequiredMixin, CreateView):
     model = Comment
@@ -189,6 +204,12 @@ class CommentUpdateView(LoginRequiredMixin, UpdateView):
     model = Comment
     fields = ["description", "task"]
     template_name = "task_app/comment_form.html"
+
+    def get_queryset(self):
+        return Comment.objects.filter(
+            Q(author=self.request.user) |
+            Q(task__project__participants=self.request.user)
+        )
     
     def form_valid(self, form):
         form.instance.author = self.request.user
@@ -199,7 +220,12 @@ class CommentUpdateView(LoginRequiredMixin, UpdateView):
 
 class CommentDeleteView(LoginRequiredMixin, DeleteView):
     model = Comment
-    success_url = reverse_lazy("comment_list")
+
+    def get_queryset(self):
+        return Comment.objects.filter(
+            Q(author=self.request.user) |
+            Q(task__project__participants=self.request.user)
+        )
 
     def get_success_url(self):
         return reverse_lazy("project_list")
@@ -229,10 +255,15 @@ class TaskListView(LoginRequiredMixin, ListView):
 class TaskDetailView(LoginRequiredMixin, DetailView):
     model = Task
     template_name = "task_app/task_detail.html"
+
+    def get_queryset(self):
+        return Task.objects.filter(
+            Q(project__participants=self.request.user) |
+            Q(assignee=self.request.user)
+        ).distinct()
     
     def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
-        context["object"] = self.object
         selected_status_list = self.request.GET.getlist("status")
         context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
         context["status_list"] = Status.objects.all()
@@ -266,8 +297,14 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
         if project:
             initial["project"] = project
         if task:
-            initial["project"] = Task.objects.get(pk=task).project.pk
-            initial["parent"] = task
+            parent_task = Task.objects.filter(
+                Q(project__participants=self.request.user) |
+                Q(assignee=self.request.user),
+                pk=task,
+            ).distinct().first()
+            if parent_task:
+                initial["project"] = parent_task.project.pk
+                initial["parent"] = task
 
         return initial
     
@@ -285,6 +322,12 @@ class TaskUpdateView(LoginRequiredMixin, UpdateView):
     model = Task
     fields = "__all__"
     template_name = "task_app/task_form.html"
+
+    def get_queryset(self):
+        return Task.objects.filter(
+            Q(project__participants=self.request.user) |
+            Q(assignee=self.request.user)
+        ).distinct()
     
     def get_context_data(self, **kwargs):
         selected_status_list = self.request.GET.getlist("status")
@@ -306,6 +349,12 @@ class TaskUpdateView(LoginRequiredMixin, UpdateView):
 
 class TaskDeleteView(LoginRequiredMixin, DeleteView):
     model = Task
+
+    def get_queryset(self):
+        return Task.objects.filter(
+            Q(project__participants=self.request.user) |
+            Q(assignee=self.request.user)
+        ).distinct()
     
     def get_success_url(self):
         return reverse_lazy("project_list")
@@ -327,8 +376,13 @@ class TaskWatchView(View):
     def post(self, request, *args, **kwargs):
         user = User.objects.get(pk=request.user.pk)
         pk = kwargs["pk"]
-        task = Task.objects.get(pk=pk)
-        user.watches.add(task)
+        task = Task.objects.filter(
+            Q(project__participants=request.user) |
+            Q(assignee=request.user),
+            pk=pk,
+        ).first()
+        if task:
+            user.watches.add(task)
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
@@ -340,8 +394,13 @@ class TaskUnwatchView(View):
     def post(self, request, *args, **kwargs):
         user = User.objects.get(pk=request.user.pk)
         pk = kwargs["pk"]
-        task = Task.objects.get(pk=pk)
-        user.watches.remove(task)
+        task = Task.objects.filter(
+            Q(project__participants=request.user) |
+            Q(assignee=request.user),
+            pk=pk,
+        ).first()
+        if task:
+            user.watches.remove(task)
         return HttpResponseRedirect(self.get_success_url())
     
     def get_success_url(self):
