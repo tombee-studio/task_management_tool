@@ -1,3 +1,8 @@
+{% if events|length == 0 %}
+<div class="panel-body">
+  <a href="{% url 'event_create' %}">イベントを追加</a>
+</div>
+{% else %}
 <table class="table">
   <thead>
     <tr>
@@ -18,3 +23,4 @@
     {% endfor %}
   </tbody>
 </table>
+{% endif %}

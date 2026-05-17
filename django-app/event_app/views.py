@@ -34,7 +34,7 @@ class EventCreateView(LoginRequiredMixin, CreateView):
     
     def get_initial(self):
         initial = super().get_initial()
-        pk = self.request.GET["previous"]
+        pk = self.request.GET.get("previous", None)
         if pk != None:
           previous = Event.objects.get(pk=pk)
           initial.update(model_to_dict(previous))
