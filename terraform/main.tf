@@ -58,7 +58,7 @@ variable "django_secret_key" {
 
 variable "allowed_hosts" {
   type    = string
-  default = "*"
+  default = ""
 }
 
 variable "image_tag" {
@@ -246,7 +246,7 @@ resource "aws_lambda_function" "web" {
     variables = {
       DJANGO_SETTINGS_MODULE = "task_management.settings"
       DJANGO_SECRET_KEY      = var.django_secret_key
-      ALLOWED_HOSTS          = "${aws_api_gateway_rest_api.api.id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
+      ALLOWED_HOSTS          = trimspace(var.allowed_hosts) != "" ? var.allowed_hosts : "${aws_api_gateway_rest_api.api.id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
       DEBUG          = var.debug_mode
 
       DB_NAME     = var.db_name
@@ -289,7 +289,7 @@ resource "aws_lambda_function" "migrate" {
     variables = {
       DJANGO_SETTINGS_MODULE = "task_management.settings"
       DJANGO_SECRET_KEY      = var.django_secret_key
-      ALLOWED_HOSTS          = "${aws_api_gateway_rest_api.api.id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
+      ALLOWED_HOSTS          = trimspace(var.allowed_hosts) != "" ? var.allowed_hosts : "${aws_api_gateway_rest_api.api.id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
       DEBUG          = var.debug_mode
 
       DB_NAME     = var.db_name
@@ -331,7 +331,7 @@ resource "aws_lambda_function" "createsuperuser" {
     variables = {
       DJANGO_SETTINGS_MODULE = "task_management.settings"
       DJANGO_SECRET_KEY = var.django_secret_key
-      ALLOWED_HOSTS = "${aws_api_gateway_rest_api.api.id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
+      ALLOWED_HOSTS = trimspace(var.allowed_hosts) != "" ? var.allowed_hosts : "${aws_api_gateway_rest_api.api.id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
 
       DB_NAME = var.db_name
       DB_USER = var.db_username
