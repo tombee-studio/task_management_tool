@@ -1,5 +1,5 @@
 import re
-import datetime
+from django.utils import timezone
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
@@ -335,7 +335,7 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
                 form.instance.parent = parent_task
                 form.instance.project = parent_task.project
 
-        form.instance.completed_at = datetime.datetime.now() \
+        form.instance.completed_at = timezone.now() \
             if form.instance.status.is_done else None
         return super().form_valid(form)
 
@@ -364,7 +364,7 @@ class TaskUpdateView(LoginRequiredMixin, UpdateView):
         return context
 
     def form_valid(self, form):
-        form.instance.completed_at = datetime.datetime.now() \
+        form.instance.completed_at = timezone.now() \
             if form.instance.status.is_done else None
         return super().form_valid(form)
 
