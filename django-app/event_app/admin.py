@@ -6,10 +6,10 @@ class EventInventoryRelationInline(admin.TabularInline):
     extra = 1
 
 
-class InventoryAdmin(admin.ModelAdmin):
+class EventAdmin(admin.ModelAdmin):
     inlines = [EventInventoryRelationInline]
 
 
 # Register your models here.
-admin.site.register(Event)
-admin.site.register(Inventory, InventoryAdmin)
+admin.site.register(Event, EventAdmin)
+admin.site.register(Inventory)
