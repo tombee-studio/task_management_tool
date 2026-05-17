@@ -1,0 +1,94 @@
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h3 class="panel-title">{{ object.name }}</h3>
+  </div>
+  <table class="table">
+    <tr>
+      <th>イベント名</th>
+      <td>{{ event.name }}</td>
+    </tr>
+    <tr>
+      <th>開催日</th>
+      <td>{{ event.event_date|date:"Y/m/d" }}</td>
+    </tr>
+    <tr>
+      <th>前回</th>
+      <td>
+        {% if event.previous_event.pk %}
+          <a href="{% url 'event_detail' pk=event.previous_event.pk %}">{{event.previous_event.name}}</a>
+        {% else %}
+          ー
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <th>次回</th>
+      <td>
+        {% if event.next_event.pk %}
+          <a href="{% url 'event_detail' pk=event.next_event.pk %}">{{event.next_event.name}}</a>
+        {% else %}
+          ー
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+  {% if not event.next_event %}
+  <div class="panel-body">
+    <a href="{% url 'event_create' %}?previous={{ object.pk }}">次回のイベントを追加</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h3 class="panel-title">{{ object.name }}の在庫</h3>
+  </div>
+  <table class="table">
+    <tr>
+      <th rowspan="2" style="width: 20%;">販売会社</th>
+      <th rowspan="2" style="width: 40%;">品名</th>
+      <th colspan="2" style="width: 20%;">開催前</th>
+      <th colspan="2" style="width: 20%;">開催後</th>
+    </tr>
+    <tr>
+      <th>1ケースあたりの個数</th>
+      <th>個数</th>
+      <th>1ケースあたりの個数</th>
+      <th>個数</th>
+    </tr>
+    {% for item in inventory %}
+    <tr>
+      <td>{{item.company}}</td>
+      <td>{{item.name}}</td>
+      <td>
+        {% if item.previous_case_count %}
+        {{ item.previous_case_count }}
+        {% else %}
+        ー
+        {% endif %}
+      </td>
+      <td>
+        {% if item.previous_item_count %}
+        {{ item.previous_item_count }}
+        {% else %}
+        ー
+        {% endif %}
+      </td>
+      <td>
+        {% if item.current_case_count %}
+        {{item.current_case_count}}
+        {% else %}
+        ー
+        {% endif %}
+      </td>
+      <td>
+        {% if item.current_item_count %}
+        {{item.current_item_count}}
+        {% else %}
+        ー
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
