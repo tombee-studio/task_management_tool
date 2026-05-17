@@ -1,0 +1,55 @@
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h3 class="panel-title">{{ object.name }}の在庫</h3>
+  </div>
+  <table class="table">
+    <tr>
+      <th rowspan="2" style="width: 20%;">販売会社</th>
+      <th rowspan="2" style="width: 45%;">品名</th>
+      <th rowspan="2" style="width: 15%;">1ケースあたりの個数</th>
+      <th colspan="2" style="width: 10%;">計量前</th>
+      <th colspan="2" style="width: 10%;">計量後</th>
+    </tr>
+    <tr>
+      <th>ケース</th>
+      <th>個数</th>
+      <th>ケース</th>
+      <th>個数</th>
+    </tr>
+    {% for item in items %}
+    <tr>
+      <td>{{item.company}}</td>
+      <td>{{item.name}}</td>
+      <td>{{item.count_per_case}}</td>
+      <td>
+        {% if item.previous_case_count or item.previous_case_count == 0 %}
+        {{ item.previous_case_count }}
+        {% else %}
+        ー
+        {% endif %}
+      </td>
+      <td>
+        {% if item.previous_item_count or item.previous_item_count == 0 %}
+        {{ item.previous_item_count }}
+        {% else %}
+        ー
+        {% endif %}
+      </td>
+      <td>
+        {% if item.current_case_count or item.current_case_count == 0 %}
+        {{item.current_case_count}}
+        {% else %}
+        ー
+        {% endif %}
+      </td>
+      <td>
+        {% if item.current_item_count or item.current_item_count == 0 %}
+        {{item.current_item_count}}
+        {% else %}
+        ー
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
