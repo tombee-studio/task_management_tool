@@ -1,0 +1,26 @@
+{% if events|length == 0 %}
+<div class="panel-body">
+  <a href="{% url 'event_create' %}">イベントを追加</a>
+</div>
+{% else %}
+<table class="table">
+  <thead>
+    <tr>
+      <th>イベント</th>
+      <th>開催日</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for event in events %}
+      <tr>
+        <td>
+          <a href="{% url 'event_detail' event.pk %}">
+            {{ event.name }}
+          </a>
+        </td>
+        <td>{{ event.event_date|date:"Y/m/d" }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}

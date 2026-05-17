@@ -44,7 +44,8 @@ INSTALLED_APPS = [
     'bootstrap3',
     'auditlog',
     'tree_queries',
-    'task_app'
+    'task_app',
+    'event_app'
 ]
 
 MIDDLEWARE = [
