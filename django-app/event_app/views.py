@@ -67,7 +67,7 @@ class InventoryDetailView(LoginRequiredMixin, DetailView):
     
     def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
-        context["items"] = Inventory.get_previous_difference(inventory=self.object)
+        context["items"] = self.object.get_previous_difference()
         return context
     
 
