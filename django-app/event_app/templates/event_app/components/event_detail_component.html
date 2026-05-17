@@ -41,6 +41,33 @@
 
 <div class="panel panel-default">
   <div class="panel-heading">
+    <h3 class="panel-title">在庫確認履歴</h3>
+  </div>
+{% if object.inventory_set.all|length > 0 %}
+  <table class="table">
+    <tr>
+      <th style="width: 30%;">記録日時</th>
+      <th style="width: 70%;">ラベル</th>
+    </tr>
+    {% for inventory in object.inventory_set.all %}
+    <tr>
+      <td style="width: 30%;">
+        <a href="{% url "inventory_detail" pk=inventory.pk %}">{{ inventory.created_at|date:"Y/m/d H:i:s" }}</a>
+      </th>
+      <td style="width: 70%;">{{ inventory.name }}</th>
+    </tr>
+    {% endfor %}
+  </table>
+{% else %}
+  <div class="panel-body">
+    <a href="{% url 'inventory_create' %}">在庫確認履歴を追加</a>
+  </div>
+{% endif %}
+</div>
+
+{% comment %}
+<div class="panel panel-default">
+  <div class="panel-heading">
     <h3 class="panel-title">{{ object.name }}の在庫</h3>
   </div>
   <table class="table">
@@ -92,3 +119,4 @@
     {% endfor %}
   </table>
 </div>
+{% endcomment %}

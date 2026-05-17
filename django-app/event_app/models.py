@@ -19,13 +19,6 @@ class Event(models.Model):
     blank=True,
     on_delete=models.SET_NULL,
     related_name="next_event")
-  inventory = models.ManyToManyField(
-    "Inventory",
-    null=True, 
-    blank=True,
-    through="EventInventoryRelation",
-    related_name="events"
-  )
   
   def get_previous_difference(event):
     """
@@ -38,11 +31,11 @@ class Event(models.Model):
     """
     previous_event = event.previous_event
 
-    current_relations = EventInventoryRelation.objects.filter(
+    current_relations = InventoryItemRelation.objects.filter(
         event=event
     )
 
-    previous_relations = EventInventoryRelation.objects.filter(
+    previous_relations = InventoryItemRelation.objects.filter(
         event=previous_event
     )
     
@@ -74,31 +67,41 @@ class Event(models.Model):
 class Inventory(models.Model):
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
+  name = models.CharField(max_length=128, default="", blank=True)
+  event = models.ForeignKey(Event, on_delete=models.CASCADE, blank=True)
+  items = models.ManyToManyField(
+    "Item",
+    null=True, 
+    blank=True,
+    through="InventoryItemRelation",
+    related_name="inventory"
+  )
+  
+  def __str__(self):
+      return f"{self.name}"
+
+
+class Item(models.Model):
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
   
   company = models.CharField(max_length=128, blank=True)
   name = models.CharField(max_length=128, blank=True)
   count_per_case = models.IntegerField(blank=True, default=1)
   
-  project = models.ForeignKey(
-    Project, 
-    on_delete=models.CASCADE, 
-    null=False, 
-    blank=False)
-  
   def __str__(self):
       return f"{self.company} {self.name}"
   
 
-
-class EventInventoryRelation(models.Model):
+class InventoryItemRelation(models.Model):
   class Meta:
-    unique_together = ('event', 'inventory')
+    unique_together = ('item', 'inventory')
 
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
-  event = models.ForeignKey(
-    Event, 
+  item = models.ForeignKey(
+    Item, 
     on_delete=models.CASCADE, 
     null=False, 
     blank=False)
