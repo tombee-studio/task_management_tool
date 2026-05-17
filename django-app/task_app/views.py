@@ -9,7 +9,7 @@ from .models import *
 
 from django.contrib.auth import login
 from django.http import HttpResponseRedirect
-from .forms import SignUpForm
+from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm
 
 
 def preprocess_description(project, _, form):
@@ -88,7 +88,7 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
 
 class ProjectCreateView(LoginRequiredMixin, CreateView):
     model = Project
-    fields = "__all__"
+    fields = ["name", "git_url"]
     template_name = "task_app/project_form.html"
     
     def get_success_url(self):
@@ -103,7 +103,7 @@ class ProjectCreateView(LoginRequiredMixin, CreateView):
 
 class ProjectUpdateView(LoginRequiredMixin, UpdateView):
     model = Project
-    fields = "__all__"
+    form_class = ProjectForm
     template_name = "task_app/project_form.html"
 
     def get_queryset(self):
@@ -180,7 +180,7 @@ class CommentDetailView(LoginRequiredMixin, DetailView):
 
 class CommentCreateView(LoginRequiredMixin, CreateView):
     model = Comment
-    fields = ["description", "task"]
+    form_class = CommentForm
     template_name = "task_app/comment_form.html"
     
     def get_initial(self):
@@ -202,7 +202,7 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
 
 class CommentUpdateView(LoginRequiredMixin, UpdateView):
     model = Comment
-    fields = ["description", "task"]
+    form_class = CommentForm
     template_name = "task_app/comment_form.html"
 
     def get_queryset(self):
@@ -285,17 +285,21 @@ class TaskDetailView(LoginRequiredMixin, DetailView):
 
 class TaskCreateView(LoginRequiredMixin, CreateView):
     model = Task
-    fields = "__all__"
+    form_class = TaskForm
     template_name = "task_app/task_form.html"
     
     def get_initial(self):
         initial = super().get_initial()
 
-        project = self.request.GET.get("project")
+        project_id = self.request.GET.get("project")
         task = self.request.GET.get("task")
-        initial["assignee"] = self.request.user
-        if project:
-            initial["project"] = project
+        if project_id:
+            project = Project.objects.filter(
+                pk=project_id,
+                participants=self.request.user
+            ).first()
+            if project:
+                initial["project"] = project.pk
         if task:
             parent_task = Task.objects.filter(
                 Q(project__participants=self.request.user) |
@@ -309,7 +313,28 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
         return initial
     
     def form_valid(self, form):
-        form.instance.author = self.request.user
+        project_id = self.request.GET.get("project")
+        task = self.request.GET.get("task")
+
+        form.instance.assignee = self.request.user
+        if project_id:
+            project = Project.objects.filter(
+                pk=project_id,
+                participants=self.request.user
+            ).first()
+            if project:
+                form.instance.project = project
+
+        if task:
+            parent_task = Task.objects.filter(
+                Q(project__participants=self.request.user) |
+                Q(assignee=self.request.user),
+                pk=task,
+            ).distinct().first()
+            if parent_task:
+                form.instance.parent = parent_task
+                form.instance.project = parent_task.project
+
         form.instance.completed_at = datetime.datetime.now() \
             if form.instance.status.is_done else None
         return super().form_valid(form)
@@ -320,7 +345,7 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
 
 class TaskUpdateView(LoginRequiredMixin, UpdateView):
     model = Task
-    fields = "__all__"
+    form_class = TaskForm
     template_name = "task_app/task_form.html"
 
     def get_queryset(self):
