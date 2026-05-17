@@ -2,12 +2,21 @@ from django import forms
 from .models import * 
 
 class EventForm(forms.ModelForm):
+    event_date = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date'})
+    )
+
     class Meta:
         model = Event
-        exclude = ("inventory",)
+        fields = '__all__'
 
-EventInventoryFormSet = forms.inlineformset_factory(
-    Event,
-    EventInventoryRelation,
-    fields=("inventory", "case_count", "item_count"),
+class InventoryForm(forms.ModelForm):
+    class Meta:
+        model = Inventory
+        fields = '__all__'
+
+InventoryItemFormSet = forms.inlineformset_factory(
+    Inventory,
+    InventoryItemRelation,
+    fields=("item", "case_count", "item_count"),
     extra=1)

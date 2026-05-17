@@ -41,54 +41,32 @@
 
 <div class="panel panel-default">
   <div class="panel-heading">
-    <h3 class="panel-title">{{ object.name }}の在庫</h3>
+    <h3 class="panel-title">在庫確認履歴</h3>
   </div>
+{% if object.inventory_set.all|length > 0 %}
   <table class="table">
     <tr>
-      <th rowspan="2" style="width: 20%;">販売会社</th>
-      <th rowspan="2" style="width: 40%;">品名</th>
-      <th colspan="2" style="width: 20%;">開催前</th>
-      <th colspan="2" style="width: 20%;">開催後</th>
+      <th style="width: 30%;">記録日時</th>
+      <th style="width: 60%;">ラベル</th>
+      <th style="width: 10%;"></th>
     </tr>
+    {% for inventory in object.inventory_set.all %}
     <tr>
-      <th>1ケースあたりの個数</th>
-      <th>個数</th>
-      <th>1ケースあたりの個数</th>
-      <th>個数</th>
-    </tr>
-    {% for item in inventory %}
-    <tr>
-      <td>{{item.company}}</td>
-      <td>{{item.name}}</td>
       <td>
-        {% if item.previous_case_count %}
-        {{ item.previous_case_count }}
-        {% else %}
-        ー
-        {% endif %}
+        <a href="{% url "inventory_detail" pk=inventory.pk %}">{{ inventory.created_at|date:"Y/m/d H:i:s" }}</a>
       </td>
+      <td>{{ inventory.name }}</th>
       <td>
-        {% if item.previous_item_count %}
-        {{ item.previous_item_count }}
-        {% else %}
-        ー
-        {% endif %}
-      </td>
-      <td>
-        {% if item.current_case_count %}
-        {{item.current_case_count}}
-        {% else %}
-        ー
-        {% endif %}
-      </td>
-      <td>
-        {% if item.current_item_count %}
-        {{item.current_item_count}}
-        {% else %}
-        ー
+        {% if not inventory.next_inventory %}
+        <a href="{% url "inventory_create" %}?previous={{inventory.pk}}">在庫確認</a>
         {% endif %}
       </td>
     </tr>
     {% endfor %}
   </table>
+{% else %}
+  <div class="panel-body">
+    <a href="{% url 'inventory_create' %}">在庫確認履歴を追加</a>
+  </div>
+{% endif %}
 </div>

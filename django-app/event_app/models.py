@@ -19,39 +19,49 @@ class Event(models.Model):
     blank=True,
     on_delete=models.SET_NULL,
     related_name="next_event")
-  inventory = models.ManyToManyField(
-    "Inventory",
+
+
+class Inventory(models.Model):
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+  name = models.CharField(max_length=128, default="", blank=True)
+  event = models.ForeignKey(Event, on_delete=models.CASCADE, blank=True)
+  items = models.ManyToManyField(
+    "Item",
     null=True, 
     blank=True,
-    through="EventInventoryRelation",
-    related_name="events"
+    through="InventoryItemRelation",
+    related_name="inventory"
   )
+  previous_inventory = models.OneToOneField(
+    "Inventory", 
+    null=True, 
+    blank=True,
+    on_delete=models.SET_NULL,
+    related_name="next_inventory")
   
-  def get_previous_difference(event):
+  def __str__(self):
+      return f"{self.name}"
+  
+  def get_previous_difference(inventory):
     """
     入力されたイベント(Event)と前回のイベントをそれぞれ出力します。
     Args:
-        event (Event): イベント
+        inventory (Inventory): イベント
 
     Returns:
         list(Inventory): Inventoryをリスト出力
     """
-    previous_event = event.previous_event
-
-    current_relations = EventInventoryRelation.objects.filter(
-        event=event
-    )
-
-    previous_relations = EventInventoryRelation.objects.filter(
-        event=previous_event
-    )
+    previous_inventory = inventory.previous_inventory
+    current_relations = InventoryItemRelation.objects.filter(inventory=inventory)
+    previous_relations = InventoryItemRelation.objects.filter(inventory=previous_inventory)
     
-    inventory_filter = models.Q(events=event)
-    if previous_event:
-        inventory_filter |= models.Q(events=previous_event)
+    item_filter = models.Q(inventory=inventory)
+    if previous_inventory:
+        item_filter |= models.Q(inventory=previous_inventory)
 
-    inventories = Inventory.objects.filter(inventory_filter).distinct()
-    inventories = inventories.annotate(
+    items = Item.objects.filter(item_filter).distinct()
+    items = items.annotate(
         current_case_count=models.Subquery(
             current_relations.values('case_count')[:1]
         ),
@@ -59,8 +69,8 @@ class Event(models.Model):
             current_relations.values('item_count')[:1]
         ),
     )
-    if previous_event:
-      inventories.annotate(
+    if previous_inventory:
+      items = items.annotate(
         previous_case_count=models.Subquery(
             previous_relations.values('case_count')[:1]
         ),
@@ -68,10 +78,10 @@ class Event(models.Model):
             previous_relations.values('item_count')[:1]
         ),
       )
-    return inventories
+    return items
 
 
-class Inventory(models.Model):
+class Item(models.Model):
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
   
@@ -79,26 +89,19 @@ class Inventory(models.Model):
   name = models.CharField(max_length=128, blank=True)
   count_per_case = models.IntegerField(blank=True, default=1)
   
-  project = models.ForeignKey(
-    Project, 
-    on_delete=models.CASCADE, 
-    null=False, 
-    blank=False)
-  
   def __str__(self):
       return f"{self.company} {self.name}"
   
 
-
-class EventInventoryRelation(models.Model):
+class InventoryItemRelation(models.Model):
   class Meta:
-    unique_together = ('event', 'inventory')
+    unique_together = ('item', 'inventory')
 
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
-  event = models.ForeignKey(
-    Event, 
+  item = models.ForeignKey(
+    Item, 
     on_delete=models.CASCADE, 
     null=False, 
     blank=False)

@@ -1,15 +1,16 @@
 from django.contrib import admin
 from .models import *
 
-class EventInventoryRelationInline(admin.TabularInline):
-    model = Inventory.events.through
+class InventoryItemRelationInline(admin.TabularInline):
+    model = Inventory.items.through
     extra = 1
 
 
-class EventAdmin(admin.ModelAdmin):
-    inlines = [EventInventoryRelationInline]
+class InventoryAdmin(admin.ModelAdmin):
+    inlines = [InventoryItemRelationInline]
 
 
 # Register your models here.
-admin.site.register(Event, EventAdmin)
-admin.site.register(Inventory)
+admin.site.register(Event)
+admin.site.register(Inventory, InventoryAdmin)
+admin.site.register(Item)
