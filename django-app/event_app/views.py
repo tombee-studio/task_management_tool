@@ -114,7 +114,7 @@ class InventoryUpdateView(LoginRequiredMixin, UpdateView):
     template_name = "event_app/inventory_form.html"
     
     def get_success_url(self):
-        return reverse_lazy("event_detail", kwargs={"pk": self.kwargs["pk"]})
+        return reverse_lazy("inventory_detail", kwargs={"pk": self.object.pk})
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
