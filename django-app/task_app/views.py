@@ -397,13 +397,13 @@ class SignUpView(CreateView):
         return HttpResponseRedirect(self.get_success_url())
 
 
-class TaskWatchView(View):
+class TaskWatchView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
-        user = User.objects.get(pk=request.user.pk)
+        user = request.user
         pk = kwargs["pk"]
         task = Task.objects.filter(
-            Q(project__participants=request.user) |
-            Q(assignee=request.user),
+            Q(project__participants=user) |
+            Q(assignee=user),
             pk=pk,
         ).first()
         if task:
@@ -414,14 +414,14 @@ class TaskWatchView(View):
         return reverse_lazy("project_list")
 
 
-class TaskUnwatchView(View):
+class TaskUnwatchView(LoginRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
-        user = User.objects.get(pk=request.user.pk)
+        user = request.user
         pk = kwargs["pk"]
         task = Task.objects.filter(
-            Q(project__participants=request.user) |
-            Q(assignee=request.user),
+            Q(project__participants=user) |
+            Q(assignee=user),
             pk=pk,
         ).first()
         if task:
