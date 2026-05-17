@@ -64,6 +64,12 @@ class InventoryListView(LoginRequiredMixin, ListView):
 class InventoryDetailView(LoginRequiredMixin, DetailView):
     model = Inventory
     template_name = "event_app/inventory_detail.html"
+    
+    def get_context_data(self, **kwargs) -> dict[str, any]:
+        context = super().get_context_data(**kwargs)
+        context["items"] = Inventory.get_previous_difference(inventory=self.object)
+        return context
+    
 
 
 class InventoryCreateView(LoginRequiredMixin, CreateView):
@@ -73,6 +79,16 @@ class InventoryCreateView(LoginRequiredMixin, CreateView):
     
     def get_success_url(self):
         return reverse_lazy("event_detail", kwargs={"pk": self.object.pk})
+
+    def get_initial(self):
+        initial = super().get_initial()
+        pk = self.request.GET.get("previous", None)
+        if pk != None:
+          previous = Inventory.objects.get(pk=pk)
+          initial.update(model_to_dict(previous))
+          initial["name"] = ""
+          initial["previous_inventory"] = previous
+        return initial
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

@@ -19,49 +19,6 @@ class Event(models.Model):
     blank=True,
     on_delete=models.SET_NULL,
     related_name="next_event")
-  
-  def get_previous_difference(event):
-    """
-    入力されたイベント(Event)と前回のイベントをそれぞれ出力します。
-    Args:
-        event (Event): イベント
-
-    Returns:
-        list(Inventory): Inventoryをリスト出力
-    """
-    previous_event = event.previous_event
-
-    current_relations = InventoryItemRelation.objects.filter(
-        event=event
-    )
-
-    previous_relations = InventoryItemRelation.objects.filter(
-        event=previous_event
-    )
-    
-    inventory_filter = models.Q(events=event)
-    if previous_event:
-        inventory_filter |= models.Q(events=previous_event)
-
-    inventories = Inventory.objects.filter(inventory_filter).distinct()
-    inventories = inventories.annotate(
-        current_case_count=models.Subquery(
-            current_relations.values('case_count')[:1]
-        ),
-        current_item_count=models.Subquery(
-            current_relations.values('item_count')[:1]
-        ),
-    )
-    if previous_event:
-      inventories.annotate(
-        previous_case_count=models.Subquery(
-            previous_relations.values('case_count')[:1]
-        ),
-        previous_item_count=models.Subquery(
-            previous_relations.values('item_count')[:1]
-        ),
-      )
-    return inventories
 
 
 class Inventory(models.Model):
@@ -76,9 +33,52 @@ class Inventory(models.Model):
     through="InventoryItemRelation",
     related_name="inventory"
   )
+  previous_inventory = models.OneToOneField(
+    "Inventory", 
+    null=True, 
+    blank=True,
+    on_delete=models.SET_NULL,
+    related_name="next_inventory")
   
   def __str__(self):
       return f"{self.name}"
+  
+  def get_previous_difference(inventory):
+    """
+    入力されたイベント(Event)と前回のイベントをそれぞれ出力します。
+    Args:
+        inventory (Inventory): イベント
+
+    Returns:
+        list(Inventory): Inventoryをリスト出力
+    """
+    previous_inventory = inventory.previous_inventory
+    current_relations = InventoryItemRelation.objects.filter(inventory=inventory)
+    previous_relations = InventoryItemRelation.objects.filter(inventory=previous_inventory)
+    
+    item_filter = models.Q(inventory=inventory)
+    if previous_inventory:
+        item_filter |= models.Q(inventory=previous_inventory)
+
+    items = Item.objects.filter(item_filter).distinct()
+    items = items.annotate(
+        current_case_count=models.Subquery(
+            current_relations.values('case_count')[:1]
+        ),
+        current_item_count=models.Subquery(
+            current_relations.values('item_count')[:1]
+        ),
+    )
+    if previous_inventory:
+      items = items.annotate(
+        previous_case_count=models.Subquery(
+            previous_relations.values('case_count')[:1]
+        ),
+        previous_item_count=models.Subquery(
+            previous_relations.values('item_count')[:1]
+        ),
+      )
+    return items
 
 
 class Item(models.Model):
