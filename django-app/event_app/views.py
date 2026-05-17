@@ -78,7 +78,7 @@ class InventoryCreateView(LoginRequiredMixin, CreateView):
     template_name = "event_app/inventory_form.html"
     
     def get_success_url(self):
-        return reverse_lazy("event_detail", kwargs={"pk": self.object.pk})
+        return reverse_lazy("inventory_detail", kwargs={"pk": self.object.pk})
 
     def get_initial(self):
         initial = super().get_initial()
