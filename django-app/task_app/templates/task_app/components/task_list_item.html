@@ -2,13 +2,18 @@
 
 <tr class="accordion">
   <td class="flex-grow-1">
-    <div class=" line-clamp-1">
+    <div class="line-clamp-1">
       <span class="tree-item" style="--depth: {{ task.tree_depth }};" >
         <a href="{% url 'task_detail' task.pk %}?{{ status_filter }}">
           <strong>{{ task.title }}</strong>
         </a>
       </span>
     </div>
+  </td>
+  <td class="text-center">
+    {% if task.total_subtask_count %}
+      {{ task.completed_subtask_count|default:0 }}/{{ task.total_subtask_count|default:0 }}
+    {% endif %}
   </td>
   <td>
     {{ task.progress_summary|markdown:task.project|safe }}

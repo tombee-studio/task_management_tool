@@ -16,12 +16,13 @@ DJANGO_SECRET_KEY="django secret key"
 DEBUG="True"
 DJANGO_LOGLEVEL=info
 DJANGO_ALLOWED_HOSTS=localhost
-DATABASE_ENGINE=postgresql_psycopg2
+DB_ENGINE=postgresql_psycopg2
 DB_NAME=dockerdjango
 DB_USER=dbuser
 DB_PASSWORD=dbpassword
 DB_HOST=db
 DB_PORT=5432
+DB_SSL_USE=require
 ```
 
 #### dockerを起動
