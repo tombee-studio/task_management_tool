@@ -92,6 +92,14 @@ class Task(models.Model):
   def __str__(self):
     return self.title
 
+  @property
+  def total_subtask_count(self):
+    return self.tasks.count()
+
+  @property
+  def completed_subtask_count(self):
+    return self.tasks.filter(status__is_done=True).count()
+
 auditlog.register(Project)
 auditlog.register(Comment)
 auditlog.register(Status)

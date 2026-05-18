@@ -4,7 +4,7 @@ from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, View
-from django.db.models import Prefetch, Q
+from django.db.models import Count, Prefetch, Q
 from .models import *
 
 from django.contrib.auth import login
@@ -238,19 +238,26 @@ class TaskListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
         selected_status_list = self.request.GET.getlist("status")
-        context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
+        selected_status_ids = list(map(lambda x: int(x), selected_status_list))
+        context["selected_status_list"] = selected_status_ids
         context["status_list"] = Status.objects.all()
-        context["tasks"] = Task.objects.filter(status__in=selected_status_list).prefetch_related(
-            Prefetch(
-                "tasks",
-                queryset=Task.objects.filter(status__in=selected_status_list),
-                to_attr="filtered_tasks",
-            )
-        )
+
+        tasks = self.get_queryset()
+        if selected_status_ids:
+            tasks = tasks.filter(status__in=selected_status_ids)
+
+        context["tasks"] = tasks
         return context
 
     def get_queryset(self):
-        return Task.objects.with_tree_fields()
+        return Task.objects.with_tree_fields().annotate(
+            completed_subtask_count=Count(
+                'tasks',
+                filter=Q(tasks__status__is_done=True),
+                distinct=True,
+            ),
+            total_subtask_count=Count('tasks', distinct=True),
+        )
 
 class TaskDetailView(LoginRequiredMixin, DetailView):
     model = Task
