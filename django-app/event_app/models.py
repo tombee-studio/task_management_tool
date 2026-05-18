@@ -7,7 +7,7 @@ class Event(models.Model):
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
   event_date = models.DateField(blank=False)
-  participant_count = models.IntegerField(blank=True)
+  participant_count = models.IntegerField(null=True, blank=True)
   project = models.ForeignKey(
     Project, 
     on_delete=models.CASCADE, 
@@ -25,10 +25,9 @@ class Inventory(models.Model):
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
   name = models.CharField(max_length=128, default="", blank=True)
-  event = models.ForeignKey(Event, on_delete=models.CASCADE, blank=True)
+  event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True, blank=True)
   items = models.ManyToManyField(
     "Item",
-    null=True, 
     blank=True,
     through="InventoryItemRelation",
     related_name="inventory"
@@ -43,20 +42,23 @@ class Inventory(models.Model):
   def __str__(self):
       return f"{self.name}"
   
-  def get_previous_difference(inventory):
+  def get_previous_difference(self):
     """
     入力されたイベント(Event)と前回のイベントをそれぞれ出力します。
-    Args:
-        inventory (Inventory): イベント
-
     Returns:
         list(Inventory): Inventoryをリスト出力
     """
-    previous_inventory = inventory.previous_inventory
-    current_relations = InventoryItemRelation.objects.filter(inventory=inventory)
-    previous_relations = InventoryItemRelation.objects.filter(inventory=previous_inventory)
+    previous_inventory = self.previous_inventory
+    current_relations = InventoryItemRelation.objects.filter(
+        inventory=self,
+        item=models.OuterRef('pk'),
+    )
+    previous_relations = InventoryItemRelation.objects.filter(
+        inventory=previous_inventory,
+        item=models.OuterRef('pk'),
+    )
     
-    item_filter = models.Q(inventory=inventory)
+    item_filter = models.Q(inventory=self)
     if previous_inventory:
         item_filter |= models.Q(inventory=previous_inventory)
 
@@ -110,5 +112,5 @@ class InventoryItemRelation(models.Model):
     on_delete=models.CASCADE, 
     null=False, 
     blank=False)
-  case_count = models.IntegerField(blank=True)
-  item_count = models.IntegerField(blank=True)
+  case_count = models.IntegerField(null=True, blank=True)
+  item_count = models.IntegerField(null=True, blank=True)
