@@ -1,6 +1,6 @@
 {% load markdown_extras %}
 
-<tr class="accordion">
+<tr class="accordion{% if task.status.is_done %} task-done{% endif %}">
   <td class="flex-grow-1">
     <div class="line-clamp-1">
       <span class="tree-item" style="--depth: {{ task.tree_depth }};" >
