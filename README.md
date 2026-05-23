@@ -79,6 +79,10 @@ terraform apply -target aws_ecr_repository.app
 ```shell:
 ../django-app/
 REPO_URL=$(terraform output -raw ecr_repository_url)
+aws ecr get-login-password --region ap-northeast-1 \ 
+  | docker login \
+    --username AWS \
+    --password-stdin ${REPO_URL}
 docker buildx build \
   --platform linux/arm64 \
   --provenance=false \
