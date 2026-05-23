@@ -100,7 +100,25 @@ class Task(models.Model):
   def completed_subtask_count(self):
     return self.tasks.filter(status__is_done=True).count()
 
+
+class Rule(models.Model):
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+  project = models.ForeignKey(
+      Project,
+      on_delete=models.CASCADE
+  )
+  name = models.CharField(max_length=255)
+  pattern = models.TextField()
+  dsl_template = models.TextField()
+  enabled = models.BooleanField(default=True)
+  history = AuditlogHistoryField()
+
+  def __str__(self):
+    return f"{self.project.name}: {self.name}"
+
 auditlog.register(Project)
 auditlog.register(Comment)
 auditlog.register(Status)
 auditlog.register(Task)
+auditlog.register(Rule)

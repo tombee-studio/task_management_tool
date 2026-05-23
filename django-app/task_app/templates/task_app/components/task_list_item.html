@@ -18,6 +18,9 @@
   <td>
     {{ task.progress_summary|markdown:task.project|safe }}
   </td>
+  <td class="text-center">
+    {{ task.assignee.get_full_name|default:task.assignee.username }}
+  </td>
   <td class="text-end" style="width: 120px;">
     <span class="badge bg-primary">{{ task.status.name }}</span>
   </td>

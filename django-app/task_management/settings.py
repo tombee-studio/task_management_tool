@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     'bootstrap3',
     'auditlog',
     'tree_queries',
-    'task_app',
+    'task_app.apps.TaskAppConfig',
     'event_app'
 ]
 

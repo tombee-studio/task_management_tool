@@ -79,6 +79,10 @@ terraform apply -target aws_ecr_repository.app
 ```shell:
 ../django-app/
 REPO_URL=$(terraform output -raw ecr_repository_url)
+aws ecr get-login-password --region ap-northeast-1 \ 
+  | docker login \
+    --username AWS \
+    --password-stdin ${REPO_URL}
 docker buildx build \
   --platform linux/arm64 \
   --provenance=false \
@@ -119,3 +123,10 @@ terraform output -raw api_url
 ```
 
 `https://***.amazonaws.com/{stage}/` へアクセスします。
+
+## テスト
+### 単体テスト
+```bash:
+cd django-app/
+DJANGO_SETTINGS_MODULE=task_management.test_settings python manage.py test
+```
