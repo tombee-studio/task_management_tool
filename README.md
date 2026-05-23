@@ -119,3 +119,10 @@ terraform output -raw api_url
 ```
 
 `https://***.amazonaws.com/{stage}/` へアクセスします。
+
+## テスト
+### 単体テスト
+```bash:
+cd django-app/
+DJANGO_SETTINGS_MODULE=task_management.test_settings python manage.py test
+```
