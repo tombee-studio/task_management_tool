@@ -446,6 +446,10 @@ output "api_url" {
   value = "https://${aws_api_gateway_rest_api.api.id}.execute-api.${data.aws_region.current.region}.amazonaws.com/${var.stage}/"
 }
 
+output "web_lambda_name" {
+  value = aws_lambda_function.web.function_name
+}
+
 output "migrate_lambda_name" {
   value = aws_lambda_function.migrate.function_name
 }
