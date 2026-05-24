@@ -1,4 +1,4 @@
-name: Deploy to Production
+name: Deploy to Prd
 
 on:
   push:
@@ -65,10 +65,6 @@ jobs:
             -backend-config="region=${{ env.AWS_REGION }}" \
             -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}"
 
-      - name: Select Terraform workspace
-        working-directory: terraform
-        run: terraform workspace select ${{ env.TF_WORKSPACE }}
-
       - name: Get Terraform outputs
         id: tf
         working-directory: terraform
@@ -94,9 +90,12 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/arm64 \
+            --provenance=false \
+            --sbom=false \
             -t $ECR_URL:$IMAGE_TAG \
             -t $ECR_URL:latest \
             --push \
+            --no-cache \
             ./django-app
           echo "image=$ECR_URL:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
