@@ -1,6 +1,7 @@
 import re
 from pathlib import Path
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from lark import Lark, Transformer
 
@@ -95,16 +96,34 @@ def execute_link(src_id, dst_id):
     src.related_tasks.add(dst)
 
 
+def execute_assign(task_id, username):
+    """タスクの担当者をユーザー名で変更する。
+
+    タスクまたはユーザーが存在しない場合は何もしない。
+    """
+    User = get_user_model()
+    try:
+        task = Task.objects.get(pk=task_id)
+        user = User.objects.get(username=username)
+    except (Task.DoesNotExist, User.DoesNotExist):
+        return
+    task.assignee = user
+    task.save()
+
+
 def execute_ast(ast):
     """AST の各コマンドを対応する execute_* 関数にディスパッチする。
 
-    未実装のコマンド (tag / parent / assign) はパース済みだが実行をスキップする。
+    未実装のコマンド (tag / parent) はパース済みだが実行をスキップする。
     """
     for command in ast:
         command_type = command[0]
         if command_type == "link":
             _, src_id, dst_id = command
             execute_link(src_id, dst_id)
+        elif command_type == "assign":
+            _, task_id, username = command
+            execute_assign(task_id, username)
 
 
 @transaction.atomic

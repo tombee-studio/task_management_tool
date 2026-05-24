@@ -3,7 +3,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .dsl import execute_dsl, execute_link, parse_dsl
+from .dsl import execute_assign, execute_dsl, execute_link, parse_dsl
 from .forms import TaskForm
 from .models import Comment, Project, Rule, Status, Task
 from .rules import process_task_rules
@@ -271,6 +271,44 @@ class DSLExecuteTest(TestCase):
         execute_dsl(f"LINK {self.src.id} -> {self.dst.id}\nLINK {self.src.id} -> {third.id}")
         self.assertIn(self.dst, self.src.related_tasks.all())
         self.assertIn(third, self.src.related_tasks.all())
+
+
+# ---------------------------------------------------------------------------
+# DSL — execute ASSIGN
+# ---------------------------------------------------------------------------
+
+class DSLExecuteAssignTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="alice", password="p")
+        self.other = User.objects.create_user(username="bob", password="p")
+        self.status = Status.objects.create(name="Open")
+        self.project = Project.objects.create(name="P")
+        self.task = Task.objects.create(
+            title="T", project=self.project, assignee=self.user, status=self.status
+        )
+
+    def test_assign_changes_assignee(self):
+        execute_dsl(f"ASSIGN {self.task.id} TO bob")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other)
+
+    def test_assign_quoted_username(self):
+        execute_dsl(f'ASSIGN {self.task.id} TO "bob"')
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other)
+
+    def test_assign_nonexistent_task_does_not_raise(self):
+        execute_dsl("ASSIGN 99999 TO bob")
+
+    def test_assign_nonexistent_user_does_not_raise(self):
+        execute_dsl(f"ASSIGN {self.task.id} TO nobody")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.user)
+
+    def test_execute_assign_directly(self):
+        execute_assign(self.task.id, "bob")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other)
 
 
 # ---------------------------------------------------------------------------
