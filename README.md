@@ -130,3 +130,5 @@ terraform output -raw api_url
 cd django-app/
 DJANGO_SETTINGS_MODULE=task_management.test_settings python manage.py test
 ```
+
+テストケースの一覧・確認観点・最終パス日時は [TESTS.md](TESTS.md) に記載しています。
