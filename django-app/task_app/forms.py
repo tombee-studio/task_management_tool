@@ -33,7 +33,8 @@ class TaskForm(forms.ModelForm):
         status = cleaned_data.get('status')
         
         # チェック：ステータスが完了状態に変更されようとしている場合
-        if status and status.is_done:
+        # 新規タスク（pk なし）はサブタスクを持てないのでスキップ
+        if status and status.is_done and self.instance.pk:
             # 未完了のサブタスクがあるか確認
             incomplete_subtasks = self.instance.tasks.filter(status__is_done=False)
             if incomplete_subtasks.exists():

@@ -1,0 +1,132 @@
+name: Deploy to Prd
+
+on:
+  push:
+    branches:
+      - releases
+
+env:
+  AWS_REGION: ap-northeast-1
+  TF_WORKSPACE: prd
+
+jobs:
+  tag-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine next version
+        id: version
+        run: |
+          LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -z "$LATEST_TAG" ]; then
+            NEXT_TAG="v1.0.0"
+          else
+            MAJOR=$(echo $LATEST_TAG | cut -d. -f1 | tr -d 'v')
+            MINOR=$(echo $LATEST_TAG | cut -d. -f2)
+            PATCH=$(echo $LATEST_TAG | cut -d. -f3)
+            NEXT_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+          fi
+          echo "tag=$NEXT_TAG" >> $GITHUB_OUTPUT
+          echo "Next version: $NEXT_TAG"
+
+      - name: Create and push git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin ${{ steps.version.outputs.tag }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=task-management/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}"
+
+      - name: Get Terraform outputs
+        id: tf
+        working-directory: terraform
+        run: |
+          echo "ecr_url=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
+          echo "lambda_web=$(terraform output -raw web_lambda_name)" >> $GITHUB_OUTPUT
+          echo "lambda_migrate=$(terraform output -raw migrate_lambda_name)" >> $GITHUB_OUTPUT
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to ECR
+        id: build-image
+        env:
+          ECR_URL: ${{ steps.tf.outputs.ecr_url }}
+          IMAGE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            --provenance=false \
+            --sbom=false \
+            --build-arg GIT_HASH=$IMAGE_TAG \
+            -t $ECR_URL:$IMAGE_TAG \
+            -t $ECR_URL:latest \
+            --push \
+            --no-cache \
+            ./django-app
+          echo "image=$ECR_URL:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Update web Lambda function
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ steps.tf.outputs.lambda_web }} \
+            --image-uri ${{ steps.build-image.outputs.image }}
+
+      - name: Wait for web Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ steps.tf.outputs.lambda_web }}
+
+      - name: Update migrate Lambda function
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ steps.tf.outputs.lambda_migrate }} \
+            --image-uri ${{ steps.build-image.outputs.image }}
+
+      - name: Wait for migrate Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ steps.tf.outputs.lambda_migrate }}
+
+      - name: Run database migration
+        run: |
+          aws lambda invoke \
+            --function-name ${{ steps.tf.outputs.lambda_migrate }} \
+            --payload '{}' \
+            --cli-binary-format raw-in-base64-out \
+            /tmp/migrate-response.json
+          cat /tmp/migrate-response.json
