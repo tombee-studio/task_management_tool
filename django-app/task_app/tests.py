@@ -156,6 +156,80 @@ class DSLParseTest(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# DSL — LARK grammar (future commands: TAG / PARENT / ASSIGN)
+# ---------------------------------------------------------------------------
+
+class DSLGrammarTest(TestCase):
+    """Parse-only tests for the Cypher-inspired grammar extensions."""
+
+    def setUp(self):
+        user = User.objects.create_user(username="u", password="p")
+        status = Status.objects.create(name="Open")
+        project = Project.objects.create(name="P")
+        self.t1 = Task.objects.create(title="T1", project=project, assignee=user, status=status)
+        self.t2 = Task.objects.create(title="T2", project=project, assignee=user, status=status)
+
+    # TAG ----------------------------------------------------------------
+
+    def test_tag_bare_name(self):
+        ast = parse_dsl(f"TAG {self.t1.id} urgent")
+        self.assertEqual(ast, [("tag", self.t1.id, "urgent")])
+
+    def test_tag_quoted_string(self):
+        ast = parse_dsl(f'TAG {self.t1.id} "high priority"')
+        self.assertEqual(ast, [("tag", self.t1.id, "high priority")])
+
+    def test_tag_case_insensitive(self):
+        ast = parse_dsl(f"tag {self.t1.id} important")
+        self.assertEqual(ast[0][0], "tag")
+
+    # PARENT -------------------------------------------------------------
+
+    def test_parent_basic(self):
+        ast = parse_dsl(f"PARENT {self.t1.id} -> {self.t2.id}")
+        self.assertEqual(ast, [("parent", self.t1.id, self.t2.id)])
+
+    def test_parent_case_insensitive(self):
+        ast = parse_dsl(f"parent {self.t1.id} -> {self.t2.id}")
+        self.assertEqual(ast[0][0], "parent")
+
+    # ASSIGN -------------------------------------------------------------
+
+    def test_assign_bare_username(self):
+        ast = parse_dsl(f"ASSIGN {self.t1.id} TO alice")
+        self.assertEqual(ast, [("assign", self.t1.id, "alice")])
+
+    def test_assign_quoted_username(self):
+        ast = parse_dsl(f'ASSIGN {self.t1.id} TO "alice smith"')
+        self.assertEqual(ast, [("assign", self.t1.id, "alice smith")])
+
+    def test_assign_case_insensitive(self):
+        ast = parse_dsl(f"assign {self.t1.id} to bob")
+        self.assertEqual(ast[0][0], "assign")
+
+    # Mixed --------------------------------------------------------------
+
+    def test_mixed_commands_in_one_dsl(self):
+        text = (
+            f"LINK {self.t1.id} -> {self.t2.id}\n"
+            f"TAG {self.t1.id} urgent\n"
+            f"PARENT {self.t1.id} -> {self.t2.id}\n"
+            f"ASSIGN {self.t1.id} TO alice"
+        )
+        ast = parse_dsl(text)
+        self.assertEqual(len(ast), 4)
+        self.assertEqual(ast[0][0], "link")
+        self.assertEqual(ast[1][0], "tag")
+        self.assertEqual(ast[2][0], "parent")
+        self.assertEqual(ast[3][0], "assign")
+
+    def test_unknown_commands_ignored_mixed(self):
+        text = f"LINK {self.t1.id} -> {self.t2.id}\nnot a command\nTAG {self.t1.id} foo"
+        ast = parse_dsl(text)
+        self.assertEqual(len(ast), 2)
+
+
+# ---------------------------------------------------------------------------
 # DSL — execute
 # ---------------------------------------------------------------------------
 
