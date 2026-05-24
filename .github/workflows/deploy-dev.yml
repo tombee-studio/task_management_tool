@@ -68,6 +68,7 @@ jobs:
             --platform linux/arm64 \
             --provenance=false \
             --sbom=false \
+            --build-arg GIT_HASH=$IMAGE_TAG \
             -t $ECR_URL:$IMAGE_TAG \
             -t $ECR_URL:latest \
             --push \

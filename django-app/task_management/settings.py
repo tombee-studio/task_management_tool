@@ -74,6 +74,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'task_app.context_processors.git_hash',
             ],
             'libraries': {
                 'markdown_extras': 'task_app.extras'
