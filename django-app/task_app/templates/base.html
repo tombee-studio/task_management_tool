@@ -40,7 +40,8 @@
 <body>
   <nav class="navbar navbar-default navbar-fixed-top">
     <div class="container-fluid">
-      <a class="navbar-brand"  href="{% url 'project_list' %}">Task Management Tool</a>
+      <a class="navbar-brand" href="{% url 'project_list' %}">Task Management Tool</a>
+      <span class="navbar-text" style="font-size: 11px; color: #aaa;">{{ GIT_HASH }}</span>
       <div class="navbar-text navbar-right">
         {% if user.is_authenticated %}
         <a href="#" class="navbar-link" style="margin: 0px 25px">{{user.username}}</a>
