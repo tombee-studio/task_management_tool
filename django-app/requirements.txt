@@ -14,3 +14,4 @@ six==1.17.0
 sqlparse==0.5.2
 wcwidth==0.6.0
 serverless-wsgi==3.1.0
+lark==1.2.2

@@ -3,7 +3,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .dsl import execute_dsl, execute_link, parse_dsl
+from .dsl import execute_assign, execute_dsl, execute_link, parse_dsl
 from .forms import TaskForm
 from .models import Comment, Project, Rule, Status, Task
 from .rules import process_task_rules
@@ -156,6 +156,80 @@ class DSLParseTest(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# DSL — LARK grammar (future commands: TAG / PARENT / ASSIGN)
+# ---------------------------------------------------------------------------
+
+class DSLGrammarTest(TestCase):
+    """Parse-only tests for the Cypher-inspired grammar extensions."""
+
+    def setUp(self):
+        user = User.objects.create_user(username="u", password="p")
+        status = Status.objects.create(name="Open")
+        project = Project.objects.create(name="P")
+        self.t1 = Task.objects.create(title="T1", project=project, assignee=user, status=status)
+        self.t2 = Task.objects.create(title="T2", project=project, assignee=user, status=status)
+
+    # TAG ----------------------------------------------------------------
+
+    def test_tag_bare_name(self):
+        ast = parse_dsl(f"TAG {self.t1.id} urgent")
+        self.assertEqual(ast, [("tag", self.t1.id, "urgent")])
+
+    def test_tag_quoted_string(self):
+        ast = parse_dsl(f'TAG {self.t1.id} "high priority"')
+        self.assertEqual(ast, [("tag", self.t1.id, "high priority")])
+
+    def test_tag_case_insensitive(self):
+        ast = parse_dsl(f"tag {self.t1.id} important")
+        self.assertEqual(ast[0][0], "tag")
+
+    # PARENT -------------------------------------------------------------
+
+    def test_parent_basic(self):
+        ast = parse_dsl(f"PARENT {self.t1.id} -> {self.t2.id}")
+        self.assertEqual(ast, [("parent", self.t1.id, self.t2.id)])
+
+    def test_parent_case_insensitive(self):
+        ast = parse_dsl(f"parent {self.t1.id} -> {self.t2.id}")
+        self.assertEqual(ast[0][0], "parent")
+
+    # ASSIGN -------------------------------------------------------------
+
+    def test_assign_bare_username(self):
+        ast = parse_dsl(f"ASSIGN {self.t1.id} TO alice")
+        self.assertEqual(ast, [("assign", self.t1.id, "alice")])
+
+    def test_assign_quoted_username(self):
+        ast = parse_dsl(f'ASSIGN {self.t1.id} TO "alice smith"')
+        self.assertEqual(ast, [("assign", self.t1.id, "alice smith")])
+
+    def test_assign_case_insensitive(self):
+        ast = parse_dsl(f"assign {self.t1.id} to bob")
+        self.assertEqual(ast[0][0], "assign")
+
+    # Mixed --------------------------------------------------------------
+
+    def test_mixed_commands_in_one_dsl(self):
+        text = (
+            f"LINK {self.t1.id} -> {self.t2.id}\n"
+            f"TAG {self.t1.id} urgent\n"
+            f"PARENT {self.t1.id} -> {self.t2.id}\n"
+            f"ASSIGN {self.t1.id} TO alice"
+        )
+        ast = parse_dsl(text)
+        self.assertEqual(len(ast), 4)
+        self.assertEqual(ast[0][0], "link")
+        self.assertEqual(ast[1][0], "tag")
+        self.assertEqual(ast[2][0], "parent")
+        self.assertEqual(ast[3][0], "assign")
+
+    def test_unknown_commands_ignored_mixed(self):
+        text = f"LINK {self.t1.id} -> {self.t2.id}\nnot a command\nTAG {self.t1.id} foo"
+        ast = parse_dsl(text)
+        self.assertEqual(len(ast), 2)
+
+
+# ---------------------------------------------------------------------------
 # DSL — execute
 # ---------------------------------------------------------------------------
 
@@ -197,6 +271,44 @@ class DSLExecuteTest(TestCase):
         execute_dsl(f"LINK {self.src.id} -> {self.dst.id}\nLINK {self.src.id} -> {third.id}")
         self.assertIn(self.dst, self.src.related_tasks.all())
         self.assertIn(third, self.src.related_tasks.all())
+
+
+# ---------------------------------------------------------------------------
+# DSL — execute ASSIGN
+# ---------------------------------------------------------------------------
+
+class DSLExecuteAssignTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="alice", password="p")
+        self.other = User.objects.create_user(username="bob", password="p")
+        self.status = Status.objects.create(name="Open")
+        self.project = Project.objects.create(name="P")
+        self.task = Task.objects.create(
+            title="T", project=self.project, assignee=self.user, status=self.status
+        )
+
+    def test_assign_changes_assignee(self):
+        execute_dsl(f"ASSIGN {self.task.id} TO bob")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other)
+
+    def test_assign_quoted_username(self):
+        execute_dsl(f'ASSIGN {self.task.id} TO "bob"')
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other)
+
+    def test_assign_nonexistent_task_does_not_raise(self):
+        execute_dsl("ASSIGN 99999 TO bob")
+
+    def test_assign_nonexistent_user_does_not_raise(self):
+        execute_dsl(f"ASSIGN {self.task.id} TO nobody")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.user)
+
+    def test_execute_assign_directly(self):
+        execute_assign(self.task.id, "bob")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other)
 
 
 # ---------------------------------------------------------------------------
@@ -315,6 +427,91 @@ class SignalTest(TestCase):
         # This save triggers the bad rule; it must not raise
         self.task_a.description = "bad 999"
         self.task_a.save()
+
+
+# ---------------------------------------------------------------------------
+# ASSIGN ルール統合テスト
+# ---------------------------------------------------------------------------
+
+class AssignRuleIntegrationTest(TestCase):
+    """ASSIGN DSL コマンドがルール・シグナル経由で正常に動作することを検証する。"""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username="owner", password="p")
+        self.bob = User.objects.create_user(username="bob", password="p")
+        self.status = Status.objects.create(name="Open")
+        self.project = Project.objects.create(name="P")
+        self.task = Task.objects.create(
+            title="T", project=self.project, assignee=self.owner, status=self.status
+        )
+
+    def _assign_rule(self, enabled=True):
+        return Rule.objects.create(
+            project=self.project, name="R",
+            pattern=r"assign to (\w+)",
+            dsl_template="ASSIGN {task_id} TO {group1}",
+            enabled=enabled,
+        )
+
+    # --- process_task_rules 直接呼び出し ---
+
+    def test_assign_rule_changes_assignee(self):
+        self._assign_rule()
+        process_task_rules(self.task, text="assign to bob")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.bob)
+
+    def test_assign_rule_no_match_preserves_assignee(self):
+        self._assign_rule()
+        process_task_rules(self.task, text="no match here")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.owner)
+
+    def test_assign_rule_disabled_preserves_assignee(self):
+        self._assign_rule(enabled=False)
+        process_task_rules(self.task, text="assign to bob")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.owner)
+
+    def test_assign_rule_nonexistent_user_preserves_assignee(self):
+        self._assign_rule()
+        process_task_rules(self.task, text="assign to nobody")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.owner)
+
+    # --- Task 保存シグナル ---
+
+    def test_task_save_triggers_assign_rule(self):
+        self._assign_rule()
+        self.task.description = "assign to bob"
+        self.task.save()
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.bob)
+
+    def test_task_save_no_match_preserves_assignee(self):
+        self._assign_rule()
+        self.task.description = "just a description"
+        self.task.save()
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.owner)
+
+    # --- Comment 保存シグナル ---
+
+    def test_comment_save_triggers_assign_rule(self):
+        self._assign_rule()
+        Comment.objects.create(
+            author=self.owner, task=self.task, description="assign to bob"
+        )
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.bob)
+
+    def test_comment_save_no_match_preserves_assignee(self):
+        self._assign_rule()
+        Comment.objects.create(
+            author=self.owner, task=self.task, description="just a comment"
+        )
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.owner)
 
 
 # ---------------------------------------------------------------------------
