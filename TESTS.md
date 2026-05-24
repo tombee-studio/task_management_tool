@@ -1,8 +1,8 @@
 # テストケース一覧
 
-合計 **158 件** のテストケース（task_app: 119 件 / event_app: 39 件）
+合計 **166 件** のテストケース（task_app: 127 件 / event_app: 39 件）
 
-**最終パス確認: 2026-05-25 JST** — `Ran 158 tests in 29.583s` → **OK**
+**最終パス確認: 2026-05-25 JST** — `Ran 166 tests in 31.312s` → **OK**
 
 凡例: ✅ 正常系 ／ ❌ 異常系・境界値 ／ 🐛 既知バグの文書化
 
@@ -134,6 +134,19 @@
 | 59 | `test_task_saved_triggers_rules_via_description` | タスク保存がルール処理を起動する | ✅ |
 | 60 | `test_signal_exception_does_not_propagate` | ルール処理中の例外がシグナルから伝播しない | ❌ |
 
+#### AssignRuleIntegrationTest（ASSIGN ルール統合）
+
+| # | テストメソッド | 確認観点 | 種別 |
+|---|---------------|---------|------|
+| 61 | `test_assign_rule_changes_assignee` | パターン一致で ASSIGN ルールが実行され担当者が変わる | ✅ |
+| 62 | `test_assign_rule_no_match_preserves_assignee` | パターン不一致では担当者が変わらない | ❌ |
+| 63 | `test_assign_rule_disabled_preserves_assignee` | 無効ルールでは担当者が変わらない | ❌ |
+| 64 | `test_assign_rule_nonexistent_user_preserves_assignee` | 存在しないユーザー名では担当者が変わらない | ❌ |
+| 65 | `test_task_save_triggers_assign_rule` | タスク保存シグナルで ASSIGN ルールが実行される | ✅ |
+| 66 | `test_task_save_no_match_preserves_assignee` | タスク保存でパターン不一致なら担当者が変わらない | ❌ |
+| 67 | `test_comment_save_triggers_assign_rule` | コメント保存シグナルで ASSIGN ルールが実行される | ✅ |
+| 68 | `test_comment_save_no_match_preserves_assignee` | コメント保存でパターン不一致なら担当者が変わらない | ❌ |
+
 ---
 
 ### フォーム層
@@ -142,11 +155,11 @@
 
 | # | テストメソッド | 確認観点 | 種別 |
 |---|---------------|---------|------|
-| 61 | `test_done_status_with_no_subtasks_is_valid` | サブタスクなしで完了ステータスに変更できる | ✅ |
-| 62 | `test_done_status_with_all_subtasks_done_is_valid` | 全サブタスク完了なら親も完了にできる | ✅ |
-| 63 | `test_done_status_with_incomplete_subtask_is_invalid` | 未完了サブタスクがあると完了ステータスにできない | ❌ |
-| 64 | `test_open_status_with_incomplete_subtask_is_valid` | 未完了ステータスへの変更は常に有効 | ✅ |
-| 65 | `test_deadline_field_is_optional` | `deadline` は空でも有効 | ✅ |
+| 69 | `test_done_status_with_no_subtasks_is_valid` | サブタスクなしで完了ステータスに変更できる | ✅ |
+| 70 | `test_done_status_with_all_subtasks_done_is_valid` | 全サブタスク完了なら親も完了にできる | ✅ |
+| 71 | `test_done_status_with_incomplete_subtask_is_invalid` | 未完了サブタスクがあると完了ステータスにできない | ❌ |
+| 72 | `test_open_status_with_incomplete_subtask_is_valid` | 未完了ステータスへの変更は常に有効 | ✅ |
+| 73 | `test_deadline_field_is_optional` | `deadline` は空でも有効 | ✅ |
 
 ---
 
@@ -156,80 +169,80 @@
 
 | # | テストメソッド | 確認観点 | 種別 |
 |---|---------------|---------|------|
-| 66 | `test_get_returns_200` | GET でサインアップフォームが表示される | ✅ |
-| 67 | `test_valid_post_creates_user_and_redirects` | 正常なPOSTでユーザー作成・ログイン・リダイレクト | ✅ |
-| 68 | `test_invalid_post_redisplays_form` | パスワード不一致でフォーム再表示・ユーザー未作成 | ❌ |
+| 74 | `test_get_returns_200` | GET でサインアップフォームが表示される | ✅ |
+| 75 | `test_valid_post_creates_user_and_redirects` | 正常なPOSTでユーザー作成・ログイン・リダイレクト | ✅ |
+| 76 | `test_invalid_post_redisplays_form` | パスワード不一致でフォーム再表示・ユーザー未作成 | ❌ |
 
 #### ProjectViewsTest
 
 | # | テストメソッド | 確認観点 | 種別 |
 |---|---------------|---------|------|
-| 69 | `test_project_list_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
-| 70 | `test_project_list_shows_own_projects` | 自分が参加しているプロジェクトが表示される | ✅ |
-| 71 | `test_project_list_hides_others_projects` | 他ユーザーのプロジェクトは表示されない | ❌ |
-| 72 | `test_project_detail_own` | 自分が参加しているプロジェクト詳細を見られる | ✅ |
-| 73 | `test_project_detail_other_returns_404` | 他ユーザーのプロジェクト詳細は 404 | ❌ |
-| 74 | `test_project_detail_with_status_filter` | ステータスフィルターがコンテキストに反映される | ✅ |
-| 75 | `test_project_create_adds_user_as_participant` | プロジェクト作成後に作成者が participants に追加される | ✅ |
-| 76 | `test_project_create_redirects_to_detail` | プロジェクト作成後に詳細ページへリダイレクト | ✅ |
-| 77 | `test_project_update_own` | 自分のプロジェクトを更新できる | ✅ |
-| 78 | `test_project_update_other_returns_404` | 他ユーザーのプロジェクト更新は 404 | ❌ |
-| 79 | `test_project_delete_own` | 自分のプロジェクトを削除できる | ✅ |
-| 80 | `test_project_delete_other_returns_404` | 他ユーザーのプロジェクト削除は 404・DB に残る | ❌ |
+| 77 | `test_project_list_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
+| 78 | `test_project_list_shows_own_projects` | 自分が参加しているプロジェクトが表示される | ✅ |
+| 79 | `test_project_list_hides_others_projects` | 他ユーザーのプロジェクトは表示されない | ❌ |
+| 80 | `test_project_detail_own` | 自分が参加しているプロジェクト詳細を見られる | ✅ |
+| 81 | `test_project_detail_other_returns_404` | 他ユーザーのプロジェクト詳細は 404 | ❌ |
+| 82 | `test_project_detail_with_status_filter` | ステータスフィルターがコンテキストに反映される | ✅ |
+| 83 | `test_project_create_adds_user_as_participant` | プロジェクト作成後に作成者が participants に追加される | ✅ |
+| 84 | `test_project_create_redirects_to_detail` | プロジェクト作成後に詳細ページへリダイレクト | ✅ |
+| 85 | `test_project_update_own` | 自分のプロジェクトを更新できる | ✅ |
+| 86 | `test_project_update_other_returns_404` | 他ユーザーのプロジェクト更新は 404 | ❌ |
+| 87 | `test_project_delete_own` | 自分のプロジェクトを削除できる | ✅ |
+| 88 | `test_project_delete_other_returns_404` | 他ユーザーのプロジェクト削除は 404・DB に残る | ❌ |
 
 #### StatusViewsTest
 
 | # | テストメソッド | 確認観点 | 種別 |
 |---|---------------|---------|------|
-| 81 | `test_status_list` | ステータス一覧が 200 | ✅ |
-| 82 | `test_status_detail` | ステータス詳細が 200 | ✅ |
-| 83 | `test_status_create` | 新しいステータスが作成される | ✅ |
-| 84 | `test_status_create_redirects` | 作成後にプロジェクト一覧へリダイレクト | ✅ |
-| 85 | `test_status_update` | name と is_done を更新できる | ✅ |
-| 86 | `test_status_delete` | ステータスを削除できる | ✅ |
-| 87 | `test_status_list_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
+| 89 | `test_status_list` | ステータス一覧が 200 | ✅ |
+| 90 | `test_status_detail` | ステータス詳細が 200 | ✅ |
+| 91 | `test_status_create` | 新しいステータスが作成される | ✅ |
+| 92 | `test_status_create_redirects` | 作成後にプロジェクト一覧へリダイレクト | ✅ |
+| 93 | `test_status_update` | name と is_done を更新できる | ✅ |
+| 94 | `test_status_delete` | ステータスを削除できる | ✅ |
+| 95 | `test_status_list_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
 
 #### TaskViewsTest
 
 | # | テストメソッド | 確認観点 | 種別 |
 |---|---------------|---------|------|
-| 88 | `test_task_list_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
-| 89 | `test_task_list_annotation_clashes_with_model_property` | 🐛 TaskListView のアノテーション名が @property と衝突し 500 | 🐛 |
-| 90 | `test_task_list_with_status_filter_annotation_bug` | 🐛 ステータスフィルター付きでも同様に 500 | 🐛 |
-| 91 | `test_task_detail_accessible_by_assignee` | 担当者本人がタスク詳細を見られる | ✅ |
-| 92 | `test_task_detail_accessible_by_project_participant` | プロジェクト参加者もタスク詳細を見られる | ✅ |
-| 93 | `test_task_detail_inaccessible_by_unrelated_user` | 無関係ユーザーには 404 | ❌ |
-| 94 | `test_task_detail_breadcrumbs_include_ancestors` | 子タスク詳細のパンくずに親・子の順で含まれる | ✅ |
-| 95 | `test_task_detail_breadcrumbs_root_task` | ルートタスクのパンくずは自分自身のみ | ✅ |
-| 96 | `test_task_create_with_project_param_sets_project` | `?project=` パラメータでプロジェクトが設定される | ✅ |
-| 97 | `test_task_create_sets_assignee_to_current_user` | タスク作成時の担当者がログインユーザーになる | ✅ |
-| 98 | `test_task_create_with_parent_param_sets_parent` | `?task=` パラメータで parent と project が設定される | ✅ |
-| 99 | `test_task_create_done_status_sets_completed_at` | 完了ステータスで作成すると `completed_at` が設定される | ✅ |
-| 100 | `test_task_create_open_status_leaves_completed_at_null` | 未完了ステータスで作成すると `completed_at` が NULL | ✅ |
-| 101 | `test_task_create_unrelated_project_param_returns_500` | 🐛 非参加プロジェクト指定時に project 未設定で IntegrityError → 500 | 🐛 |
-| 102 | `test_task_update_sets_completed_at_when_done` | 完了ステータスに更新すると `completed_at` が設定される | ✅ |
-| 103 | `test_task_update_clears_completed_at_when_not_done` | 未完了ステータスに戻すと `completed_at` が NULL になる | ✅ |
-| 104 | `test_task_delete_removes_task` | タスクを削除できる | ✅ |
-| 105 | `test_task_watch_adds_to_watches` | ウォッチ追加でユーザーの watches に入る | ✅ |
-| 106 | `test_task_unwatch_removes_from_watches` | ウォッチ解除で watches から外れる | ✅ |
-| 107 | `test_task_watch_unrelated_task_has_no_effect` | 無関係タスクをウォッチしても watches に追加されない | ❌ |
-| 108 | `test_task_watch_requires_login` | 未ログインでリダイレクト・ウォッチ追加されない | ❌ |
+| 96 | `test_task_list_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
+| 97 | `test_task_list_annotation_clashes_with_model_property` | 🐛 TaskListView のアノテーション名が @property と衝突し 500 | 🐛 |
+| 98 | `test_task_list_with_status_filter_annotation_bug` | 🐛 ステータスフィルター付きでも同様に 500 | 🐛 |
+| 99 | `test_task_detail_accessible_by_assignee` | 担当者本人がタスク詳細を見られる | ✅ |
+| 100 | `test_task_detail_accessible_by_project_participant` | プロジェクト参加者もタスク詳細を見られる | ✅ |
+| 101 | `test_task_detail_inaccessible_by_unrelated_user` | 無関係ユーザーには 404 | ❌ |
+| 102 | `test_task_detail_breadcrumbs_include_ancestors` | 子タスク詳細のパンくずに親・子の順で含まれる | ✅ |
+| 103 | `test_task_detail_breadcrumbs_root_task` | ルートタスクのパンくずは自分自身のみ | ✅ |
+| 104 | `test_task_create_with_project_param_sets_project` | `?project=` パラメータでプロジェクトが設定される | ✅ |
+| 105 | `test_task_create_sets_assignee_to_current_user` | タスク作成時の担当者がログインユーザーになる | ✅ |
+| 106 | `test_task_create_with_parent_param_sets_parent` | `?task=` パラメータで parent と project が設定される | ✅ |
+| 107 | `test_task_create_done_status_sets_completed_at` | 完了ステータスで作成すると `completed_at` が設定される | ✅ |
+| 108 | `test_task_create_open_status_leaves_completed_at_null` | 未完了ステータスで作成すると `completed_at` が NULL | ✅ |
+| 109 | `test_task_create_unrelated_project_param_returns_500` | 🐛 非参加プロジェクト指定時に project 未設定で IntegrityError → 500 | 🐛 |
+| 110 | `test_task_update_sets_completed_at_when_done` | 完了ステータスに更新すると `completed_at` が設定される | ✅ |
+| 111 | `test_task_update_clears_completed_at_when_not_done` | 未完了ステータスに戻すと `completed_at` が NULL になる | ✅ |
+| 112 | `test_task_delete_removes_task` | タスクを削除できる | ✅ |
+| 113 | `test_task_watch_adds_to_watches` | ウォッチ追加でユーザーの watches に入る | ✅ |
+| 114 | `test_task_unwatch_removes_from_watches` | ウォッチ解除で watches から外れる | ✅ |
+| 115 | `test_task_watch_unrelated_task_has_no_effect` | 無関係タスクをウォッチしても watches に追加されない | ❌ |
+| 116 | `test_task_watch_requires_login` | 未ログインでリダイレクト・ウォッチ追加されない | ❌ |
 
 #### CommentViewsTest
 
 | # | テストメソッド | 確認観点 | 種別 |
 |---|---------------|---------|------|
-| 109 | `test_comment_list_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
-| 110 | `test_comment_list_template_references_undefined_task_variable` | 🐛 テンプレートが未定義変数 `task` を参照し 500 | 🐛 |
-| 111 | `test_comment_detail_accessible_by_author` | 投稿者本人がコメント詳細を見られる | ✅ |
-| 112 | `test_comment_detail_accessible_by_participant` | プロジェクト参加者もコメント詳細を見られる | ✅ |
-| 113 | `test_comment_detail_inaccessible_by_unrelated_user` | 無関係ユーザーには 404 | ❌ |
-| 114 | `test_comment_create_sets_author` | コメント作成時の author がログインユーザーになる | ✅ |
-| 115 | `test_comment_create_get_with_task_param_prefills_initial` | `?task=` パラメータでフォームの initial が設定される | ✅ |
-| 116 | `test_comment_update_own` | 自分のコメントを更新できる | ✅ |
-| 117 | `test_comment_update_by_unrelated_user_returns_404` | 無関係ユーザーによる更新は 404 | ❌ |
-| 118 | `test_comment_delete_own` | 自分のコメントを削除できる | ✅ |
-| 119 | `test_comment_delete_by_unrelated_user_returns_404` | 無関係ユーザーによる削除は 404・DB に残る | ❌ |
+| 117 | `test_comment_list_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
+| 118 | `test_comment_list_template_references_undefined_task_variable` | 🐛 テンプレートが未定義変数 `task` を参照し 500 | 🐛 |
+| 119 | `test_comment_detail_accessible_by_author` | 投稿者本人がコメント詳細を見られる | ✅ |
+| 120 | `test_comment_detail_accessible_by_participant` | プロジェクト参加者もコメント詳細を見られる | ✅ |
+| 121 | `test_comment_detail_inaccessible_by_unrelated_user` | 無関係ユーザーには 404 | ❌ |
+| 122 | `test_comment_create_sets_author` | コメント作成時の author がログインユーザーになる | ✅ |
+| 123 | `test_comment_create_get_with_task_param_prefills_initial` | `?task=` パラメータでフォームの initial が設定される | ✅ |
+| 124 | `test_comment_update_own` | 自分のコメントを更新できる | ✅ |
+| 125 | `test_comment_update_by_unrelated_user_returns_404` | 無関係ユーザーによる更新は 404 | ❌ |
+| 126 | `test_comment_delete_own` | 自分のコメントを削除できる | ✅ |
+| 127 | `test_comment_delete_by_unrelated_user_returns_404` | 無関係ユーザーによる削除は 404・DB に残る | ❌ |
 
 ---
 
@@ -241,25 +254,25 @@
 
 | # | テストメソッド | 確認観点 | 種別 |
 |---|---------------|---------|------|
-| 120 | `test_str` | `__str__` が "company name" を返す | ✅ |
-| 121 | `test_count_per_case_default_is_one` | `count_per_case` のデフォルト値が 1 | ✅ |
-| 122 | `test_company_and_name_can_be_blank` | company・name が空でも作成できる | ✅ |
+| 128 | `test_str` | `__str__` が "company name" を返す | ✅ |
+| 129 | `test_count_per_case_default_is_one` | `count_per_case` のデフォルト値が 1 | ✅ |
+| 130 | `test_company_and_name_can_be_blank` | company・name が空でも作成できる | ✅ |
 
 #### InventoryModelTest
 
 | # | テストメソッド | 確認観点 | 種別 |
 |---|---------------|---------|------|
-| 123 | `test_str` | `__str__` が name を返す | ✅ |
-| 124 | `test_unique_together_item_inventory_raises_on_duplicate` | 同じ item × inventory の組み合わせは IntegrityError | ❌ |
-| 125 | `test_previous_inventory_link` | `previous_inventory` と `next_inventory` の双方向リンク | ✅ |
+| 131 | `test_str` | `__str__` が name を返す | ✅ |
+| 132 | `test_unique_together_item_inventory_raises_on_duplicate` | 同じ item × inventory の組み合わせは IntegrityError | ❌ |
+| 133 | `test_previous_inventory_link` | `previous_inventory` と `next_inventory` の双方向リンク | ✅ |
 
 #### EventModelTest
 
 | # | テストメソッド | 確認観点 | 種別 |
 |---|---------------|---------|------|
-| 126 | `test_previous_event_link` | `previous_event` と `next_event` の双方向リンク | ✅ |
-| 127 | `test_previous_event_is_optional` | `previous_event` がデフォルト NULL | ✅ |
-| 128 | `test_participant_count_is_optional` | `participant_count` がデフォルト NULL | ✅ |
+| 134 | `test_previous_event_link` | `previous_event` と `next_event` の双方向リンク | ✅ |
+| 135 | `test_previous_event_is_optional` | `previous_event` がデフォルト NULL | ✅ |
+| 136 | `test_participant_count_is_optional` | `participant_count` がデフォルト NULL | ✅ |
 
 ---
 
@@ -269,13 +282,13 @@
 
 | # | テストメソッド | 確認観点 | 種別 |
 |---|---------------|---------|------|
-| 129 | `test_single_item_counts_returned_correctly` | 今回・前回の case_count / item_count が正しく返る | ✅ |
-| 130 | `test_no_previous_inventory_has_no_previous_counts` | 前回インベントリなしでも今回の値は返る | ✅ |
-| 131 | `test_multiple_items_all_returned` | 複数アイテムが全件返る | ✅ |
-| 132 | `test_item_only_in_current_has_null_previous` | 今回のみのアイテムは previous_* が NULL | ❌ |
-| 133 | `test_item_only_in_previous_has_null_current` | 前回のみのアイテムは current_* が NULL | ❌ |
-| 134 | `test_item_unchanged_still_returned` | 変化のないアイテムも返る（今回 = 前回） | ✅ |
-| 135 | `test_empty_inventory_returns_empty_queryset` | アイテムなしで空のクエリセットが返る | ✅ |
+| 137 | `test_single_item_counts_returned_correctly` | 今回・前回の case_count / item_count が正しく返る | ✅ |
+| 138 | `test_no_previous_inventory_has_no_previous_counts` | 前回インベントリなしでも今回の値は返る | ✅ |
+| 139 | `test_multiple_items_all_returned` | 複数アイテムが全件返る | ✅ |
+| 140 | `test_item_only_in_current_has_null_previous` | 今回のみのアイテムは previous_* が NULL | ❌ |
+| 141 | `test_item_only_in_previous_has_null_current` | 前回のみのアイテムは current_* が NULL | ❌ |
+| 142 | `test_item_unchanged_still_returned` | 変化のないアイテムも返る（今回 = 前回） | ✅ |
+| 143 | `test_empty_inventory_returns_empty_queryset` | アイテムなしで空のクエリセットが返る | ✅ |
 
 ---
 
@@ -285,34 +298,34 @@
 
 | # | テストメソッド | 確認観点 | 種別 |
 |---|---------------|---------|------|
-| 136 | `test_event_list_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
-| 137 | `test_event_list_template_does_not_exist` | 🐛 `event_list.html` が存在せず 500 | 🐛 |
-| 138 | `test_event_detail_own` | 自分のイベント詳細が 200 | ✅ |
-| 139 | `test_event_detail_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
-| 140 | `test_event_detail_other_returns_404` | 他ユーザーのイベント詳細は 404 | ❌ |
-| 141 | `test_event_create_get_returns_200` | イベント作成フォームが 200 | ✅ |
-| 142 | `test_event_create_with_previous_param_prefills_form` | `?previous=` で `previous_event` が initial に設定される | ✅ |
-| 143 | `test_event_create_post_creates_event` | 正常なPOSTでイベントが作成される | ✅ |
-| 144 | `test_event_update_changes_date` | イベントの `event_date` を更新できる | ✅ |
-| 145 | `test_event_update_other_returns_404` | 他ユーザーのイベント更新は 404 | ❌ |
-| 146 | `test_event_delete_removes_event` | イベントを削除できる | ✅ |
-| 147 | `test_event_delete_other_returns_404` | 他ユーザーのイベント削除は 404・DB に残る | ❌ |
+| 144 | `test_event_list_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
+| 145 | `test_event_list_template_does_not_exist` | 🐛 `event_list.html` が存在せず 500 | 🐛 |
+| 146 | `test_event_detail_own` | 自分のイベント詳細が 200 | ✅ |
+| 147 | `test_event_detail_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
+| 148 | `test_event_detail_other_returns_404` | 他ユーザーのイベント詳細は 404 | ❌ |
+| 149 | `test_event_create_get_returns_200` | イベント作成フォームが 200 | ✅ |
+| 150 | `test_event_create_with_previous_param_prefills_form` | `?previous=` で `previous_event` が initial に設定される | ✅ |
+| 151 | `test_event_create_post_creates_event` | 正常なPOSTでイベントが作成される | ✅ |
+| 152 | `test_event_update_changes_date` | イベントの `event_date` を更新できる | ✅ |
+| 153 | `test_event_update_other_returns_404` | 他ユーザーのイベント更新は 404 | ❌ |
+| 154 | `test_event_delete_removes_event` | イベントを削除できる | ✅ |
+| 155 | `test_event_delete_other_returns_404` | 他ユーザーのイベント削除は 404・DB に残る | ❌ |
 
 #### InventoryViewsTest
 
 | # | テストメソッド | 確認観点 | 種別 |
 |---|---------------|---------|------|
-| 148 | `test_inventory_list_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
-| 149 | `test_inventory_list_template_does_not_exist` | 🐛 `inventory_list.html` が存在せず 500 | 🐛 |
-| 150 | `test_inventory_detail_returns_200` | 自分のインベントリ詳細が 200 | ✅ |
-| 151 | `test_inventory_detail_context_includes_items` | 詳細コンテキストに `items`（差分）が含まれる | ✅ |
-| 152 | `test_inventory_detail_other_returns_404` | 他ユーザーのインベントリ詳細は 404 | ❌ |
-| 153 | `test_inventory_create_get_with_previous_param_prefills_form` | `?previous=` で `previous_inventory` が initial に設定される | ✅ |
-| 154 | `test_inventory_create_get_with_previous_clears_name` | `?previous=` 指定時に name が空文字でリセットされる | ✅ |
-| 155 | `test_inventory_update_get_returns_200` | 自分のインベントリ更新フォームが 200 | ✅ |
-| 156 | `test_inventory_update_other_returns_404` | 他ユーザーのインベントリ更新フォームは 404 | ❌ |
-| 157 | `test_inventory_delete_removes_inventory` | インベントリを削除できる | ✅ |
-| 158 | `test_inventory_delete_other_returns_404` | 他ユーザーのインベントリ削除は 404・DB に残る | ❌ |
+| 156 | `test_inventory_list_requires_login` | 未ログインでログイン画面へリダイレクト | ❌ |
+| 157 | `test_inventory_list_template_does_not_exist` | 🐛 `inventory_list.html` が存在せず 500 | 🐛 |
+| 158 | `test_inventory_detail_returns_200` | 自分のインベントリ詳細が 200 | ✅ |
+| 159 | `test_inventory_detail_context_includes_items` | 詳細コンテキストに `items`（差分）が含まれる | ✅ |
+| 160 | `test_inventory_detail_other_returns_404` | 他ユーザーのインベントリ詳細は 404 | ❌ |
+| 161 | `test_inventory_create_get_with_previous_param_prefills_form` | `?previous=` で `previous_inventory` が initial に設定される | ✅ |
+| 162 | `test_inventory_create_get_with_previous_clears_name` | `?previous=` 指定時に name が空文字でリセットされる | ✅ |
+| 163 | `test_inventory_update_get_returns_200` | 自分のインベントリ更新フォームが 200 | ✅ |
+| 164 | `test_inventory_update_other_returns_404` | 他ユーザーのインベントリ更新フォームは 404 | ❌ |
+| 165 | `test_inventory_delete_removes_inventory` | インベントリを削除できる | ✅ |
+| 166 | `test_inventory_delete_other_returns_404` | 他ユーザーのインベントリ削除は 404・DB に残る | ❌ |
 
 ---
 
@@ -320,11 +333,11 @@
 
 | バグ | 影響箇所 | テスト # |
 |------|---------|---------|
-| `TaskListView` が `completed_subtask_count` / `total_subtask_count` アノテーション名を Task の `@property` と同名で定義しており、クエリセット反復時に `AttributeError` で 500 | `task_list` 画面 | 89, 90 |
-| プロジェクト作成で非参加プロジェクトの `?project=` を指定した場合、`project_id` が NULL のまま保存されて `IntegrityError` が発生し 500 | タスク作成画面 | 101 |
-| `comment_list_component.html` が未定義変数 `task` を参照（`{{ comment.description\|markdown:task.project }}`）しており 500 | コメント一覧画面 | 110 |
-| `event_app/event_list.html` テンプレートが存在しない | イベント一覧画面 | 137 |
-| `event_app/inventory_list.html` テンプレートが存在しない | インベントリ一覧画面 | 149 |
+| `TaskListView` が `completed_subtask_count` / `total_subtask_count` アノテーション名を Task の `@property` と同名で定義しており、クエリセット反復時に `AttributeError` で 500 | `task_list` 画面 | 97, 98 |
+| プロジェクト作成で非参加プロジェクトの `?project=` を指定した場合、`project_id` が NULL のまま保存されて `IntegrityError` が発生し 500 | タスク作成画面 | 109 |
+| `comment_list_component.html` が未定義変数 `task` を参照（`{{ comment.description\|markdown:task.project }}`）しており 500 | コメント一覧画面 | 118 |
+| `event_app/event_list.html` テンプレートが存在しない | イベント一覧画面 | 145 |
+| `event_app/inventory_list.html` テンプレートが存在しない | インベントリ一覧画面 | 157 |
 
 ---
 
@@ -338,15 +351,16 @@
 | DSL 層（grammar） | 10 |
 | ルール処理層 | 9 |
 | シグナル層 | 4 |
+| ASSIGN ルール統合 | 8 |
 | フォーム層 | 5 |
 | ビュー層（task_app） | 54 |
 | モデル層（event_app） | 9 |
 | ビジネスロジック層（event_app） | 7 |
 | ビュー層（event_app） | 23 |
-| **合計** | **158** |
+| **合計** | **166** |
 
 | 種別 | 件数 |
 |------|-----|
-| ✅ 正常系 | 95 |
-| ❌ 異常系・境界値 | 58 |
+| ✅ 正常系 | 98 |
+| ❌ 異常系・境界値 | 63 |
 | 🐛 既知バグ文書化 | 5 |

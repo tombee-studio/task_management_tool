@@ -100,15 +100,14 @@ def execute_assign(task_id, username):
     """タスクの担当者をユーザー名で変更する。
 
     タスクまたはユーザーが存在しない場合は何もしない。
+    QuerySet.update() を使うことで post_save シグナルの再発火を防ぐ。
     """
     User = get_user_model()
     try:
-        task = Task.objects.get(pk=task_id)
         user = User.objects.get(username=username)
-    except (Task.DoesNotExist, User.DoesNotExist):
+    except User.DoesNotExist:
         return
-    task.assignee = user
-    task.save()
+    Task.objects.filter(pk=task_id).update(assignee=user)
 
 
 def execute_ast(ast):

@@ -430,6 +430,91 @@ class SignalTest(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# ASSIGN ルール統合テスト
+# ---------------------------------------------------------------------------
+
+class AssignRuleIntegrationTest(TestCase):
+    """ASSIGN DSL コマンドがルール・シグナル経由で正常に動作することを検証する。"""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username="owner", password="p")
+        self.bob = User.objects.create_user(username="bob", password="p")
+        self.status = Status.objects.create(name="Open")
+        self.project = Project.objects.create(name="P")
+        self.task = Task.objects.create(
+            title="T", project=self.project, assignee=self.owner, status=self.status
+        )
+
+    def _assign_rule(self, enabled=True):
+        return Rule.objects.create(
+            project=self.project, name="R",
+            pattern=r"assign to (\w+)",
+            dsl_template="ASSIGN {task_id} TO {group1}",
+            enabled=enabled,
+        )
+
+    # --- process_task_rules 直接呼び出し ---
+
+    def test_assign_rule_changes_assignee(self):
+        self._assign_rule()
+        process_task_rules(self.task, text="assign to bob")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.bob)
+
+    def test_assign_rule_no_match_preserves_assignee(self):
+        self._assign_rule()
+        process_task_rules(self.task, text="no match here")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.owner)
+
+    def test_assign_rule_disabled_preserves_assignee(self):
+        self._assign_rule(enabled=False)
+        process_task_rules(self.task, text="assign to bob")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.owner)
+
+    def test_assign_rule_nonexistent_user_preserves_assignee(self):
+        self._assign_rule()
+        process_task_rules(self.task, text="assign to nobody")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.owner)
+
+    # --- Task 保存シグナル ---
+
+    def test_task_save_triggers_assign_rule(self):
+        self._assign_rule()
+        self.task.description = "assign to bob"
+        self.task.save()
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.bob)
+
+    def test_task_save_no_match_preserves_assignee(self):
+        self._assign_rule()
+        self.task.description = "just a description"
+        self.task.save()
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.owner)
+
+    # --- Comment 保存シグナル ---
+
+    def test_comment_save_triggers_assign_rule(self):
+        self._assign_rule()
+        Comment.objects.create(
+            author=self.owner, task=self.task, description="assign to bob"
+        )
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.bob)
+
+    def test_comment_save_no_match_preserves_assignee(self):
+        self._assign_rule()
+        Comment.objects.create(
+            author=self.owner, task=self.task, description="just a comment"
+        )
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.owner)
+
+
+# ---------------------------------------------------------------------------
 # Form
 # ---------------------------------------------------------------------------
 
