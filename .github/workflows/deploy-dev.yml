@@ -7,7 +7,6 @@ on:
 
 env:
   AWS_REGION: ap-northeast-1
-  TF_WORKSPACE: dev
 
 jobs:
   deploy:
