@@ -62,7 +62,7 @@ jobs:
         id: build-image
         env:
           ECR_URL: ${{ steps.tf.outputs.ecr_url }}
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE_TAG: "latest"
         run: |
           docker buildx build \
             --platform linux/arm64 \
@@ -70,7 +70,6 @@ jobs:
             --sbom=false \
             --build-arg GIT_HASH=$IMAGE_TAG \
             -t $ECR_URL:$IMAGE_TAG \
-            -t $ECR_URL:latest \
             --push \
             --no-cache \
             ./django-app
