@@ -15,6 +15,7 @@ Rules:
   blank lines : blank line after first line, and before "Task:"
   task_id     : integer
 """
+import os
 import re
 import sys
 
@@ -26,8 +27,9 @@ def error(msg):
 
 def main():
     with open(sys.argv[1], encoding="utf-8", errors="replace") as f:
-        raw = f.read().splitlines()
+        content = f.read()
 
+    raw = content.splitlines()
     lines = [l for l in raw if not l.startswith("#")]
 
     while lines and not lines[-1].strip():
@@ -57,9 +59,10 @@ def main():
             f"  Got: {first!r}"
         )
 
-    # Last line: Task: <id>
+    # Last line: Task: <id>  (plain or already rewritten as Markdown link)
     last = lines[-1]
-    if not re.match(r"^Task: \d+$", last):
+    task_match = re.match(r"^Task: (\d+)$", last) or re.match(r"^Task: \[(\d+)\]\(https://\S+\)$", last)
+    if not task_match:
         error(f"Last line must be 'Task: <number>'.\n  Got: {last!r}")
 
     # Blank line after first line
@@ -78,6 +81,20 @@ def main():
             error(f"Line {i} must be ASCII only.\n  Got: {line!r}")
         if len(line) > 50:
             error(f"Line {i} must be 50 characters or less (currently {len(line)}).\n  Got: {line!r}")
+
+    # Rewrite plain Task line as Markdown link if not already done
+    if re.match(r"^Task: \d+$", last):
+        base_url = os.environ.get("TASK_URL", "").rstrip("/")
+        if not base_url:
+            error("TASK_URL environment variable is not set.")
+        content = re.sub(
+            r"^Task: (\d+)$",
+            lambda mo: f"Task: [{mo.group(1)}]({base_url}/{mo.group(1)})",
+            content,
+            flags=re.MULTILINE,
+        )
+        with open(sys.argv[1], "w", encoding="utf-8") as f:
+            f.write(content)
 
 
 if __name__ == "__main__":
