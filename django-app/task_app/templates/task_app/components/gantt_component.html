@@ -1,0 +1,67 @@
+{% if gantt %}
+<div class="gantt-wrapper">
+  <div class="gantt-container" style="--day-pct: {{ gantt.day_pct }}%;">
+
+    <!-- ヘッダー行（月ラベル） -->
+    <div class="gantt-row gantt-header-row">
+      <div class="gantt-name-col">名前</div>
+      <div class="gantt-bar-area">
+        {% for label in gantt.date_labels %}
+        <div class="gantt-tick" style="left: {{ label.pct }}%;"></div>
+        <div class="gantt-date-label" style="left: {{ label.pct }}%;">{{ label.label }}</div>
+        {% endfor %}
+        <div class="gantt-today-line" style="left: {{ gantt.today_pct }}%;"></div>
+      </div>
+    </div>
+
+    <!-- イベント行 -->
+    {% for event_item in gantt.events %}
+    <div class="gantt-row gantt-event-row">
+      <div class="gantt-name-col gantt-event-name">
+        <a href="{% url 'event_detail' event_item.event.pk %}">{{ event_item.event }}</a>
+      </div>
+      <div class="gantt-bar-area">
+        {% for label in gantt.date_labels %}
+        <div class="gantt-tick" style="left: {{ label.pct }}%;"></div>
+        {% endfor %}
+        <div class="gantt-today-line" style="left: {{ gantt.today_pct }}%;"></div>
+        <div class="gantt-event-marker" style="left: {{ event_item.pct }}%;"
+             title="{{ event_item.event.event_date|date:'Y/m/d' }}"></div>
+      </div>
+    </div>
+    {% endfor %}
+
+    <!-- タスク行 -->
+    {% for task_item in gantt.tasks %}
+    <div class="gantt-row gantt-task-row">
+      <div class="gantt-name-col" style="padding-left: {{ task_item.margin_left }}px;">
+        <a href="{% url 'task_detail' task_item.task.pk %}">{{ task_item.task.title }}</a>
+      </div>
+      <div class="gantt-bar-area">
+        {% for label in gantt.date_labels %}
+        <div class="gantt-tick" style="left: {{ label.pct }}%;"></div>
+        {% endfor %}
+        <div class="gantt-today-line" style="left: {{ gantt.today_pct }}%;"></div>
+        {% if task_item.has_deadline %}
+        <div class="gantt-bar gantt-bar-active"
+          style="left: {{ task_item.start_pct }}%; width: {{ task_item.width_pct }}%;"
+          title="{{ task_item.task.title }}: {{ task_item.task.deadline|date:'Y/m/d' }}まで">
+        </div>
+        {% else %}
+        <div class="gantt-dot" style="left: {{ task_item.start_pct }}%;"
+             title="{{ task_item.task.title }}: 期日未設定"></div>
+        {% endif %}
+      </div>
+    </div>
+    {% empty %}
+    <div class="gantt-row">
+      <div class="gantt-name-col" style="color: #999;">タスクはまだ登録されていません。</div>
+      <div class="gantt-bar-area"></div>
+    </div>
+    {% endfor %}
+
+  </div>
+</div>
+{% else %}
+<p style="color: #999; padding: 8px;">表示できるデータがありません。</p>
+{% endif %}
