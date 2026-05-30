@@ -68,6 +68,14 @@ class EventModelTest(TestCase):
         e = Event.objects.create(event_date="2026-01-01", project=self.project)
         self.assertIsNone(e.participant_count)
 
+    def test_str_with_name(self):
+        e = Event.objects.create(event_date="2026-06-01", project=self.project, name="Summer Event")
+        self.assertEqual(str(e), "2026-06-01 Summer Event")
+
+    def test_str_without_name(self):
+        e = Event.objects.create(event_date="2026-06-01", project=self.project, name="")
+        self.assertEqual(str(e), "2026-06-01")
+
 
 # ---------------------------------------------------------------------------
 # Inventory.get_previous_difference
