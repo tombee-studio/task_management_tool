@@ -10,7 +10,7 @@ from .models import Task
 _GRAMMAR = (Path(__file__).parent / "dsl_grammar.lark").read_text()
 
 _STATEMENT_RE = re.compile(
-    r"^\s*(LINK|TAG|PARENT|ASSIGN|EVENT)\b",
+    r"^\s*(LINK|TAG|PARENT|ASSIGN)\b",
     re.IGNORECASE,
 )
 
@@ -39,10 +39,6 @@ class _DslTransformer(Transformer):
     def assign_stmt(self, args):
         """ASSIGN コマンドを ("assign", task_id, username) に変換する。"""
         return ("assign", int(args[0]), args[1])
-
-    def event_stmt(self, args):
-        """EVENT コマンドを ("event", task_id, event_id) に変換する。"""
-        return ("event", int(args[0]), int(args[1]))
 
     def name_or_string(self, args):
         """識別子またはクォート文字列を Python の str に変換する。
@@ -100,19 +96,6 @@ def execute_link(src_id, dst_id):
     src.related_tasks.add(dst)
 
 
-def execute_event(task_id, event_id):
-    """タスクをイベントに紐付ける。
-
-    タスクまたはイベントが存在しない場合は何もしない。
-    """
-    from event_app.models import Event
-    try:
-        event = Event.objects.get(pk=event_id)
-    except Event.DoesNotExist:
-        return
-    Task.objects.filter(pk=task_id).update(event=event)
-
-
 def execute_assign(task_id, username):
     """タスクの担当者をユーザー名で変更する。
 
@@ -140,9 +123,6 @@ def execute_ast(ast):
         elif command_type == "assign":
             _, task_id, username = command
             execute_assign(task_id, username)
-        elif command_type == "event":
-            _, task_id, event_id = command
-            execute_event(task_id, event_id)
 
 
 @transaction.atomic

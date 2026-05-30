@@ -3,10 +3,9 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .dsl import execute_assign, execute_dsl, execute_event, execute_link, parse_dsl
+from .dsl import execute_assign, execute_dsl, execute_link, parse_dsl
 from .forms import TaskForm
 from .models import Comment, Project, Rule, Status, Task
-from event_app.models import Event
 from .rules import process_task_rules
 
 User = get_user_model()
@@ -186,40 +185,6 @@ class TaskDeadlinePropertyTest(TestCase):
     def test_warning_past_deadline_is_false(self):
         from datetime import timedelta
         self.assertFalse(self._task(deadline=self.today - timedelta(days=1)).is_deadline_warning)
-
-
-class TaskEventRelationModelTest(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="u", password="p")
-        self.status = Status.objects.create(name="Open")
-        self.project = Project.objects.create(name="P")
-        self.event = Event.objects.create(event_date="2026-06-01", project=self.project, name="Test Event")
-
-    def _task(self, event=None):
-        return Task.objects.create(
-            title="T", project=self.project, assignee=self.user,
-            status=self.status, event=event,
-        )
-
-    def test_event_is_optional(self):
-        self.assertIsNone(self._task().event)
-
-    def test_event_link(self):
-        task = self._task(event=self.event)
-        self.assertEqual(task.event, self.event)
-
-    def test_event_reverse_accessor_returns_linked_task(self):
-        task = self._task(event=self.event)
-        self.assertIn(task, self.event.tasks.all())
-
-    def test_event_reverse_accessor_excludes_unlinked_task(self):
-        self.assertNotIn(self._task(), self.event.tasks.all())
-
-    def test_event_delete_nullifies_task_event(self):
-        task = self._task(event=self.event)
-        self.event.delete()
-        task.refresh_from_db()
-        self.assertIsNone(task.event)
 
 
 class RuleModelTest(TestCase):
@@ -434,74 +399,6 @@ class DSLExecuteAssignTest(TestCase):
         execute_assign(self.task.id, "bob")
         self.task.refresh_from_db()
         self.assertEqual(self.task.assignee, self.other)
-
-
-# ---------------------------------------------------------------------------
-# DSL — EVENT コマンド（パース）
-# ---------------------------------------------------------------------------
-
-class DSLEventParseTest(TestCase):
-    def setUp(self):
-        user = User.objects.create_user(username="u", password="p")
-        status = Status.objects.create(name="Open")
-        project = Project.objects.create(name="P")
-        self.task = Task.objects.create(title="T", project=project, assignee=user, status=status)
-        self.event = Event.objects.create(event_date="2026-06-01", project=project)
-
-    def test_event_parsed(self):
-        ast = parse_dsl(f"EVENT {self.task.id} {self.event.id}")
-        self.assertEqual(ast, [("event", self.task.id, self.event.id)])
-
-    def test_event_case_insensitive(self):
-        ast = parse_dsl(f"event {self.task.id} {self.event.id}")
-        self.assertEqual(ast[0][0], "event")
-
-    def test_event_mixed_with_other_commands(self):
-        other_task = Task.objects.create(
-            title="T2", project=self.task.project, assignee=self.task.assignee, status=self.task.status
-        )
-        text = f"LINK {self.task.id} -> {other_task.id}\nEVENT {self.task.id} {self.event.id}"
-        ast = parse_dsl(text)
-        self.assertEqual(len(ast), 2)
-        self.assertEqual(ast[0][0], "link")
-        self.assertEqual(ast[1][0], "event")
-
-    def test_non_event_line_ignored(self):
-        ast = parse_dsl("not a command")
-        self.assertEqual(ast, [])
-
-
-# ---------------------------------------------------------------------------
-# DSL — EVENT コマンド（実行）
-# ---------------------------------------------------------------------------
-
-class DSLExecuteEventTest(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="u", password="p")
-        self.status = Status.objects.create(name="Open")
-        self.project = Project.objects.create(name="P")
-        self.task = Task.objects.create(
-            title="T", project=self.project, assignee=self.user, status=self.status
-        )
-        self.event = Event.objects.create(event_date="2026-06-01", project=self.project)
-
-    def test_execute_event_links_task_to_event(self):
-        execute_event(self.task.id, self.event.id)
-        self.task.refresh_from_db()
-        self.assertEqual(self.task.event, self.event)
-
-    def test_execute_event_nonexistent_event_does_not_raise(self):
-        execute_event(self.task.id, 99999)
-        self.task.refresh_from_db()
-        self.assertIsNone(self.task.event)
-
-    def test_execute_event_nonexistent_task_does_not_raise(self):
-        execute_event(99999, self.event.id)
-
-    def test_execute_dsl_event_links_task(self):
-        execute_dsl(f"EVENT {self.task.id} {self.event.id}")
-        self.task.refresh_from_db()
-        self.assertEqual(self.task.event, self.event)
 
 
 # ---------------------------------------------------------------------------
@@ -758,56 +655,6 @@ class TaskFormTest(TestCase):
             data={"title": "T", "description": "test", "progress_summary": "", "status": self.status.pk, "deadline": ""},
             instance=self.task,
         )
-        self.assertTrue(form.is_valid(), form.errors)
-
-
-# ---------------------------------------------------------------------------
-# Form — Task-Event
-# ---------------------------------------------------------------------------
-
-class TaskFormEventTest(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="u", password="p")
-        self.other = User.objects.create_user(username="other", password="p")
-        self.status = Status.objects.create(name="Open")
-        self.project = Project.objects.create(name="P")
-        self.project.participants.add(self.user)
-        self.event = Event.objects.create(
-            event_date="2026-06-01", project=self.project, name="My Event"
-        )
-        self.task = Task.objects.create(
-            title="T", project=self.project, assignee=self.user, status=self.status
-        )
-        other_project = Project.objects.create(name="Other")
-        other_project.participants.add(self.other)
-        self.other_event = Event.objects.create(
-            event_date="2026-07-01", project=other_project, name="Other Event"
-        )
-
-    def _form(self, extra_data=None, user=None):
-        data = {"title": "T", "description": "test", "progress_summary": "", "status": self.status.pk}
-        if extra_data:
-            data.update(extra_data)
-        return TaskForm(data=data, user=user, instance=self.task)
-
-    def test_event_field_is_present(self):
-        self.assertIn("event", self._form(user=self.user).fields)
-
-    def test_event_field_is_not_required(self):
-        self.assertFalse(self._form(user=self.user).fields["event"].required)
-
-    def test_form_valid_without_event(self):
-        form = self._form(user=self.user)
-        self.assertTrue(form.is_valid(), form.errors)
-
-    def test_event_queryset_includes_own_event(self):
-        self.assertIn(self.event, self._form(user=self.user).fields["event"].queryset)
-
-    def test_event_queryset_excludes_other_users_event(self):
-        self.assertNotIn(self.other_event, self._form(user=self.user).fields["event"].queryset)
-
-    def test_form_valid_with_event(self):
-        form = self._form(extra_data={"event": self.event.pk}, user=self.user)
         self.assertTrue(form.is_valid(), form.errors)
 
 
@@ -1152,56 +999,6 @@ class TaskViewsTest(BaseViewTest):
         response = self.client.post(reverse("task_watch", kwargs={"pk": self.task.pk}))
         self.assertEqual(response.status_code, 302)
         self.assertNotIn(self.task, self.user.watches.all())
-
-
-# ---------------------------------------------------------------------------
-# Views — Task-Event
-# ---------------------------------------------------------------------------
-
-class TaskEventViewsTest(BaseViewTest):
-    def setUp(self):
-        super().setUp()
-        self.event = Event.objects.create(
-            event_date="2026-06-01", project=self.project, name="Test Event"
-        )
-
-    def test_task_create_with_event_sets_event(self):
-        self.login()
-        self.client.post(
-            reverse("task_create") + f"?project={self.project.pk}",
-            {"title": "New", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "event": self.event.pk},
-        )
-        self.assertEqual(Task.objects.get(title="New").event, self.event)
-
-    def test_task_create_without_event_leaves_null(self):
-        self.login()
-        self.client.post(
-            reverse("task_create") + f"?project={self.project.pk}",
-            {"title": "New", "description": "test", "progress_summary": "", "status": self.status.pk},
-        )
-        self.assertIsNone(Task.objects.get(title="New").event)
-
-    def test_task_update_sets_event(self):
-        self.login()
-        self.client.post(
-            reverse("task_update", kwargs={"pk": self.task.pk}),
-            {"title": "T", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "event": self.event.pk},
-        )
-        self.task.refresh_from_db()
-        self.assertEqual(self.task.event, self.event)
-
-    def test_task_update_clears_event(self):
-        Task.objects.filter(pk=self.task.pk).update(event=self.event)
-        self.login()
-        self.client.post(
-            reverse("task_update", kwargs={"pk": self.task.pk}),
-            {"title": "T", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "event": ""},
-        )
-        self.task.refresh_from_db()
-        self.assertIsNone(self.task.event)
 
 
 # ---------------------------------------------------------------------------

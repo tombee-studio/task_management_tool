@@ -8,8 +8,7 @@
 //   LINK    <src>  -> <dst>          create a bidirectional relation
 //   TAG     <id>   <name>            assign a label  (future)
 //   PARENT  <child> -> <parent>      set hierarchy   (future)
-//   ASSIGN  <id>   TO <username>     set assignee
-//   EVENT   <task_id> <event_id>     link task to event
+//   ASSIGN  <id>   TO <username>     set assignee    (future)
 
 start : statement*
 
@@ -17,7 +16,6 @@ start : statement*
            | tag_stmt
            | parent_stmt
            | assign_stmt
-           | event_stmt
 
 // LINK 1 -> 2
 // Mirrors Cypher's CREATE (a)-[:RELATES]->(b) but concise
@@ -34,10 +32,6 @@ parent_stmt : "PARENT"i INTEGER "->" INTEGER
 // ASSIGN 1 TO "alice"  |  ASSIGN 1 TO alice
 // Mirrors Cypher's SET n.assignee = value
 assign_stmt : "ASSIGN"i INTEGER "TO"i name_or_string
-
-// EVENT 1 2
-// Link task 1 to event 2
-event_stmt  : "EVENT"i  INTEGER INTEGER
 
 // Values may be bare identifiers or double-quoted strings
 name_or_string : NAME | ESCAPED_STRING

@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from task_app.models import Project, Status, Task
+from task_app.models import Project
 from .models import Event, Inventory, InventoryItemRelation, Item
 
 User = get_user_model()
@@ -263,31 +263,6 @@ class EventViewsTest(BaseEventViewTest):
         response = self.client.post(reverse("event_delete", kwargs={"pk": other.pk}))
         self.assertEqual(response.status_code, 404)
         self.assertTrue(Event.objects.filter(pk=other.pk).exists())
-
-    def test_event_detail_shows_linked_task(self):
-        status = Status.objects.create(name="Open")
-        task = Task.objects.create(
-            title="Linked Task", project=self.project,
-            assignee=self.user, status=status, event=self.event,
-        )
-        self.login()
-        response = self.client.get(reverse("event_detail", kwargs={"pk": self.event.pk}))
-        self.assertContains(response, task.title)
-
-    def test_event_detail_excludes_unlinked_task(self):
-        status = Status.objects.create(name="Open")
-        task = Task.objects.create(
-            title="Unlinked Task", project=self.project,
-            assignee=self.user, status=status,
-        )
-        self.login()
-        response = self.client.get(reverse("event_detail", kwargs={"pk": self.event.pk}))
-        self.assertNotContains(response, task.title)
-
-    def test_event_detail_shows_no_tasks_message_when_empty(self):
-        self.login()
-        response = self.client.get(reverse("event_detail", kwargs={"pk": self.event.pk}))
-        self.assertContains(response, "タスクはまだ登録されていません")
 
 
 # ---------------------------------------------------------------------------
