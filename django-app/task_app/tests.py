@@ -97,6 +97,96 @@ class TaskModelTest(TestCase):
         self.assertIsNone(task.completed_at)
 
 
+class TaskDeadlinePropertyTest(TestCase):
+    def setUp(self):
+        from datetime import date, timedelta
+        self.today = date.today()
+        self.user = User.objects.create_user(username="u", password="p")
+        self.status = Status.objects.create(name="Open")
+        self.done = Status.objects.create(name="Done", is_done=True)
+        self.project = Project.objects.create(name="P")
+
+    def _task(self, deadline=None, status=None):
+        return Task.objects.create(
+            title="T",
+            project=self.project,
+            assignee=self.user,
+            status=status or self.status,
+            deadline=deadline,
+        )
+
+    # deadline_days_remaining
+
+    def test_days_remaining_no_deadline_returns_none(self):
+        self.assertIsNone(self._task().deadline_days_remaining)
+
+    def test_days_remaining_future(self):
+        from datetime import timedelta
+        task = self._task(deadline=self.today + timedelta(days=5))
+        self.assertEqual(task.deadline_days_remaining, 5)
+
+    def test_days_remaining_today(self):
+        task = self._task(deadline=self.today)
+        self.assertEqual(task.deadline_days_remaining, 0)
+
+    def test_days_remaining_past(self):
+        from datetime import timedelta
+        task = self._task(deadline=self.today - timedelta(days=2))
+        self.assertEqual(task.deadline_days_remaining, -2)
+
+    # is_deadline_urgent
+
+    def test_urgent_today(self):
+        self.assertTrue(self._task(deadline=self.today).is_deadline_urgent)
+
+    def test_urgent_tomorrow(self):
+        from datetime import timedelta
+        self.assertTrue(self._task(deadline=self.today + timedelta(days=1)).is_deadline_urgent)
+
+    def test_urgent_past_deadline(self):
+        from datetime import timedelta
+        self.assertTrue(self._task(deadline=self.today - timedelta(days=1)).is_deadline_urgent)
+
+    def test_urgent_two_days_away_is_false(self):
+        from datetime import timedelta
+        self.assertFalse(self._task(deadline=self.today + timedelta(days=2)).is_deadline_urgent)
+
+    def test_urgent_no_deadline_is_false(self):
+        self.assertFalse(self._task().is_deadline_urgent)
+
+    def test_urgent_done_task_is_false(self):
+        self.assertFalse(self._task(deadline=self.today, status=self.done).is_deadline_urgent)
+
+    # is_deadline_warning
+
+    def test_warning_two_days_away(self):
+        from datetime import timedelta
+        self.assertTrue(self._task(deadline=self.today + timedelta(days=2)).is_deadline_warning)
+
+    def test_warning_three_days_away(self):
+        from datetime import timedelta
+        self.assertTrue(self._task(deadline=self.today + timedelta(days=3)).is_deadline_warning)
+
+    def test_warning_one_day_away_is_false(self):
+        from datetime import timedelta
+        self.assertFalse(self._task(deadline=self.today + timedelta(days=1)).is_deadline_warning)
+
+    def test_warning_four_days_away_is_false(self):
+        from datetime import timedelta
+        self.assertFalse(self._task(deadline=self.today + timedelta(days=4)).is_deadline_warning)
+
+    def test_warning_no_deadline_is_false(self):
+        self.assertFalse(self._task().is_deadline_warning)
+
+    def test_warning_done_task_is_false(self):
+        from datetime import timedelta
+        self.assertFalse(self._task(deadline=self.today + timedelta(days=2), status=self.done).is_deadline_warning)
+
+    def test_warning_past_deadline_is_false(self):
+        from datetime import timedelta
+        self.assertFalse(self._task(deadline=self.today - timedelta(days=1)).is_deadline_warning)
+
+
 class RuleModelTest(TestCase):
     def setUp(self):
         self.project = Project.objects.create(name="Proj")
