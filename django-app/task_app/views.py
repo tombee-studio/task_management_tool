@@ -1,4 +1,5 @@
 import re
+from datetime import timedelta
 from django.utils import timezone
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -44,17 +45,36 @@ class ProjectListView(LoginRequiredMixin, ListView):
         active_status_list = Status.objects.filter(is_done=False)
         context["status_list"] = Status.objects.all()
         context["tasks"] = Task.objects.filter(
-            status__in=active_status_list, 
+            status__in=active_status_list,
             assignee=self.request.user)\
                 .prefetch_related(
                     Prefetch(
                         "tasks",
                         queryset=Task.objects.filter(
-                            status__in=active_status_list, 
+                            status__in=active_status_list,
                             assignee=self.request.user),
                         to_attr="filtered_tasks",
                     ))
         context["watching_tasks"] = self.request.user.watches.all()
+
+        # 最近更新されたタスク
+        period = self.request.GET.get("period", "today")
+        now = timezone.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        if period == "week":
+            updated_filter = {"updated_at__gte": today_start - timedelta(days=7)}
+        else:
+            period = "today"
+            updated_filter = {"updated_at__gte": today_start}
+
+        accessible_tasks = Task.objects.filter(
+            Q(project__participants=self.request.user) |
+            Q(assignee=self.request.user)
+        ).distinct().select_related("project", "status", "assignee")
+
+        context["recently_updated_tasks"] = accessible_tasks.filter(**updated_filter).order_by("-updated_at")
+        context["period"] = period
         return context
     
 
