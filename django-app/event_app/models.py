@@ -14,11 +14,14 @@ class Event(models.Model):
     null=False, 
     blank=False)
   previous_event = models.OneToOneField(
-    "Event", 
-    null=True, 
+    "Event",
+    null=True,
     blank=True,
     on_delete=models.SET_NULL,
     related_name="next_event")
+
+  def __str__(self):
+    return f"{self.event_date} {self.name}" if self.name else str(self.event_date)
 
 
 class Inventory(models.Model):
