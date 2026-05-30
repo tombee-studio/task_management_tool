@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 
 from .models import Project, Task, Comment
+from event_app.models import Event
 
 
 class SignUpForm(UserCreationForm):
@@ -23,10 +24,25 @@ class TaskForm(forms.ModelForm):
         required=False,
         widget=forms.DateInput(attrs={'type': 'date'})
     )
+    event = forms.ModelChoiceField(
+        queryset=Event.objects.none(),
+        required=False,
+        empty_label='（なし）',
+    )
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        if user is not None:
+            self.fields['event'].queryset = Event.objects.filter(
+                project__participants=user
+            ).order_by('-event_date')
+        else:
+            self.fields['event'].queryset = Event.objects.all().order_by('-event_date')
 
     class Meta:
         model = Task
-        fields = ['title', 'description', 'progress_summary', 'status', 'deadline']
+        fields = ['title', 'description', 'progress_summary', 'status', 'deadline', 'event']
     
     def clean(self):
         cleaned_data = super().clean()
