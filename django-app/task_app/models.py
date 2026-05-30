@@ -100,6 +100,23 @@ class Task(models.Model):
   def completed_subtask_count(self):
     return self.tasks.filter(status__is_done=True).count()
 
+  @property
+  def deadline_days_remaining(self):
+    from datetime import date
+    if not self.deadline:
+      return None
+    return (self.deadline - date.today()).days
+
+  @property
+  def is_deadline_urgent(self):
+    days = self.deadline_days_remaining
+    return days is not None and not self.status.is_done and days <= 1
+
+  @property
+  def is_deadline_warning(self):
+    days = self.deadline_days_remaining
+    return days is not None and not self.status.is_done and 2 <= days <= 3
+
 
 class Rule(models.Model):
   created_at = models.DateTimeField(auto_now_add=True)
