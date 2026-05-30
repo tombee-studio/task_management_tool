@@ -85,6 +85,12 @@ class Task(models.Model):
     symmetrical=True,
     null=True,
     blank=True)
+  event = models.ForeignKey(
+    'event_app.Event',
+    on_delete=models.SET_NULL,
+    related_name='tasks',
+    null=True,
+    blank=True)
   history = AuditlogHistoryField()
   
   objects = TreeQuerySet.as_manager(with_tree_fields=True)
