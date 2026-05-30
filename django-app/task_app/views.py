@@ -44,17 +44,16 @@ class ProjectListView(LoginRequiredMixin, ListView):
         context["status_filter"] = "&".join(status_list)
         active_status_list = Status.objects.filter(is_done=False)
         context["status_list"] = Status.objects.all()
-        context["tasks"] = Task.objects.filter(
-            status__in=active_status_list,
-            assignee=self.request.user)\
-                .prefetch_related(
-                    Prefetch(
-                        "tasks",
-                        queryset=Task.objects.filter(
-                            status__in=active_status_list,
-                            assignee=self.request.user),
-                        to_attr="filtered_tasks",
-                    ))
+        tasks_by_project = []
+        for project in self.request.user.projects.order_by("name"):
+            project_tasks = Task.objects.with_tree_fields().filter(
+                status__in=active_status_list,
+                assignee=self.request.user,
+                project=project,
+            )
+            if project_tasks.exists():
+                tasks_by_project.append((project, project_tasks))
+        context["tasks_by_project"] = tasks_by_project
         context["watching_tasks"] = self.request.user.watches.all()
 
         # 最近更新されたタスク
