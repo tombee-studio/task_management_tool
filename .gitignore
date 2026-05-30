@@ -1,10 +1,11 @@
 .claude/
 venv/
-migrations/
 __pycache__
 db.sqlite3
 .env
+.envrc
 
 .terraform*
 terraform.*
 response.json
+*.sh

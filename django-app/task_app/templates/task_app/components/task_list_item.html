@@ -1,6 +1,6 @@
 {% load markdown_extras %}
 
-<tr class="accordion{% if task.status.is_done %} task-done{% endif %}">
+<tr class="accordion{% if task.status.is_done %} task-done{% elif task.is_deadline_urgent %} task-deadline-urgent{% elif task.is_deadline_warning %} task-deadline-warning{% endif %}">
   <td class="flex-grow-1">
     <div class="line-clamp-1">
       <span class="tree-item" style="--depth: {{ task.tree_depth }};" >
@@ -18,6 +18,11 @@
   <td>
     {{ task.progress_summary|markdown:task.project|safe }}
   </td>
+  {% if not hide_project_column %}
+  <td>
+    <a href="{% url 'project_detail' task.project.pk %}">{{ task.project.name }}</a>
+  </td>
+  {% endif %}
   <td class="text-center">
     {{ task.assignee.get_full_name|default:task.assignee.username }}
   </td>

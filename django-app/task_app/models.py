@@ -85,6 +85,12 @@ class Task(models.Model):
     symmetrical=True,
     null=True,
     blank=True)
+  event = models.ForeignKey(
+    'event_app.Event',
+    on_delete=models.SET_NULL,
+    related_name='tasks',
+    null=True,
+    blank=True)
   history = AuditlogHistoryField()
   
   objects = TreeQuerySet.as_manager(with_tree_fields=True)
@@ -99,6 +105,23 @@ class Task(models.Model):
   @property
   def completed_subtask_count(self):
     return self.tasks.filter(status__is_done=True).count()
+
+  @property
+  def deadline_days_remaining(self):
+    from datetime import date
+    if not self.deadline:
+      return None
+    return (self.deadline - date.today()).days
+
+  @property
+  def is_deadline_urgent(self):
+    days = self.deadline_days_remaining
+    return days is not None and not self.status.is_done and days <= 1
+
+  @property
+  def is_deadline_warning(self):
+    days = self.deadline_days_remaining
+    return days is not None and not self.status.is_done and 2 <= days <= 3
 
 
 class Rule(models.Model):

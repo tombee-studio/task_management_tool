@@ -32,6 +32,28 @@
         transparent 6px
       );
     }
+
+    .task-deadline-warning {
+      background-color: #fffbe6;
+      background-image: repeating-linear-gradient(
+        45deg,
+        rgba(255, 200, 0, 0.25) 0,
+        rgba(255, 200, 0, 0.25) 1px,
+        transparent 1px,
+        transparent 6px
+      );
+    }
+
+    .task-deadline-urgent {
+      background-color: #fff0f0;
+      background-image: repeating-linear-gradient(
+        45deg,
+        rgba(220, 0, 0, 0.25) 0,
+        rgba(220, 0, 0, 0.25) 1px,
+        transparent 1px,
+        transparent 6px
+      );
+    }
   </style>
 
   {% block extra_head %}{% endblock %}

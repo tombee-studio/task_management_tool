@@ -1,5 +1,6 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 from .models import Task, Comment
 from .rules import process_task_rules
 
@@ -23,3 +24,5 @@ def comment_saved(sender, instance, created, **kwargs):
         process_task_rules(instance.task, text=instance.description)
     except Exception:
         pass
+    if created:
+        Task.objects.filter(pk=instance.task.pk).update(updated_at=timezone.now())

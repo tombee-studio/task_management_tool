@@ -1,4 +1,5 @@
 import re
+from datetime import timedelta
 from django.utils import timezone
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -43,18 +44,36 @@ class ProjectListView(LoginRequiredMixin, ListView):
         context["status_filter"] = "&".join(status_list)
         active_status_list = Status.objects.filter(is_done=False)
         context["status_list"] = Status.objects.all()
-        context["tasks"] = Task.objects.filter(
-            status__in=active_status_list, 
-            assignee=self.request.user)\
-                .prefetch_related(
-                    Prefetch(
-                        "tasks",
-                        queryset=Task.objects.filter(
-                            status__in=active_status_list, 
-                            assignee=self.request.user),
-                        to_attr="filtered_tasks",
-                    ))
+        tasks_by_project = []
+        for project in self.request.user.projects.order_by("name"):
+            project_tasks = Task.objects.with_tree_fields().filter(
+                status__in=active_status_list,
+                assignee=self.request.user,
+                project=project,
+            )
+            if project_tasks.exists():
+                tasks_by_project.append((project, project_tasks))
+        context["tasks_by_project"] = tasks_by_project
         context["watching_tasks"] = self.request.user.watches.all()
+
+        # 最近更新されたタスク
+        period = self.request.GET.get("period", "today")
+        now = timezone.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        if period == "week":
+            updated_filter = {"updated_at__gte": today_start - timedelta(days=7)}
+        else:
+            period = "today"
+            updated_filter = {"updated_at__gte": today_start}
+
+        accessible_tasks = Task.objects.filter(
+            Q(project__participants=self.request.user) |
+            Q(assignee=self.request.user)
+        ).distinct().select_related("project", "status", "assignee")
+
+        context["recently_updated_tasks"] = accessible_tasks.filter(**updated_filter).order_by("-updated_at")
+        context["period"] = period
         return context
     
 
@@ -294,36 +313,45 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
     model = Task
     form_class = TaskForm
     template_name = "task_app/task_form.html"
-    
-    def get_initial(self):
-        initial = super().get_initial()
 
+    def _resolve_project(self):
         project_id = self.request.GET.get("project")
-        task = self.request.GET.get("task")
+        task_id = self.request.GET.get("task")
         if project_id:
-            project = Project.objects.filter(
-                pk=project_id,
-                participants=self.request.user
+            return Project.objects.filter(
+                pk=project_id, participants=self.request.user
             ).first()
-            if project:
-                initial["project"] = project.pk
-        if task:
+        if task_id:
             parent_task = Task.objects.filter(
                 Q(project__participants=self.request.user) |
                 Q(assignee=self.request.user),
-                pk=task,
+                pk=task_id,
             ).distinct().first()
             if parent_task:
-                initial["project"] = parent_task.project.pk
-                initial["parent"] = task
+                return parent_task.project
+        return None
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['project'] = self._resolve_project()
+        return kwargs
+
+    def get_initial(self):
+        initial = super().get_initial()
+        project = self._resolve_project()
+        task_id = self.request.GET.get("task")
+        if project:
+            initial["project"] = project.pk
+        if task_id:
+            initial["parent"] = task_id
+        initial["assignee"] = self.request.user.pk
         return initial
-    
+
     def form_valid(self, form):
         project_id = self.request.GET.get("project")
         task = self.request.GET.get("task")
 
-        form.instance.assignee = self.request.user
         if project_id:
             project = Project.objects.filter(
                 pk=project_id,
@@ -354,6 +382,12 @@ class TaskUpdateView(LoginRequiredMixin, UpdateView):
     model = Task
     form_class = TaskForm
     template_name = "task_app/task_form.html"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['project'] = self.object.project
+        return kwargs
 
     def get_queryset(self):
         return Task.objects.filter(

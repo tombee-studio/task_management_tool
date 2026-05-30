@@ -2,6 +2,11 @@
 
 {% block content %}
 <div class="panel panel-default">
+  <div class="panel-heading">最近更新されたタスク</div>
+  {% include "task_app/components/recently_updated_tasks_component.html" %}
+</div>
+
+<div class="panel panel-default">
   <div class="panel-heading">プロジェクト一覧</div>
   <div class="panel-body">
     <p>
@@ -13,7 +18,14 @@
 
 <div class="panel panel-default">
   <div class="panel-heading">{{user.username}}が割り当てられているタスク</div>
-  {% include "task_app/components/task_list_component.html" with tasks=tasks %}
+  {% for project, project_tasks in tasks_by_project %}
+    <div class="panel-heading" style="background-color: #f5f5f5; border-top: 1px solid #ddd; font-size: 0.95em;">
+      <a href="{% url 'project_detail' project.pk %}?{{ status_filter }}">{{ project.name }}</a>
+    </div>
+    {% include "task_app/components/task_table_component.html" with tasks=project_tasks %}
+  {% empty %}
+    <p class="panel-body">タスクはまだ登録されていません。</p>
+  {% endfor %}
 </div>
 
 <div class="panel panel-default">

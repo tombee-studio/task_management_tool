@@ -1,0 +1,34 @@
+<div class="panel-body">
+  <div class="btn-group" role="group">
+    <a href="?period=today" class="btn btn-{% if period == 'today' %}primary{% else %}default{% endif %} btn-sm">当日</a>
+    <a href="?period=week" class="btn btn-{% if period == 'week' %}primary{% else %}default{% endif %} btn-sm">一週間</a>
+  </div>
+</div>
+{% if recently_updated_tasks %}
+<table class="table">
+  <tr>
+    <th style="width: 25%;">タイトル</th>
+    <th style="width: 20%;">プロジェクト</th>
+    <th style="width: 12%;">担当者</th>
+    <th style="width: 10%;">ステータス</th>
+    <th style="width: 18%;">更新日時</th>
+  </tr>
+  {% for task in recently_updated_tasks %}
+  <tr class="{% if task.status.is_done %}task-done{% elif task.is_deadline_urgent %}task-deadline-urgent{% elif task.is_deadline_warning %}task-deadline-warning{% endif %}">
+    <td>
+      <a href="{% url 'task_detail' task.pk %}">
+        <strong>{{ task.title }}</strong>
+      </a>
+    </td>
+    <td>
+      <a href="{% url 'project_detail' task.project.pk %}">{{ task.project.name }}</a>
+    </td>
+    <td>{{ task.assignee.get_full_name|default:task.assignee.username }}</td>
+    <td><span class="badge bg-primary">{{ task.status.name }}</span></td>
+    <td>{{ task.updated_at|date:"Y/m/d H:i" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="panel-body">この期間に更新されたタスクはありません。</p>
+{% endif %}
