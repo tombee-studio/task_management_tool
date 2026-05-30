@@ -1,0 +1,3 @@
+#!/bin/sh
+
+cd django-app && DJANGO_SETTINGS_MODULE=task_management.test_settings python manage.py test task_app event_app --verbosity=1
