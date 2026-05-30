@@ -315,40 +315,44 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
     form_class = TaskForm
     template_name = "task_app/task_form.html"
 
+    def _resolve_project(self):
+        project_id = self.request.GET.get("project")
+        task_id = self.request.GET.get("task")
+        if project_id:
+            return Project.objects.filter(
+                pk=project_id, participants=self.request.user
+            ).first()
+        if task_id:
+            parent_task = Task.objects.filter(
+                Q(project__participants=self.request.user) |
+                Q(assignee=self.request.user),
+                pk=task_id,
+            ).distinct().first()
+            if parent_task:
+                return parent_task.project
+        return None
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
+        kwargs['project'] = self._resolve_project()
         return kwargs
 
     def get_initial(self):
         initial = super().get_initial()
-
-        project_id = self.request.GET.get("project")
-        task = self.request.GET.get("task")
-        if project_id:
-            project = Project.objects.filter(
-                pk=project_id,
-                participants=self.request.user
-            ).first()
-            if project:
-                initial["project"] = project.pk
-        if task:
-            parent_task = Task.objects.filter(
-                Q(project__participants=self.request.user) |
-                Q(assignee=self.request.user),
-                pk=task,
-            ).distinct().first()
-            if parent_task:
-                initial["project"] = parent_task.project.pk
-                initial["parent"] = task
-
+        project = self._resolve_project()
+        task_id = self.request.GET.get("task")
+        if project:
+            initial["project"] = project.pk
+        if task_id:
+            initial["parent"] = task_id
+        initial["assignee"] = self.request.user.pk
         return initial
-    
+
     def form_valid(self, form):
         project_id = self.request.GET.get("project")
         task = self.request.GET.get("task")
 
-        form.instance.assignee = self.request.user
         if project_id:
             project = Project.objects.filter(
                 pk=project_id,
@@ -383,6 +387,7 @@ class TaskUpdateView(LoginRequiredMixin, UpdateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
+        kwargs['project'] = self.object.project
         return kwargs
 
     def get_queryset(self):

@@ -29,9 +29,15 @@ class TaskForm(forms.ModelForm):
         required=False,
         empty_label='（なし）',
     )
+    assignee = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        required=True,
+        label='担当者',
+    )
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
+        project = kwargs.pop('project', None)
         super().__init__(*args, **kwargs)
         if user is not None:
             self.fields['event'].queryset = Event.objects.filter(
@@ -39,10 +45,14 @@ class TaskForm(forms.ModelForm):
             ).order_by('-event_date')
         else:
             self.fields['event'].queryset = Event.objects.all().order_by('-event_date')
+        if project is not None:
+            self.fields['assignee'].queryset = project.participants.all()
+        else:
+            self.fields['assignee'].queryset = User.objects.all()
 
     class Meta:
         model = Task
-        fields = ['title', 'description', 'progress_summary', 'status', 'deadline', 'event']
+        fields = ['title', 'description', 'progress_summary', 'assignee', 'status', 'deadline', 'event']
     
     def clean(self):
         cleaned_data = super().clean()
