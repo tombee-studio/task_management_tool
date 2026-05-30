@@ -438,6 +438,196 @@ resource "aws_api_gateway_stage" "api" {
   stage_name    = var.stage
 }
 
+# -----------------------------
+# VPC Endpoints (ECS image pull用)
+# -----------------------------
+
+resource "aws_security_group" "vpc_endpoints" {
+  name        = "${local.name}-vpc-endpoints-sg"
+  description = "Security group for VPC endpoints"
+  vpc_id      = var.vpc_id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "vpc_endpoints_from_ecs" {
+  security_group_id            = aws_security_group.vpc_endpoints.id
+  referenced_security_group_id = aws_security_group.ecs.id
+  ip_protocol                  = "tcp"
+  from_port                    = 443
+  to_port                      = 443
+  description                  = "Allow HTTPS from ECS tasks"
+}
+
+resource "aws_vpc_endpoint" "ecr_api" {
+  vpc_id              = var.vpc_id
+  service_name        = "com.amazonaws.${var.aws_region}.ecr.api"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+}
+
+resource "aws_vpc_endpoint" "ecr_dkr" {
+  vpc_id              = var.vpc_id
+  service_name        = "com.amazonaws.${var.aws_region}.ecr.dkr"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+}
+
+# S3ゲートウェイエンドポイント（ECRのレイヤーはS3から取得）
+data "aws_route_tables" "vpc" {
+  vpc_id = var.vpc_id
+}
+
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.${var.aws_region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = data.aws_route_tables.vpc.ids
+}
+
+resource "aws_vpc_endpoint" "logs" {
+  vpc_id              = var.vpc_id
+  service_name        = "com.amazonaws.${var.aws_region}.logs"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+}
+
+# -----------------------------
+# ECS Cluster
+# -----------------------------
+
+resource "aws_ecs_cluster" "app" {
+  name = local.name
+}
+
+resource "aws_cloudwatch_log_group" "ecs" {
+  name              = "/ecs/${local.name}"
+  retention_in_days = 7
+}
+
+# -----------------------------
+# ECS IAM Execution Role
+# -----------------------------
+
+resource "aws_iam_role" "ecs_execution" {
+  name = "${local.name}-ecs-execution-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_execution" {
+  role       = aws_iam_role.ecs_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+# -----------------------------
+# ECS Security Group
+# -----------------------------
+
+resource "aws_security_group" "ecs" {
+  name        = "${local.name}-ecs-sg"
+  description = "Security group for ECS one-off tasks"
+  vpc_id      = var.vpc_id
+}
+
+# ECS -> RDS
+resource "aws_vpc_security_group_egress_rule" "ecs_to_rds" {
+  security_group_id            = aws_security_group.ecs.id
+  referenced_security_group_id = aws_security_group.rds.id
+  ip_protocol                  = "tcp"
+  from_port                    = local.db_port
+  to_port                      = local.db_port
+  description                  = "Allow ECS to connect to RDS"
+}
+
+# ECS -> internet (ECR image pull, CloudWatch Logs)
+resource "aws_vpc_security_group_egress_rule" "ecs_to_https" {
+  security_group_id = aws_security_group.ecs.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  description       = "Allow ECS to reach ECR and CloudWatch Logs via HTTPS"
+}
+
+# RDS <- ECS
+resource "aws_vpc_security_group_ingress_rule" "rds_from_ecs" {
+  security_group_id            = aws_security_group.rds.id
+  referenced_security_group_id = aws_security_group.ecs.id
+  ip_protocol                  = "tcp"
+  from_port                    = local.db_port
+  to_port                      = local.db_port
+  description                  = "Allow RDS to receive traffic from ECS"
+}
+
+# -----------------------------
+# ECS Task Definition
+# -----------------------------
+
+resource "aws_ecs_task_definition" "manage" {
+  family                   = "${local.name}-manage"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = 256
+  memory                   = 512
+  execution_role_arn       = aws_iam_role.ecs_execution.arn
+
+  runtime_platform {
+    cpu_architecture        = "ARM64"
+    operating_system_family = "LINUX"
+  }
+
+  container_definitions = jsonencode([
+    {
+      name      = "app"
+      image     = local.image_uri
+      essential = true
+
+      entryPoint = ["/var/lang/bin/python3"]
+      command    = ["manage.py", "help"]
+
+      environment = [
+        { name = "DJANGO_SETTINGS_MODULE", value = "task_management.settings" },
+        { name = "DJANGO_SECRET_KEY",      value = var.django_secret_key },
+        { name = "ALLOWED_HOSTS",          value = var.allowed_hosts },
+        { name = "DEBUG",                  value = var.debug_mode },
+        { name = "DB_NAME",                value = var.db_name },
+        { name = "DB_USER",                value = var.db_username },
+        { name = "DB_PASSWORD",            value = random_password.db.result },
+        { name = "DB_HOST",                value = aws_db_instance.db.address },
+        { name = "DB_PORT",                value = tostring(local.db_port) },
+        { name = "DB_SSL_USE",             value = var.db_ssl_use },
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = "/ecs/${local.name}"
+          "awslogs-region"        = data.aws_region.current.region
+          "awslogs-stream-prefix" = "manage"
+        }
+      }
+    }
+  ])
+
+  depends_on = [aws_cloudwatch_log_group.ecs]
+}
+
 output "ecr_repository_url" {
   value = aws_ecr_repository.app.repository_url
 }
@@ -460,4 +650,16 @@ output "createsuperuser_lambda_name" {
 
 output "db_endpoint" {
   value = aws_db_instance.db.address
+}
+
+output "ecs_cluster_name" {
+  value = aws_ecs_cluster.app.name
+}
+
+output "ecs_task_definition_arn" {
+  value = aws_ecs_task_definition.manage.arn
+}
+
+output "ecs_security_group_id" {
+  value = aws_security_group.ecs.id
 }
