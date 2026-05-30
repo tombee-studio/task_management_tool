@@ -41,6 +41,32 @@
 
 <div class="panel panel-default">
   <div class="panel-heading">
+    <h3 class="panel-title">タスク一覧</h3>
+  </div>
+  {% if event.tasks.all %}
+  <table class="table">
+    <tr>
+      <th>タスク</th>
+      <th>プロジェクト</th>
+      <th>ステータス</th>
+    </tr>
+    {% for task in event.tasks.all %}
+    <tr>
+      <td><a href="{% url 'task_detail' task.pk %}">#{{ task.pk }} {{ task.title }}</a></td>
+      <td>{{ task.project.name }}</td>
+      <td><span class="badge bg-primary">{{ task.status.name }}</span></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="panel-body">
+    <p>タスクはまだ登録されていません。</p>
+  </div>
+  {% endif %}
+</div>
+
+<div class="panel panel-default">
+  <div class="panel-heading">
     <h3 class="panel-title">在庫確認履歴</h3>
   </div>
 {% if object.inventory_set.all|length > 0 %}
