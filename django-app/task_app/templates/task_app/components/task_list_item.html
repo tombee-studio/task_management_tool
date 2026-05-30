@@ -18,6 +18,11 @@
   <td>
     {{ task.progress_summary|markdown:task.project|safe }}
   </td>
+  {% if not hide_project_column %}
+  <td>
+    <a href="{% url 'project_detail' task.project.pk %}">{{ task.project.name }}</a>
+  </td>
+  {% endif %}
   <td class="text-center">
     {{ task.assignee.get_full_name|default:task.assignee.username }}
   </td>
