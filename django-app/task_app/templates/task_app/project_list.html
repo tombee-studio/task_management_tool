@@ -1,36 +1,97 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="panel panel-default">
-  <div class="panel-heading">最近更新されたタスク</div>
-  {% include "task_app/components/recently_updated_tasks_component.html" %}
-</div>
+<ul class="nav nav-tabs" role="tablist">
+  <li role="presentation" class="active">
+    <a href="#tab-list" aria-controls="tab-list" role="tab" data-toggle="tab">タスク一覧</a>
+  </li>
+  <li role="presentation">
+    <a href="#tab-gantt" aria-controls="tab-gantt" role="tab" data-toggle="tab">ガントチャート</a>
+  </li>
+</ul>
 
-<div class="panel panel-default">
-  <div class="panel-heading">プロジェクト一覧</div>
-  <div class="panel-body">
-    <p>
-      <a href="{% url 'project_create' %}">新規プロジェクト作成</a>
-    </p>
-  </div>
-  {% include "task_app/components/project_list_component.html" with projects=projects %}
-</div>
+<div class="tab-content">
 
-<div class="panel panel-default">
-  <div class="panel-heading">{{user.username}}が割り当てられているタスク</div>
-  {% for project, project_tasks in tasks_by_project %}
-    <div class="panel-heading" style="background-color: #f5f5f5; border-top: 1px solid #ddd; font-size: 0.95em;">
-      <a href="{% url 'project_detail' project.pk %}?{{ status_filter }}">{{ project.name }}</a>
+  <div role="tabpanel" class="tab-pane active" id="tab-list">
+    <div class="panel panel-default">
+      <div class="panel-heading">最近更新されたタスク</div>
+      {% include "task_app/components/recently_updated_tasks_component.html" %}
     </div>
-    {% include "task_app/components/task_table_component.html" with tasks=project_tasks %}
-  {% empty %}
-    <p class="panel-body">タスクはまだ登録されていません。</p>
-  {% endfor %}
+
+    <div class="panel panel-default">
+      <div class="panel-heading">プロジェクト一覧</div>
+      <div class="panel-body">
+        <p>
+          <a href="{% url 'project_create' %}">新規プロジェクト作成</a>
+        </p>
+      </div>
+      {% include "task_app/components/project_list_component.html" with projects=projects %}
+    </div>
+
+    <div class="panel panel-default">
+      <div class="panel-heading">{{user.username}}が割り当てられているタスク</div>
+      {% for project, project_tasks in tasks_by_project %}
+        <div class="panel-heading" style="background-color: #f5f5f5; border-top: 1px solid #ddd; font-size: 0.95em;">
+          <a href="{% url 'project_detail' project.pk %}?{{ status_filter }}">{{ project.name }}</a>
+        </div>
+        {% include "task_app/components/task_table_component.html" with tasks=project_tasks %}
+      {% empty %}
+        <p class="panel-body">タスクはまだ登録されていません。</p>
+      {% endfor %}
+    </div>
+
+    <div class="panel panel-default">
+      <div class="panel-heading">{{user.username}}がウォッチしているタスク</div>
+      {% include "task_app/components/task_list_component.html" with tasks=watching_tasks %}
+    </div>
+  </div>
+
+  <div role="tabpanel" class="tab-pane" id="tab-gantt">
+    <form class="form-inline" method="get" style="margin: 12px 0;">
+      <div class="form-group">
+        <label>開始日&nbsp;<input type="date" name="gantt_from" class="form-control input-sm" value="{{ gantt_from }}"></label>
+      </div>
+      &nbsp;〜&nbsp;
+      <div class="form-group">
+        <label>終了日&nbsp;<input type="date" name="gantt_to" class="form-control input-sm" value="{{ gantt_to }}"></label>
+      </div>
+      &nbsp;<button type="submit" class="btn btn-default btn-sm">表示</button>
+      {% if gantt_from or gantt_to %}
+      <a href="{% url 'project_list' %}" class="btn btn-link btn-sm">リセット</a>
+      {% endif %}
+    </form>
+    {% for item in gantt_by_project %}
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <a href="{% url 'project_detail' item.project.pk %}">{{ item.project.name }}</a>
+      </div>
+      <div class="panel-body" style="padding: 8px;">
+        {% include "task_app/components/gantt_component.html" with gantt=item.gantt %}
+      </div>
+    </div>
+    {% empty %}
+    <p>参画しているプロジェクトがありません。</p>
+    {% endfor %}
+  </div>
+
 </div>
 
-<div class="panel panel-default">
-  <div class="panel-heading">{{user.username}}がウォッチしているタスク</div>
-  {% include "task_app/components/task_list_component.html" with tasks=watching_tasks %}
-</div>
-
+{% block extra_js %}
+<script>
+  $(document).ready(function() {
+    var params = new URLSearchParams(window.location.search);
+    var hash = window.location.hash;
+    if (hash) {
+      $('a[href="' + hash + '"]').tab('show');
+    } else if (params.has('gantt_from') || params.has('gantt_to')) {
+      $('a[href="#tab-gantt"]').tab('show');
+    }
+    $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+      if (history.replaceState) {
+        history.replaceState(null, null, e.target.hash);
+      }
+    });
+  });
+</script>
+{% endblock %}
 {% endblock %}

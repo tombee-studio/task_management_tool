@@ -7,12 +7,69 @@
   </div>
   {% include "task_app/components/project_detail_component.html" with project=project %}
 </div>
-<div class="panel panel-default">
-  <div class="panel-heading">{{ project.name }}のイベント一覧</div>
-  {% include "event_app/components/event_list_component.html" with events=project.event_set.all %}
+
+<ul class="nav nav-tabs" role="tablist">
+  <li role="presentation" class="active">
+    <a href="#tab-detail" aria-controls="tab-detail" role="tab" data-toggle="tab">詳細</a>
+  </li>
+  <li role="presentation">
+    <a href="#tab-gantt" aria-controls="tab-gantt" role="tab" data-toggle="tab">ガントチャート</a>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  <div role="tabpanel" class="tab-pane active" id="tab-detail">
+    <div class="panel panel-default">
+      <div class="panel-heading">{{ project.name }}のイベント一覧</div>
+      {% include "event_app/components/event_list_component.html" with events=project.event_set.all %}
+    </div>
+    <div class="panel panel-default">
+      <div class="panel-heading">{{ project.name }}のタスク一覧</div>
+      {% include "task_app/components/task_list_component.html" with tasks=tasks project=project status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+    </div>
+  </div>
+
+  <div role="tabpanel" class="tab-pane" id="tab-gantt">
+    <div class="panel panel-default">
+      <div class="panel-heading">{{ project.name }}のガントチャート</div>
+      <div class="panel-body" style="padding: 8px;">
+        <form class="form-inline" method="get" style="margin-bottom: 12px;">
+          <div class="form-group">
+            <label>開始日&nbsp;<input type="date" name="gantt_from" class="form-control input-sm" value="{{ gantt_from }}"></label>
+          </div>
+          &nbsp;〜&nbsp;
+          <div class="form-group">
+            <label>終了日&nbsp;<input type="date" name="gantt_to" class="form-control input-sm" value="{{ gantt_to }}"></label>
+          </div>
+          &nbsp;<button type="submit" class="btn btn-default btn-sm">表示</button>
+          {% if gantt_from or gantt_to %}
+          <a href="{% url 'project_detail' project.pk %}" class="btn btn-link btn-sm">リセット</a>
+          {% endif %}
+        </form>
+        {% include "task_app/components/gantt_component.html" with gantt=gantt %}
+      </div>
+    </div>
+  </div>
+
 </div>
-<div class="panel panel-default">
-  <div class="panel-heading">{{ project.name }}のタスク一覧</div>
-  {% include "task_app/components/task_list_component.html" with tasks=tasks project=project status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
-</div>
+
+{% block extra_js %}
+<script>
+  $(document).ready(function() {
+    var params = new URLSearchParams(window.location.search);
+    var hash = window.location.hash;
+    if (hash) {
+      $('a[href="' + hash + '"]').tab('show');
+    } else if (params.has('gantt_from') || params.has('gantt_to')) {
+      $('a[href="#tab-gantt"]').tab('show');
+    }
+    $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+      if (history.replaceState) {
+        history.replaceState(null, null, e.target.hash);
+      }
+    });
+  });
+</script>
+{% endblock %}
 {% endblock %}
