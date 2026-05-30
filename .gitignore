@@ -3,6 +3,7 @@ venv/
 __pycache__
 db.sqlite3
 .env
+.envrc
 
 .terraform*
 terraform.*
