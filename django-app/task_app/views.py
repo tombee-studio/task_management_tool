@@ -9,7 +9,7 @@ from django.db.models import Count, Prefetch, Q
 from .models import *
 
 from django.contrib.auth import login
-from django.http import HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect
 from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm
 
 
@@ -142,19 +142,17 @@ class ProjectListView(LoginRequiredMixin, ListView):
     
     def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
-        status_list = list(map(lambda status: f"status={status.pk}", Status.objects.filter(is_done=False)))
-        context["status_filter"] = "&".join(status_list)
-        active_status_list = Status.objects.filter(is_done=False)
-        context["status_list"] = Status.objects.all()
         tasks_by_project = []
         for project in self.request.user.projects.order_by("name"):
+            active_statuses = project.statuses.filter(is_done=False)
             project_tasks = Task.objects.with_tree_fields().filter(
-                status__in=active_status_list,
+                status__in=active_statuses,
                 assignee=self.request.user,
                 project=project,
             )
+            project_status_filter = "&".join([f"status={s.pk}" for s in active_statuses])
             if project_tasks.exists():
-                tasks_by_project.append((project, project_tasks))
+                tasks_by_project.append((project, project_tasks, project_status_filter))
         context["tasks_by_project"] = tasks_by_project
         context["watching_tasks"] = self.request.user.watches.all()
 
@@ -214,10 +212,11 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         selected_status_list = self.request.GET.getlist("status")
-        
-        status_list = list(map(lambda status: f"status={status.pk}", Status.objects.filter(is_done=False)))
-        context["status_filter"] = "&".join(status_list)
-        context["status_list"] = Status.objects.all()
+
+        project_statuses = self.object.statuses.all()
+        active_statuses = project_statuses.filter(is_done=False)
+        context["status_filter"] = "&".join([f"status={s.pk}" for s in active_statuses])
+        context["status_list"] = project_statuses
         context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
         context["tasks"] = self.object.task_set.filter(status__in=selected_status_list).prefetch_related(
             Prefetch(
@@ -288,9 +287,12 @@ class StatusListView(LoginRequiredMixin, ListView):
     model = Status
     template_name = "task_app/status_list.html"
     context_object_name = "status_list"
-    
-    def get_success_url(self):
-        return reverse_lazy("project_list")
+
+    def get_queryset(self):
+        project_pk = self.request.GET.get('project')
+        if project_pk:
+            return Status.objects.filter(project_id=project_pk)
+        return Status.objects.filter(project__participants=self.request.user).distinct()
 
 
 class StatusDetailView(LoginRequiredMixin, DetailView):
@@ -298,29 +300,66 @@ class StatusDetailView(LoginRequiredMixin, DetailView):
     template_name = "task_app/status_detail.html"
     context_object_name = "status"
 
-    def get_success_url(self):
-        return reverse_lazy("project_list")
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['project'] = self.object.project
+        return context
+
 
 class StatusCreateView(LoginRequiredMixin, CreateView):
     model = Status
     fields = ["name", "is_done"]
     template_name = "task_app/status_form.html"
 
+    def _get_project(self):
+        pk = self.kwargs.get('project_pk')
+        if pk:
+            return Project.objects.filter(pk=pk, participants=self.request.user).first()
+        return None
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._get_project() is None:
+            raise Http404
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['project'] = self._get_project()
+        return context
+
+    def form_valid(self, form):
+        form.instance.project = self._get_project()
+        return super().form_valid(form)
+
     def get_success_url(self):
+        if self.object.project_id:
+            return reverse_lazy("project_detail", kwargs={"pk": self.object.project_id}) + "#tab-status"
         return reverse_lazy("project_list")
+
 
 class StatusUpdateView(LoginRequiredMixin, UpdateView):
     model = Status
     fields = ["name", "is_done"]
     template_name = "task_app/status_form.html"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['project'] = self.object.project
+        return context
+
     def get_success_url(self):
+        if self.object.project_id:
+            return reverse_lazy("project_detail", kwargs={"pk": self.object.project_id}) + "#tab-status"
         return reverse_lazy("project_list")
+
 
 class StatusDeleteView(LoginRequiredMixin, DeleteView):
     model = Status
 
     def get_success_url(self):
+        project_id = self.object.project_id
+        if project_id:
+            return reverse_lazy("project_detail", kwargs={"pk": project_id}) + "#tab-status"
         return reverse_lazy("project_list")
 
 class CommentListView(LoginRequiredMixin, ListView):
