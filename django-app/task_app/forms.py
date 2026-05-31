@@ -34,6 +34,15 @@ class TaskForm(forms.ModelForm):
         required=True,
         label='担当者',
     )
+    dsl = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'placeholder': 'ASSIGN {task_id} TO {username}\nLINK {src_id} -> {dst_id}\nEVENT {task_id} {event_id}',
+        }),
+        label='DSL（保存後実行）',
+        help_text='保存後に実行するDSLコマンドを入力してください（DBには保存されません）。',
+    )
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
@@ -74,6 +83,16 @@ class TaskForm(forms.ModelForm):
 
 
 class CommentForm(forms.ModelForm):
+    dsl = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'placeholder': 'ASSIGN {task_id} TO {username}\nLINK {src_id} -> {dst_id}\nEVENT {task_id} {event_id}',
+        }),
+        label='DSL（保存後実行）',
+        help_text='保存後に実行するDSLコマンドを入力してください（DBには保存されません）。',
+    )
+
     class Meta:
         model = Comment
         fields = ['description', 'task']
