@@ -11,6 +11,7 @@ from .models import *
 from django.contrib.auth import login
 from django.http import Http404, HttpResponseRedirect
 from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm
+from .dsl import execute_dsl
 
 
 def _parse_gantt_date(value):
@@ -146,7 +147,7 @@ class ProjectListView(LoginRequiredMixin, ListView):
         for project in self.request.user.projects.order_by("name"):
             active_statuses = project.statuses.filter(is_done=False)
             project_tasks = Task.objects.with_tree_fields().filter(
-                status__in=active_statuses,
+                status__is_done=False,
                 assignee=self.request.user,
                 project=project,
             )
@@ -217,6 +218,8 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
         active_statuses = project_statuses.filter(is_done=False)
         context["status_filter"] = "&".join([f"status={s.pk}" for s in active_statuses])
         context["status_list"] = project_statuses
+        if not selected_status_list:
+            selected_status_list = [str(s.pk) for s in active_statuses]
         context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
         context["tasks"] = self.object.task_set.filter(status__in=selected_status_list).prefetch_related(
             Prefetch(
@@ -395,7 +398,11 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
     
     def form_valid(self, form):
         form.instance.author = self.request.user
-        return super().form_valid(form)
+        self.object = form.save()
+        dsl_text = form.cleaned_data.get('dsl', '').strip()
+        if dsl_text:
+            execute_dsl(dsl_text)
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
         return reverse_lazy("project_list")
@@ -411,10 +418,14 @@ class CommentUpdateView(LoginRequiredMixin, UpdateView):
             Q(author=self.request.user) |
             Q(task__project__participants=self.request.user)
         ).distinct()
-    
+
     def form_valid(self, form):
         form.instance.author = self.request.user
-        return super().form_valid(form)
+        self.object = form.save()
+        dsl_text = form.cleaned_data.get('dsl', '').strip()
+        if dsl_text:
+            execute_dsl(dsl_text)
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
         return reverse_lazy("project_list")
@@ -554,7 +565,11 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
 
         form.instance.completed_at = timezone.now() \
             if form.instance.status.is_done else None
-        return super().form_valid(form)
+        self.object = form.save()
+        dsl_text = form.cleaned_data.get('dsl', '').strip()
+        if dsl_text:
+            execute_dsl(dsl_text)
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
         return reverse_lazy("project_list")
@@ -589,7 +604,11 @@ class TaskUpdateView(LoginRequiredMixin, UpdateView):
     def form_valid(self, form):
         form.instance.completed_at = timezone.now() \
             if form.instance.status.is_done else None
-        return super().form_valid(form)
+        self.object = form.save()
+        dsl_text = form.cleaned_data.get('dsl', '').strip()
+        if dsl_text:
+            execute_dsl(dsl_text)
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
         return reverse_lazy("project_list")

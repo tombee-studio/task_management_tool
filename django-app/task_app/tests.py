@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .dsl import execute_assign, execute_dsl, execute_event, execute_link, parse_dsl
-from .forms import TaskForm
+from .forms import CommentForm, TaskForm
 from .models import Comment, Project, Rule, Status, Task
 from event_app.models import Event
 from .rules import process_task_rules
@@ -1635,3 +1635,202 @@ class GanttFilterViewTest(BaseViewTest):
             {"gantt_assignees": "other2"},
         )
         self.assertEqual(response.context["gantt_assignees"], "other2")
+
+
+# ---------------------------------------------------------------------------
+# Form — DSL field
+# ---------------------------------------------------------------------------
+
+class TaskFormDSLTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="u", password="p")
+        self.project = Project.objects.create(name="P")
+        self.project.participants.add(self.user)
+        self.status = Status.objects.create(name="Open", project=self.project)
+        self.task = Task.objects.create(
+            title="T", project=self.project, assignee=self.user, status=self.status
+        )
+
+    def _form(self, dsl=""):
+        return TaskForm(
+            data={"title": "T", "description": "test", "progress_summary": "",
+                  "status": self.status.pk, "assignee": self.user.pk, "dsl": dsl},
+            user=self.user, project=self.project, instance=self.task,
+        )
+
+    def test_dsl_field_is_present(self):
+        self.assertIn("dsl", self._form().fields)
+
+    def test_dsl_field_is_not_required(self):
+        self.assertFalse(self._form().fields["dsl"].required)
+
+    def test_dsl_not_in_meta_fields(self):
+        self.assertNotIn("dsl", TaskForm.Meta.fields)
+
+    def test_form_valid_without_dsl(self):
+        form = self._form()
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_form_valid_with_dsl(self):
+        form = self._form(dsl=f"ASSIGN {self.task.pk} TO u")
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_dsl_value_in_cleaned_data(self):
+        dsl_text = f"ASSIGN {self.task.pk} TO u"
+        form = self._form(dsl=dsl_text)
+        self.assertTrue(form.is_valid())
+        self.assertEqual(form.cleaned_data["dsl"], dsl_text)
+
+
+# ---------------------------------------------------------------------------
+# Views — DSL execution on save
+# ---------------------------------------------------------------------------
+
+class TaskDSLViewTest(BaseViewTest):
+    def setUp(self):
+        super().setUp()
+        self.other_user = User.objects.create_user(username="other_user", password="pass")
+        self.project.participants.add(self.other_user)
+
+    def _post_update(self, extra_data=None):
+        data = {"title": "T", "description": "test", "progress_summary": "",
+                "status": self.status.pk, "assignee": self.user.pk}
+        if extra_data:
+            data.update(extra_data)
+        self.login()
+        return self.client.post(
+            reverse("task_update", kwargs={"pk": self.task.pk}), data
+        )
+
+    def test_update_with_assign_dsl_changes_assignee(self):
+        dsl = f"ASSIGN {self.task.pk} TO other_user"
+        self._post_update({"dsl": dsl})
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other_user)
+
+    def test_update_with_multiline_dsl_executes_all_commands(self):
+        second_task = Task.objects.create(
+            title="T2", project=self.project, assignee=self.user, status=self.status
+        )
+        dsl = f"ASSIGN {self.task.pk} TO other_user\nLINK {self.task.pk} -> {second_task.pk}"
+        self._post_update({"dsl": dsl})
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other_user)
+        self.assertIn(second_task, self.task.related_tasks.all())
+
+    def test_update_with_empty_dsl_saves_normally(self):
+        response = self._post_update({"dsl": ""})
+        self.assertEqual(response.status_code, 302)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.title, "T")
+
+    def test_create_with_dsl_executes_after_save(self):
+        dsl = f"ASSIGN {self.task.pk} TO other_user"
+        self.login()
+        self.client.post(
+            reverse("task_create") + f"?project={self.project.pk}",
+            {"title": "NewTask", "description": "test", "progress_summary": "",
+             "status": self.status.pk, "assignee": self.user.pk, "dsl": dsl},
+        )
+        self.assertTrue(Task.objects.filter(title="NewTask").exists())
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other_user)
+
+
+# ---------------------------------------------------------------------------
+# Form — CommentForm DSL field
+# ---------------------------------------------------------------------------
+
+class CommentFormDSLTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="u", password="p")
+        self.project = Project.objects.create(name="P")
+        self.status = Status.objects.create(name="Open", project=self.project)
+        self.task = Task.objects.create(
+            title="T", project=self.project, assignee=self.user, status=self.status
+        )
+
+    def _form(self, dsl=""):
+        return CommentForm(
+            data={"description": "test comment", "task": self.task.pk, "dsl": dsl},
+        )
+
+    def test_dsl_field_is_present(self):
+        self.assertIn("dsl", self._form().fields)
+
+    def test_dsl_field_is_not_required(self):
+        self.assertFalse(self._form().fields["dsl"].required)
+
+    def test_dsl_not_in_meta_fields(self):
+        self.assertNotIn("dsl", CommentForm.Meta.fields)
+
+    def test_form_valid_without_dsl(self):
+        form = self._form()
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_form_valid_with_dsl(self):
+        form = self._form(dsl=f"ASSIGN {self.task.pk} TO u")
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_dsl_value_in_cleaned_data(self):
+        dsl_text = f"ASSIGN {self.task.pk} TO u"
+        form = self._form(dsl=dsl_text)
+        self.assertTrue(form.is_valid())
+        self.assertEqual(form.cleaned_data["dsl"], dsl_text)
+
+
+# ---------------------------------------------------------------------------
+# Views — Comment DSL execution on save
+# ---------------------------------------------------------------------------
+
+class CommentDSLViewTest(BaseViewTest):
+    def setUp(self):
+        super().setUp()
+        self.other_user = User.objects.create_user(username="other_user", password="pass")
+        self.project.participants.add(self.other_user)
+        self.comment = Comment.objects.create(
+            author=self.user, task=self.task, description="Hello"
+        )
+
+    def test_create_with_assign_dsl_changes_assignee(self):
+        dsl = f"ASSIGN {self.task.pk} TO other_user"
+        self.login()
+        self.client.post(
+            reverse("comment_create"),
+            {"description": "New comment", "task": self.task.pk, "dsl": dsl},
+        )
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other_user)
+
+    def test_create_with_multiline_dsl_executes_all_commands(self):
+        second_task = Task.objects.create(
+            title="T2", project=self.project, assignee=self.user, status=self.status
+        )
+        dsl = f"ASSIGN {self.task.pk} TO other_user\nLINK {self.task.pk} -> {second_task.pk}"
+        self.login()
+        self.client.post(
+            reverse("comment_create"),
+            {"description": "Multi DSL", "task": self.task.pk, "dsl": dsl},
+        )
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other_user)
+        self.assertIn(second_task, self.task.related_tasks.all())
+
+    def test_create_with_empty_dsl_saves_normally(self):
+        self.login()
+        response = self.client.post(
+            reverse("comment_create"),
+            {"description": "No DSL", "task": self.task.pk, "dsl": ""},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Comment.objects.filter(description="No DSL").exists())
+
+    def test_update_with_assign_dsl_changes_assignee(self):
+        dsl = f"ASSIGN {self.task.pk} TO other_user"
+        self.login()
+        self.client.post(
+            reverse("comment_update", kwargs={"pk": self.comment.pk}),
+            {"description": "Updated", "task": self.task.pk, "dsl": dsl},
+        )
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other_user)
