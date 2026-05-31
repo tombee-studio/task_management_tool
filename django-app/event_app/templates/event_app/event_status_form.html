@@ -1,0 +1,23 @@
+{% extends "base_form.html" %}
+
+{% block header_links %}
+{% if object %}
+  <h1>イベントステータス編集</h1>
+{% else %}
+  <h1>イベントステータス作成{% if project %} — {{ project.name }}{% endif %}</h1>
+{% endif %}
+{% endblock %}
+
+{% block form_button %}
+<div>
+  <button type="submit">保存</button>
+
+  {% if project %}
+    <a href="{% url 'project_detail' project.pk %}#tab-event-status">キャンセル</a>
+  {% elif object and object.project %}
+    <a href="{% url 'project_detail' object.project.pk %}#tab-event-status">キャンセル</a>
+  {% else %}
+    <a href="{% url 'project_list' %}">キャンセル</a>
+  {% endif %}
+</div>
+{% endblock %}

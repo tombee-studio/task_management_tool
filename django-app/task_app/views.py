@@ -247,6 +247,19 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
         context["gantt_status"] = gantt_status
 
         context["gantt"] = build_gantt_data(self.object, gantt_from, gantt_to, assignee_ids=assignee_ids, status_filter=gantt_status)
+
+        event_statuses = self.object.event_statuses.all()
+        active_event_statuses = event_statuses.filter(is_done=False)
+        selected_event_status_list = self.request.GET.getlist("event_status")
+        if not selected_event_status_list:
+            selected_event_status_list = [str(s.pk) for s in active_event_statuses]
+        context["event_status_list"] = event_statuses
+        context["selected_event_status_list"] = list(map(int, selected_event_status_list))
+        if event_statuses.exists() and selected_event_status_list:
+            context["events"] = self.object.event_set.filter(status__in=selected_event_status_list)
+        else:
+            context["events"] = self.object.event_set.all()
+
         return context
 
 
