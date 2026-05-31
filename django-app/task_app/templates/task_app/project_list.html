@@ -55,10 +55,18 @@
       <div class="form-group">
         <label>終了日&nbsp;<input type="date" name="gantt_to" class="form-control input-sm" value="{{ gantt_to }}"></label>
       </div>
+      &nbsp;
+      <div class="form-group">
+        <label>担当者&nbsp;<input type="text" name="gantt_assignees" class="form-control input-sm" value="{{ gantt_assignees }}" placeholder="ユーザ名（カンマ区切り）" style="width: 200px;"></label>
+      </div>
+      &nbsp;
+      <div class="form-group">
+        <label class="radio-inline"><input type="radio" name="gantt_status" value="active" {% if gantt_status == 'active' or not gantt_status %}checked{% endif %}>&nbsp;進行中</label>
+        <label class="radio-inline"><input type="radio" name="gantt_status" value="done" {% if gantt_status == 'done' %}checked{% endif %}>&nbsp;完了</label>
+        <label class="radio-inline"><input type="radio" name="gantt_status" value="all" {% if gantt_status == 'all' %}checked{% endif %}>&nbsp;すべて</label>
+      </div>
       &nbsp;<button type="submit" class="btn btn-default btn-sm">表示</button>
-      {% if gantt_from or gantt_to %}
-      <a href="{% url 'project_list' %}" class="btn btn-link btn-sm">リセット</a>
-      {% endif %}
+      <a href="{% url 'project_list' %}#tab-gantt" class="btn btn-link btn-sm">リセット</a>
     </form>
     {% for item in gantt_by_project %}
     <div class="panel panel-default">
@@ -83,7 +91,7 @@
     var hash = window.location.hash;
     if (hash) {
       $('a[href="' + hash + '"]').tab('show');
-    } else if (params.has('gantt_from') || params.has('gantt_to')) {
+    } else if (params.has('gantt_from') || params.has('gantt_to') || params.has('gantt_assignees') || params.has('gantt_status')) {
       $('a[href="#tab-gantt"]').tab('show');
     }
     $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
