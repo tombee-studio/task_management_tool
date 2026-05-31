@@ -25,6 +25,13 @@ class Status(models.Model):
   updated_at = models.DateTimeField(auto_now=True)
   name = models.CharField(max_length=128, null=False, blank=False)
   is_done = models.BooleanField(default=False)
+  project = models.ForeignKey(
+    'Project',
+    on_delete=models.CASCADE,
+    related_name='statuses',
+    null=True,
+    blank=True,
+  )
   history = AuditlogHistoryField()
   
   def __str__(self):

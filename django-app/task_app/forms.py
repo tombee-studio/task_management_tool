@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 
-from .models import Project, Task, Comment
+from .models import Project, Task, Comment, Status
 from event_app.models import Event
 
 
@@ -47,8 +47,10 @@ class TaskForm(forms.ModelForm):
             self.fields['event'].queryset = Event.objects.all().order_by('-event_date')
         if project is not None:
             self.fields['assignee'].queryset = project.participants.all()
+            self.fields['status'].queryset = Status.objects.filter(project=project)
         else:
             self.fields['assignee'].queryset = User.objects.all()
+            self.fields['status'].queryset = Status.objects.all()
 
     class Meta:
         model = Task

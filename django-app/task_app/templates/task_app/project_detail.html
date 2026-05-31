@@ -13,6 +13,9 @@
     <a href="#tab-detail" aria-controls="tab-detail" role="tab" data-toggle="tab">詳細</a>
   </li>
   <li role="presentation">
+    <a href="#tab-status" aria-controls="tab-status" role="tab" data-toggle="tab">ステータス</a>
+  </li>
+  <li role="presentation">
     <a href="#tab-gantt" aria-controls="tab-gantt" role="tab" data-toggle="tab">ガントチャート</a>
   </li>
 </ul>
@@ -27,6 +30,16 @@
     <div class="panel panel-default">
       <div class="panel-heading">{{ project.name }}のタスク一覧</div>
       {% include "task_app/components/task_list_component.html" with tasks=tasks project=project status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+    </div>
+  </div>
+
+  <div role="tabpanel" class="tab-pane" id="tab-status">
+    <div class="panel panel-default">
+      <div class="panel-heading">{{ project.name }}のステータス一覧</div>
+      <div class="panel-body">
+        <a href="{% url 'status_create' project.pk %}" class="btn btn-default btn-sm">新規ステータス作成</a>
+      </div>
+      {% include "task_app/components/status_list_component.html" with status_list=status_list project=project %}
     </div>
   </div>
 
@@ -69,6 +82,8 @@
     var hash = window.location.hash;
     if (hash) {
       $('a[href="' + hash + '"]').tab('show');
+    } else if (hash === '#tab-status') {
+      $('a[href="#tab-status"]').tab('show');
     } else if (params.has('gantt_from') || params.has('gantt_to') || params.has('gantt_assignees') || params.has('gantt_status')) {
       $('a[href="#tab-gantt"]').tab('show');
     }
