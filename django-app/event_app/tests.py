@@ -3,7 +3,8 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from task_app.models import Project, Status, Task
-from .models import Event, Inventory, InventoryItemRelation, Item
+from .models import Event, EventStatus, Inventory, InventoryItemRelation, Item
+from .form import EventForm
 
 User = get_user_model()
 
@@ -223,6 +224,12 @@ class EventViewsTest(BaseEventViewTest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["form"].initial.get("previous_event"), self.event)
 
+    def test_event_create_with_project_param_prefills_project(self):
+        self.login()
+        response = self.client.get(reverse("event_create") + f"?project={self.project.pk}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["form"].initial.get("project"), self.project)
+
     def test_event_create_post_creates_event(self):
         self.login()
         self.client.post(reverse("event_create"), {
@@ -368,3 +375,251 @@ class InventoryViewsTest(BaseEventViewTest):
         response = self.client.post(reverse("inventory_delete", kwargs={"pk": other_inv.pk}))
         self.assertEqual(response.status_code, 404)
         self.assertTrue(Inventory.objects.filter(pk=other_inv.pk).exists())
+
+
+# ---------------------------------------------------------------------------
+# EventStatus — モデル
+# ---------------------------------------------------------------------------
+
+class EventStatusModelTest(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="P")
+
+    def test_str(self):
+        s = EventStatus.objects.create(name="準備中", project=self.project)
+        self.assertEqual(str(s), "準備中")
+
+    def test_is_done_default_is_false(self):
+        s = EventStatus.objects.create(name="開催前", project=self.project)
+        self.assertFalse(s.is_done)
+
+    def test_project_is_optional(self):
+        s = EventStatus.objects.create(name="汎用")
+        self.assertIsNone(s.project)
+
+    def test_project_related_name(self):
+        s = EventStatus.objects.create(name="開催中", project=self.project)
+        self.assertIn(s, self.project.event_statuses.all())
+
+    def test_event_status_fk_on_event(self):
+        s = EventStatus.objects.create(name="開催済み", is_done=True, project=self.project)
+        e = Event.objects.create(event_date="2026-06-01", project=self.project, status=s)
+        self.assertEqual(e.status, s)
+        self.assertIn(e, s.events.all())
+
+    def test_event_status_is_optional_on_event(self):
+        e = Event.objects.create(event_date="2026-06-01", project=self.project)
+        self.assertIsNone(e.status)
+
+    def test_deleting_event_status_sets_event_status_null(self):
+        s = EventStatus.objects.create(name="一時", project=self.project)
+        e = Event.objects.create(event_date="2026-06-01", project=self.project, status=s)
+        s.delete()
+        e.refresh_from_db()
+        self.assertIsNone(e.status)
+
+
+# ---------------------------------------------------------------------------
+# EventForm — status フィールド
+# ---------------------------------------------------------------------------
+
+class EventFormStatusTest(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="P")
+        self.other_project = Project.objects.create(name="Other")
+        self.status = EventStatus.objects.create(name="準備中", project=self.project)
+        self.other_status = EventStatus.objects.create(name="他プロジェクト", project=self.other_project)
+        self.event = Event.objects.create(event_date="2026-01-01", project=self.project, name="E1")
+        self.other_event = Event.objects.create(event_date="2026-01-01", project=self.other_project, name="E2")
+
+    def test_status_field_is_present(self):
+        form = EventForm(project=self.project)
+        self.assertIn("status", form.fields)
+
+    def test_status_field_is_not_required(self):
+        form = EventForm(project=self.project)
+        self.assertFalse(form.fields["status"].required)
+
+    def test_status_queryset_includes_project_status(self):
+        form = EventForm(project=self.project)
+        self.assertIn(self.status, form.fields["status"].queryset)
+
+    def test_status_queryset_excludes_other_project_status(self):
+        form = EventForm(project=self.project)
+        self.assertNotIn(self.other_status, form.fields["status"].queryset)
+
+    def test_form_valid_without_status(self):
+        form = EventForm(
+            data={"name": "E", "event_date": "2026-06-01", "project": self.project.pk},
+            project=self.project,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_form_valid_with_status(self):
+        form = EventForm(
+            data={"name": "E", "event_date": "2026-06-01", "project": self.project.pk,
+                  "status": self.status.pk},
+            project=self.project,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_previous_event_queryset_includes_project_event(self):
+        form = EventForm(project=self.project)
+        self.assertIn(self.event, form.fields["previous_event"].queryset)
+
+    def test_previous_event_queryset_excludes_other_project_event(self):
+        form = EventForm(project=self.project)
+        self.assertNotIn(self.other_event, form.fields["previous_event"].queryset)
+
+    def test_previous_event_queryset_not_filtered_without_project(self):
+        form = EventForm()
+        self.assertIn(self.event, form.fields["previous_event"].queryset)
+        self.assertIn(self.other_event, form.fields["previous_event"].queryset)
+
+
+# ---------------------------------------------------------------------------
+# EventStatus — CRUD views
+# ---------------------------------------------------------------------------
+
+class EventStatusBaseTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username="owner", password="pass")
+        self.other = User.objects.create_user(username="other", password="pass")
+        self.project = Project.objects.create(name="P")
+        self.project.participants.add(self.user)
+        self.event_status = EventStatus.objects.create(name="準備中", project=self.project)
+
+    def login(self):
+        self.client.force_login(self.user)
+
+
+class EventStatusCreateViewTest(EventStatusBaseTest):
+    def test_create_event_status(self):
+        self.login()
+        self.client.post(
+            reverse("event_status_create", kwargs={"project_pk": self.project.pk}),
+            {"name": "開催中", "is_done": False},
+        )
+        self.assertTrue(EventStatus.objects.filter(name="開催中", project=self.project).exists())
+
+    def test_create_sets_project(self):
+        self.login()
+        self.client.post(
+            reverse("event_status_create", kwargs={"project_pk": self.project.pk}),
+            {"name": "終了", "is_done": True},
+        )
+        s = EventStatus.objects.get(name="終了")
+        self.assertEqual(s.project, self.project)
+
+    def test_create_unrelated_project_returns_404(self):
+        other_project = Project.objects.create(name="Other")
+        self.login()
+        response = self.client.post(
+            reverse("event_status_create", kwargs={"project_pk": other_project.pk}),
+            {"name": "X", "is_done": False},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_create_redirects_to_project_detail(self):
+        self.login()
+        response = self.client.post(
+            reverse("event_status_create", kwargs={"project_pk": self.project.pk}),
+            {"name": "新規", "is_done": False},
+        )
+        self.assertRedirects(
+            response,
+            reverse("project_detail", kwargs={"pk": self.project.pk}) + "#tab-event-status",
+            fetch_redirect_response=False,
+        )
+
+
+class EventStatusUpdateViewTest(EventStatusBaseTest):
+    def test_update_event_status(self):
+        self.login()
+        self.client.post(
+            reverse("event_status_update", kwargs={"pk": self.event_status.pk}),
+            {"name": "開催済み", "is_done": True},
+        )
+        self.event_status.refresh_from_db()
+        self.assertEqual(self.event_status.name, "開催済み")
+        self.assertTrue(self.event_status.is_done)
+
+
+class EventStatusDeleteViewTest(EventStatusBaseTest):
+    def test_delete_event_status(self):
+        self.login()
+        self.client.post(reverse("event_status_delete", kwargs={"pk": self.event_status.pk}))
+        self.assertFalse(EventStatus.objects.filter(pk=self.event_status.pk).exists())
+
+    def test_delete_redirects_to_project_detail(self):
+        self.login()
+        project_id = self.event_status.project_id
+        response = self.client.post(
+            reverse("event_status_delete", kwargs={"pk": self.event_status.pk})
+        )
+        self.assertRedirects(
+            response,
+            reverse("project_detail", kwargs={"pk": project_id}) + "#tab-event-status",
+            fetch_redirect_response=False,
+        )
+
+
+# ---------------------------------------------------------------------------
+# ProjectDetailView — EventStatus フィルタ
+# ---------------------------------------------------------------------------
+
+class ProjectDetailEventStatusFilterTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username="owner", password="pass")
+        self.project = Project.objects.create(name="P")
+        self.project.participants.add(self.user)
+        self.active_status = EventStatus.objects.create(name="準備中", is_done=False, project=self.project)
+        self.done_status = EventStatus.objects.create(name="終了", is_done=True, project=self.project)
+        self.event_active = Event.objects.create(
+            event_date="2026-06-01", project=self.project, name="Active", status=self.active_status
+        )
+        self.event_done = Event.objects.create(
+            event_date="2026-07-01", project=self.project, name="Done", status=self.done_status
+        )
+
+    def _get(self, params=None):
+        self.client.force_login(self.user)
+        return self.client.get(
+            reverse("project_detail", kwargs={"pk": self.project.pk}),
+            params or {},
+        )
+
+    def test_default_shows_active_events(self):
+        response = self._get()
+        events = list(response.context["events"])
+        self.assertIn(self.event_active, events)
+        self.assertNotIn(self.event_done, events)
+
+    def test_filter_by_done_status(self):
+        response = self._get({"event_status": self.done_status.pk})
+        events = list(response.context["events"])
+        self.assertIn(self.event_done, events)
+        self.assertNotIn(self.event_active, events)
+
+    def test_event_status_list_in_context(self):
+        response = self._get()
+        self.assertIn(self.active_status, response.context["event_status_list"])
+        self.assertIn(self.done_status, response.context["event_status_list"])
+
+    def test_selected_event_status_list_defaults_to_active(self):
+        response = self._get()
+        self.assertIn(self.active_status.pk, response.context["selected_event_status_list"])
+        self.assertNotIn(self.done_status.pk, response.context["selected_event_status_list"])
+
+    def test_no_event_statuses_shows_all_events(self):
+        project2 = Project.objects.create(name="P2")
+        project2.participants.add(self.user)
+        e1 = Event.objects.create(event_date="2026-06-01", project=project2, name="E1")
+        e2 = Event.objects.create(event_date="2026-07-01", project=project2, name="E2")
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("project_detail", kwargs={"pk": project2.pk}))
+        events = list(response.context["events"])
+        self.assertIn(e1, events)
+        self.assertIn(e2, events)

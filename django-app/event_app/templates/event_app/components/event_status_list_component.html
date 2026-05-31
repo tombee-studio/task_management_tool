@@ -1,0 +1,28 @@
+{% if event_status_list %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>ステータス名</th>
+        <th>完了</th>
+        <th>作成日</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for status in event_status_list %}
+        <tr>
+          <td>{{ status.name }}</td>
+          <td>{% if status.is_done %}✓{% endif %}</td>
+          <td>{{ status.created_at|date:"Y/m/d" }}</td>
+          <td>
+            <a href="{% url 'event_status_update' status.pk %}">編集</a>
+            &nbsp;
+            <a href="{% url 'event_status_delete' status.pk %}">削除</a>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="panel-body">イベントステータスはまだ登録されていません。</p>
+{% endif %}

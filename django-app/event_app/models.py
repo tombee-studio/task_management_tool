@@ -2,6 +2,23 @@ from django.db import models
 from task_app.models import Project
 
 
+class EventStatus(models.Model):
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+  name = models.CharField(max_length=128, null=False, blank=False)
+  is_done = models.BooleanField(default=False)
+  project = models.ForeignKey(
+    Project,
+    on_delete=models.CASCADE,
+    related_name='event_statuses',
+    null=True,
+    blank=True,
+  )
+
+  def __str__(self):
+    return self.name
+
+
 class Event(models.Model):
   name = models.CharField(max_length=128, default="", blank=True)
   created_at = models.DateTimeField(auto_now_add=True)
@@ -9,10 +26,17 @@ class Event(models.Model):
   event_date = models.DateField(blank=False)
   participant_count = models.IntegerField(null=True, blank=True)
   project = models.ForeignKey(
-    Project, 
-    on_delete=models.CASCADE, 
-    null=False, 
+    Project,
+    on_delete=models.CASCADE,
+    null=False,
     blank=False)
+  status = models.ForeignKey(
+    EventStatus,
+    on_delete=models.SET_NULL,
+    related_name='events',
+    null=True,
+    blank=True,
+  )
   previous_event = models.OneToOneField(
     "Event",
     null=True,
