@@ -11,6 +11,7 @@ from .models import *
 from django.contrib.auth import login
 from django.http import Http404, HttpResponseRedirect
 from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm
+from .filters import TaskFilterForm, parse_search_query, apply_task_filters
 from .dsl import execute_dsl
 
 
@@ -141,20 +142,31 @@ class ProjectListView(LoginRequiredMixin, ListView):
         return self.request.user.projects.all()
     
     
+    # デフォルト検索クエリ: 未完了かつ自分に割り当て済み
+    TASK_FILTER_DEFAULT = 'status__is_done=False assignee=me'
+
+    def _get_task_filter_form(self):
+        if not hasattr(self, '_task_filter_form'):
+            raw = self.request.GET.get('search', self.TASK_FILTER_DEFAULT)
+            self._task_filter_form = TaskFilterForm(data={'search': raw})
+        return self._task_filter_form
+
     def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
+        form = self._get_task_filter_form()
+        raw = form.data.get('search', self.TASK_FILTER_DEFAULT)
+        parsed = parse_search_query(raw, user=self.request.user)
+
         tasks_by_project = []
         for project in self.request.user.projects.order_by("name"):
+            base_qs = Task.objects.with_tree_fields().filter(project=project)
+            project_tasks = apply_task_filters(base_qs, parsed)
             active_statuses = project.statuses.filter(is_done=False)
-            project_tasks = Task.objects.with_tree_fields().filter(
-                status__is_done=False,
-                assignee=self.request.user,
-                project=project,
-            )
             project_status_filter = "&".join([f"status={s.pk}" for s in active_statuses])
             if project_tasks.exists():
                 tasks_by_project.append((project, project_tasks, project_status_filter))
         context["tasks_by_project"] = tasks_by_project
+        context["filter_form"] = form
         context["watching_tasks"] = self.request.user.watches.all()
 
         # 最近更新されたタスク
@@ -459,23 +471,21 @@ class TaskListView(LoginRequiredMixin, ListView):
     model = Task
     template_name = "task_app/task_list.html"
     context_object_name = "tasks"
-    
-    def get_context_data(self, **kwargs) -> dict[str, any]:
-        context = super().get_context_data(**kwargs)
-        selected_status_list = self.request.GET.getlist("status")
-        selected_status_ids = list(map(lambda x: int(x), selected_status_list))
-        context["selected_status_list"] = selected_status_ids
-        context["status_list"] = Status.objects.all()
 
-        tasks = self.get_queryset()
-        if selected_status_ids:
-            tasks = tasks.filter(status__in=selected_status_ids)
+    # デフォルト検索クエリ: 未完了タスクのみ表示
+    TASK_FILTER_DEFAULT = 'status__is_done=False'
 
-        context["tasks"] = tasks
-        return context
+    def _get_task_filter_form(self):
+        if not hasattr(self, '_task_filter_form'):
+            raw = self.request.GET.get('search', self.TASK_FILTER_DEFAULT)
+            self._task_filter_form = TaskFilterForm(data={'search': raw})
+        return self._task_filter_form
 
     def get_queryset(self):
-        return Task.objects.with_tree_fields().annotate(
+        form = self._get_task_filter_form()
+        raw = form.data.get('search', self.TASK_FILTER_DEFAULT)
+        parsed = parse_search_query(raw, user=self.request.user)
+        base_qs = Task.objects.with_tree_fields().annotate(
             completed_subtask_count=Count(
                 'tasks',
                 filter=Q(tasks__status__is_done=True),
@@ -483,6 +493,12 @@ class TaskListView(LoginRequiredMixin, ListView):
             ),
             total_subtask_count=Count('tasks', distinct=True),
         )
+        return apply_task_filters(base_qs, parsed)
+
+    def get_context_data(self, **kwargs) -> dict[str, any]:
+        context = super().get_context_data(**kwargs)
+        context["filter_form"] = self._get_task_filter_form()
+        return context
 
 class TaskDetailView(LoginRequiredMixin, DetailView):
     model = Task
