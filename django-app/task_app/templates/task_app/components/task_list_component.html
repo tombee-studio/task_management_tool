@@ -6,16 +6,6 @@
   {% elif task %}
   <a href="{% url 'task_create' %}?task={{ task.id }}">タスク追加</a>
   {% endif %}
-  <form method="get">
-    {% for status in status_list %}
-    <input 
-      type="checkbox" 
-      name="status" 
-      value="{{ status.pk }}"
-      {% if status.pk in selected_status_list %}checked{% endif %}>{{ status.name }}</input>
-    {% endfor %}
-    <button type="submit">更新</button>
-  </form>
 </div>
 {% if tasks %}
 <table class="table">
