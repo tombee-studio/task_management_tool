@@ -13,6 +13,12 @@
     <a href="#tab-detail" aria-controls="tab-detail" role="tab" data-toggle="tab">詳細</a>
   </li>
   <li role="presentation">
+    <a href="#tab-status" aria-controls="tab-status" role="tab" data-toggle="tab">ステータス</a>
+  </li>
+  <li role="presentation">
+    <a href="#tab-event-status" aria-controls="tab-event-status" role="tab" data-toggle="tab">イベントステータス</a>
+  </li>
+  <li role="presentation">
     <a href="#tab-gantt" aria-controls="tab-gantt" role="tab" data-toggle="tab">ガントチャート</a>
   </li>
 </ul>
@@ -22,11 +28,31 @@
   <div role="tabpanel" class="tab-pane active" id="tab-detail">
     <div class="panel panel-default">
       <div class="panel-heading">{{ project.name }}のイベント一覧</div>
-      {% include "event_app/components/event_list_component.html" with events=project.event_set.all %}
+      {% include "event_app/components/event_list_component.html" with events=events event_status_list=event_status_list selected_event_status_list=selected_event_status_list project=project %}
     </div>
     <div class="panel panel-default">
       <div class="panel-heading">{{ project.name }}のタスク一覧</div>
       {% include "task_app/components/task_list_component.html" with tasks=tasks project=project status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+    </div>
+  </div>
+
+  <div role="tabpanel" class="tab-pane" id="tab-status">
+    <div class="panel panel-default">
+      <div class="panel-heading">{{ project.name }}のステータス一覧</div>
+      <div class="panel-body">
+        <a href="{% url 'status_create' project.pk %}" class="btn btn-default btn-sm">新規ステータス作成</a>
+      </div>
+      {% include "task_app/components/status_list_component.html" with status_list=status_list project=project %}
+    </div>
+  </div>
+
+  <div role="tabpanel" class="tab-pane" id="tab-event-status">
+    <div class="panel panel-default">
+      <div class="panel-heading">{{ project.name }}のイベントステータス一覧</div>
+      <div class="panel-body">
+        <a href="{% url 'event_status_create' project.pk %}" class="btn btn-default btn-sm">新規イベントステータス作成</a>
+      </div>
+      {% include "event_app/components/event_status_list_component.html" with event_status_list=event_status_list project=project %}
     </div>
   </div>
 
@@ -42,10 +68,18 @@
           <div class="form-group">
             <label>終了日&nbsp;<input type="date" name="gantt_to" class="form-control input-sm" value="{{ gantt_to }}"></label>
           </div>
+          &nbsp;
+          <div class="form-group">
+            <label>担当者&nbsp;<input type="text" name="gantt_assignees" class="form-control input-sm" value="{{ gantt_assignees }}" placeholder="ユーザ名（カンマ区切り）" style="width: 200px;"></label>
+          </div>
+          &nbsp;
+          <div class="form-group">
+            <label class="radio-inline"><input type="radio" name="gantt_status" value="active" {% if gantt_status == 'active' or not gantt_status %}checked{% endif %}>&nbsp;進行中</label>
+            <label class="radio-inline"><input type="radio" name="gantt_status" value="done" {% if gantt_status == 'done' %}checked{% endif %}>&nbsp;完了</label>
+            <label class="radio-inline"><input type="radio" name="gantt_status" value="all" {% if gantt_status == 'all' %}checked{% endif %}>&nbsp;すべて</label>
+          </div>
           &nbsp;<button type="submit" class="btn btn-default btn-sm">表示</button>
-          {% if gantt_from or gantt_to %}
-          <a href="{% url 'project_detail' project.pk %}" class="btn btn-link btn-sm">リセット</a>
-          {% endif %}
+          <a href="{% url 'project_detail' project.pk %}#tab-gantt" class="btn btn-link btn-sm">リセット</a>
         </form>
         {% include "task_app/components/gantt_component.html" with gantt=gantt %}
       </div>
@@ -61,7 +95,7 @@
     var hash = window.location.hash;
     if (hash) {
       $('a[href="' + hash + '"]').tab('show');
-    } else if (params.has('gantt_from') || params.has('gantt_to')) {
+    } else if (params.has('gantt_from') || params.has('gantt_to') || params.has('gantt_assignees') || params.has('gantt_status')) {
       $('a[href="#tab-gantt"]').tab('show');
     }
     $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {

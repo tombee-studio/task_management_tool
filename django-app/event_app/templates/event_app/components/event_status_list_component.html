@@ -1,4 +1,4 @@
-{% if status_list %}
+{% if event_status_list %}
   <table class="table">
     <thead>
       <tr>
@@ -9,20 +9,20 @@
       </tr>
     </thead>
     <tbody>
-      {% for status in status_list %}
+      {% for status in event_status_list %}
         <tr>
           <td>{{ status.name }}</td>
           <td>{% if status.is_done %}✓{% endif %}</td>
           <td>{{ status.created_at|date:"Y/m/d" }}</td>
           <td>
-            <a href="{% url 'status_update' status.pk %}">編集</a>
+            <a href="{% url 'event_status_update' status.pk %}">編集</a>
             &nbsp;
-            <a href="{% url 'status_delete' status.pk %}">削除</a>
+            <a href="{% url 'event_status_delete' status.pk %}">削除</a>
           </td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
 {% else %}
-  <p class="panel-body">ステータスはまだ登録されていません。</p>
+  <p class="panel-body">イベントステータスはまだ登録されていません。</p>
 {% endif %}

@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .dsl import execute_assign, execute_dsl, execute_event, execute_link, parse_dsl
-from .forms import TaskForm
+from .forms import CommentForm, TaskForm
 from .models import Comment, Project, Rule, Status, Task
 from event_app.models import Event
 from .rules import process_task_rules
@@ -823,10 +823,11 @@ class BaseViewTest(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(username="owner", password="pass")
         self.other = User.objects.create_user(username="other", password="pass")
-        self.status = Status.objects.create(name="Open")
-        self.done = Status.objects.create(name="Done", is_done=True)
         self.project = Project.objects.create(name="P")
         self.project.participants.add(self.user)
+        # ステータスはプロジェクトに紐づける（TaskForm がプロジェクト別にフィルタするため）
+        self.status = Status.objects.create(name="Open", project=self.project)
+        self.done = Status.objects.create(name="Done", is_done=True, project=self.project)
         self.task = Task.objects.create(
             title="T", project=self.project, assignee=self.user, status=self.status
         )
@@ -951,6 +952,9 @@ class ProjectViewsTest(BaseViewTest):
 # ---------------------------------------------------------------------------
 
 class StatusViewsTest(BaseViewTest):
+    def _create_url(self):
+        return reverse("status_create", kwargs={"project_pk": self.project.pk})
+
     def test_status_list(self):
         self.login()
         self.assertEqual(self.client.get(reverse("status_list")).status_code, 200)
@@ -963,13 +967,32 @@ class StatusViewsTest(BaseViewTest):
 
     def test_status_create(self):
         self.login()
-        self.client.post(reverse("status_create"), {"name": "Review", "is_done": False})
+        self.client.post(self._create_url(), {"name": "Review", "is_done": False})
         self.assertTrue(Status.objects.filter(name="Review").exists())
 
-    def test_status_create_redirects(self):
+    def test_status_create_sets_project(self):
         self.login()
-        response = self.client.post(reverse("status_create"), {"name": "Review", "is_done": False})
-        self.assertRedirects(response, reverse("project_list"))
+        self.client.post(self._create_url(), {"name": "Review", "is_done": False})
+        status = Status.objects.get(name="Review")
+        self.assertEqual(status.project, self.project)
+
+    def test_status_create_redirects_to_project_detail(self):
+        self.login()
+        response = self.client.post(self._create_url(), {"name": "Review", "is_done": False})
+        status = Status.objects.get(name="Review")
+        self.assertRedirects(
+            response,
+            reverse("project_detail", kwargs={"pk": self.project.pk}) + "#tab-status",
+        )
+
+    def test_status_create_other_project_returns_404(self):
+        other = self._other_project()
+        self.login()
+        response = self.client.post(
+            reverse("status_create", kwargs={"project_pk": other.pk}),
+            {"name": "X", "is_done": False},
+        )
+        self.assertEqual(response.status_code, 404)
 
     def test_status_update(self):
         self.login()
@@ -980,11 +1003,30 @@ class StatusViewsTest(BaseViewTest):
         self.assertEqual(self.status.name, "Updated")
         self.assertTrue(self.status.is_done)
 
+    def test_status_update_redirects_to_project_detail(self):
+        self.login()
+        response = self.client.post(
+            reverse("status_update", kwargs={"pk": self.status.pk}), {"name": "Updated", "is_done": False}
+        )
+        self.assertRedirects(
+            response,
+            reverse("project_detail", kwargs={"pk": self.project.pk}) + "#tab-status",
+        )
+
     def test_status_delete(self):
-        temp = Status.objects.create(name="Temp")
+        temp = Status.objects.create(name="Temp", project=self.project)
         self.login()
         self.client.post(reverse("status_delete", kwargs={"pk": temp.pk}))
         self.assertFalse(Status.objects.filter(pk=temp.pk).exists())
+
+    def test_status_delete_redirects_to_project_detail(self):
+        temp = Status.objects.create(name="Temp", project=self.project)
+        self.login()
+        response = self.client.post(reverse("status_delete", kwargs={"pk": temp.pk}))
+        self.assertRedirects(
+            response,
+            reverse("project_detail", kwargs={"pk": self.project.pk}) + "#tab-status",
+        )
 
     def test_status_list_requires_login(self):
         self.assertEqual(self.client.get(reverse("status_list")).status_code, 302)
@@ -1300,3 +1342,495 @@ class CommentViewsTest(BaseViewTest):
         response = self.client.post(reverse("comment_delete", kwargs={"pk": self.comment.pk}))
         self.assertEqual(response.status_code, 404)
         self.assertTrue(Comment.objects.filter(pk=self.comment.pk).exists())
+
+
+# ---------------------------------------------------------------------------
+# Status.project — モデル
+# ---------------------------------------------------------------------------
+
+class StatusProjectModelTest(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="P")
+        self.other_project = Project.objects.create(name="Other")
+
+    def test_status_can_be_linked_to_project(self):
+        status = Status.objects.create(name="Open", project=self.project)
+        self.assertEqual(status.project, self.project)
+
+    def test_status_project_is_optional(self):
+        status = Status.objects.create(name="Open")
+        self.assertIsNone(status.project)
+
+    def test_project_statuses_accessor(self):
+        s1 = Status.objects.create(name="Open", project=self.project)
+        s2 = Status.objects.create(name="Done", is_done=True, project=self.project)
+        self.assertIn(s1, self.project.statuses.all())
+        self.assertIn(s2, self.project.statuses.all())
+
+    def test_project_statuses_excludes_other_project(self):
+        Status.objects.create(name="Other Status", project=self.other_project)
+        Status.objects.create(name="Mine", project=self.project)
+        self.assertFalse(
+            self.project.statuses.filter(name="Other Status").exists()
+        )
+
+    def test_project_statuses_active_filter(self):
+        Status.objects.create(name="Open", project=self.project)
+        Status.objects.create(name="Done", is_done=True, project=self.project)
+        self.assertEqual(self.project.statuses.filter(is_done=False).count(), 1)
+
+    def test_deleting_project_cascades_to_statuses(self):
+        status = Status.objects.create(name="Open", project=self.project)
+        pk = status.pk
+        self.project.delete()
+        self.assertFalse(Status.objects.filter(pk=pk).exists())
+
+
+# ---------------------------------------------------------------------------
+# TaskForm — ステータスのプロジェクト別フィルタ
+# ---------------------------------------------------------------------------
+
+class TaskFormStatusFilterTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="u", password="p")
+        self.project = Project.objects.create(name="P")
+        self.project.participants.add(self.user)
+        self.other_project = Project.objects.create(name="Other")
+        self.status = Status.objects.create(name="Open", project=self.project)
+        self.other_status = Status.objects.create(name="OtherOpen", project=self.other_project)
+        self.global_status = Status.objects.create(name="Global")  # project なし
+
+    def test_status_queryset_shows_only_project_statuses(self):
+        form = TaskForm(user=self.user, project=self.project)
+        self.assertIn(self.status, form.fields["status"].queryset)
+
+    def test_status_queryset_excludes_other_project_statuses(self):
+        form = TaskForm(user=self.user, project=self.project)
+        self.assertNotIn(self.other_status, form.fields["status"].queryset)
+
+    def test_status_queryset_excludes_project_less_statuses(self):
+        form = TaskForm(user=self.user, project=self.project)
+        self.assertNotIn(self.global_status, form.fields["status"].queryset)
+
+    def test_status_queryset_all_when_no_project(self):
+        form = TaskForm(user=self.user, project=None)
+        qs = form.fields["status"].queryset
+        self.assertIn(self.status, qs)
+        self.assertIn(self.other_status, qs)
+        self.assertIn(self.global_status, qs)
+
+
+# ---------------------------------------------------------------------------
+# ProjectDetailView — ステータスのプロジェクト別コンテキスト
+# ---------------------------------------------------------------------------
+
+class ProjectDetailStatusContextTest(BaseViewTest):
+    def setUp(self):
+        super().setUp()
+        self.other_project = Project.objects.create(name="Other")
+        self.other_project.participants.add(self.user)
+        self.other_status = Status.objects.create(name="OtherOpen", project=self.other_project)
+
+    def test_status_list_contains_own_project_statuses(self):
+        self.login()
+        response = self.client.get(reverse("project_detail", kwargs={"pk": self.project.pk}))
+        self.assertIn(self.status, response.context["status_list"])
+
+    def test_status_list_excludes_other_project_statuses(self):
+        self.login()
+        response = self.client.get(reverse("project_detail", kwargs={"pk": self.project.pk}))
+        self.assertNotIn(self.other_status, response.context["status_list"])
+
+    def test_status_filter_uses_project_active_statuses(self):
+        self.login()
+        response = self.client.get(reverse("project_detail", kwargs={"pk": self.project.pk}))
+        status_filter = response.context["status_filter"]
+        self.assertIn(str(self.status.pk), status_filter)
+        self.assertNotIn(str(self.other_status.pk), status_filter)
+
+    def test_status_filter_excludes_done_statuses(self):
+        self.login()
+        response = self.client.get(reverse("project_detail", kwargs={"pk": self.project.pk}))
+        status_filter = response.context["status_filter"]
+        self.assertNotIn(str(self.done.pk), status_filter)
+
+
+# ---------------------------------------------------------------------------
+# build_gantt_data — assignee_ids / status_filter
+# ---------------------------------------------------------------------------
+
+class BuildGanttDataFilterTest(TestCase):
+    def setUp(self):
+        from datetime import date, timedelta
+        self.user = User.objects.create_user(username="u", password="p")
+        self.other = User.objects.create_user(username="other", password="p")
+        self.project = Project.objects.create(name="P")
+        self.status_open = Status.objects.create(name="Open", project=self.project)
+        self.status_done = Status.objects.create(name="Done", is_done=True, project=self.project)
+        deadline = date.today() + timedelta(days=7)
+        self.task_mine = Task.objects.create(
+            title="Mine", project=self.project, assignee=self.user,
+            status=self.status_open, deadline=deadline,
+        )
+        self.task_others = Task.objects.create(
+            title="Others", project=self.project, assignee=self.other,
+            status=self.status_open, deadline=deadline,
+        )
+        self.task_done = Task.objects.create(
+            title="Done", project=self.project, assignee=self.user,
+            status=self.status_done, deadline=deadline,
+        )
+
+    def _titles(self, gantt):
+        return [item["task"].title for item in gantt["tasks"]]
+
+    def test_status_filter_active_excludes_done_tasks(self):
+        from .views import build_gantt_data
+        self.assertNotIn("Done", self._titles(build_gantt_data(self.project, status_filter="active")))
+
+    def test_status_filter_active_includes_open_tasks(self):
+        from .views import build_gantt_data
+        self.assertIn("Mine", self._titles(build_gantt_data(self.project, status_filter="active")))
+
+    def test_status_filter_done_excludes_open_tasks(self):
+        from .views import build_gantt_data
+        self.assertNotIn("Mine", self._titles(build_gantt_data(self.project, status_filter="done")))
+
+    def test_status_filter_done_includes_done_tasks(self):
+        from .views import build_gantt_data
+        self.assertIn("Done", self._titles(build_gantt_data(self.project, status_filter="done")))
+
+    def test_status_filter_all_includes_all_tasks(self):
+        from .views import build_gantt_data
+        titles = self._titles(build_gantt_data(self.project, status_filter="all"))
+        self.assertIn("Mine", titles)
+        self.assertIn("Done", titles)
+        self.assertIn("Others", titles)
+
+    def test_assignee_ids_filters_to_specified_user(self):
+        from .views import build_gantt_data
+        titles = self._titles(
+            build_gantt_data(self.project, assignee_ids=[self.user.id], status_filter="all")
+        )
+        self.assertIn("Mine", titles)
+        self.assertNotIn("Others", titles)
+
+    def test_assignee_ids_none_shows_all_users(self):
+        from .views import build_gantt_data
+        titles = self._titles(
+            build_gantt_data(self.project, assignee_ids=None, status_filter="all")
+        )
+        self.assertIn("Mine", titles)
+        self.assertIn("Others", titles)
+
+    def test_assignee_ids_multiple_users(self):
+        from .views import build_gantt_data
+        titles = self._titles(
+            build_gantt_data(
+                self.project,
+                assignee_ids=[self.user.id, self.other.id],
+                status_filter="all",
+            )
+        )
+        self.assertIn("Mine", titles)
+        self.assertIn("Others", titles)
+
+    def test_assignee_and_status_filter_combined(self):
+        from .views import build_gantt_data
+        titles = self._titles(
+            build_gantt_data(self.project, assignee_ids=[self.user.id], status_filter="active")
+        )
+        self.assertIn("Mine", titles)
+        self.assertNotIn("Done", titles)
+        self.assertNotIn("Others", titles)
+
+
+# ---------------------------------------------------------------------------
+# ガントフィルタ — ビューレベル（ProjectDetailView / ProjectListView）
+# ---------------------------------------------------------------------------
+
+class GanttFilterViewTest(BaseViewTest):
+    def setUp(self):
+        super().setUp()
+        from datetime import date, timedelta
+        deadline = date.today() + timedelta(days=7)
+        self.other_user = User.objects.create_user(username="other2", password="pass")
+        self.project.participants.add(self.other_user)
+        self.other_task = Task.objects.create(
+            title="OtherTask", project=self.project, assignee=self.other_user,
+            status=self.status, deadline=deadline,
+        )
+        Task.objects.filter(pk=self.task.pk).update(deadline=deadline)
+        self.done_task = Task.objects.create(
+            title="DoneTask", project=self.project, assignee=self.user,
+            status=self.done, deadline=deadline,
+        )
+
+    def _gantt_titles(self, response):
+        return [item["task"].title for item in response.context["gantt"]["tasks"]]
+
+    def test_gantt_default_hides_done_tasks(self):
+        self.login()
+        response = self.client.get(reverse("project_detail", kwargs={"pk": self.project.pk}))
+        self.assertNotIn("DoneTask", self._gantt_titles(response))
+
+    def test_gantt_default_shows_own_active_tasks(self):
+        self.login()
+        response = self.client.get(reverse("project_detail", kwargs={"pk": self.project.pk}))
+        self.assertIn("T", self._gantt_titles(response))
+
+    def test_gantt_default_hides_other_users_tasks(self):
+        self.login()
+        response = self.client.get(reverse("project_detail", kwargs={"pk": self.project.pk}))
+        self.assertNotIn("OtherTask", self._gantt_titles(response))
+
+    def test_gantt_status_all_shows_done_tasks(self):
+        self.login()
+        response = self.client.get(
+            reverse("project_detail", kwargs={"pk": self.project.pk}),
+            {"gantt_status": "all"},
+        )
+        self.assertIn("DoneTask", self._gantt_titles(response))
+
+    def test_gantt_status_done_shows_only_done_tasks(self):
+        self.login()
+        response = self.client.get(
+            reverse("project_detail", kwargs={"pk": self.project.pk}),
+            {"gantt_status": "done"},
+        )
+        titles = self._gantt_titles(response)
+        self.assertIn("DoneTask", titles)
+        self.assertNotIn("T", titles)
+
+    def test_gantt_assignees_param_filters_by_username(self):
+        self.login()
+        response = self.client.get(
+            reverse("project_detail", kwargs={"pk": self.project.pk}),
+            {"gantt_assignees": "other2", "gantt_status": "all"},
+        )
+        titles = self._gantt_titles(response)
+        self.assertIn("OtherTask", titles)
+        self.assertNotIn("T", titles)
+
+    def test_gantt_context_contains_gantt_status(self):
+        self.login()
+        response = self.client.get(
+            reverse("project_detail", kwargs={"pk": self.project.pk}),
+            {"gantt_status": "done"},
+        )
+        self.assertEqual(response.context["gantt_status"], "done")
+
+    def test_gantt_invalid_status_falls_back_to_active(self):
+        self.login()
+        response = self.client.get(
+            reverse("project_detail", kwargs={"pk": self.project.pk}),
+            {"gantt_status": "invalid_value"},
+        )
+        self.assertEqual(response.context["gantt_status"], "active")
+
+    def test_gantt_context_contains_gantt_assignees(self):
+        self.login()
+        response = self.client.get(
+            reverse("project_detail", kwargs={"pk": self.project.pk}),
+            {"gantt_assignees": "other2"},
+        )
+        self.assertEqual(response.context["gantt_assignees"], "other2")
+
+
+# ---------------------------------------------------------------------------
+# Form — DSL field
+# ---------------------------------------------------------------------------
+
+class TaskFormDSLTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="u", password="p")
+        self.project = Project.objects.create(name="P")
+        self.project.participants.add(self.user)
+        self.status = Status.objects.create(name="Open", project=self.project)
+        self.task = Task.objects.create(
+            title="T", project=self.project, assignee=self.user, status=self.status
+        )
+
+    def _form(self, dsl=""):
+        return TaskForm(
+            data={"title": "T", "description": "test", "progress_summary": "",
+                  "status": self.status.pk, "assignee": self.user.pk, "dsl": dsl},
+            user=self.user, project=self.project, instance=self.task,
+        )
+
+    def test_dsl_field_is_present(self):
+        self.assertIn("dsl", self._form().fields)
+
+    def test_dsl_field_is_not_required(self):
+        self.assertFalse(self._form().fields["dsl"].required)
+
+    def test_dsl_not_in_meta_fields(self):
+        self.assertNotIn("dsl", TaskForm.Meta.fields)
+
+    def test_form_valid_without_dsl(self):
+        form = self._form()
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_form_valid_with_dsl(self):
+        form = self._form(dsl=f"ASSIGN {self.task.pk} TO u")
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_dsl_value_in_cleaned_data(self):
+        dsl_text = f"ASSIGN {self.task.pk} TO u"
+        form = self._form(dsl=dsl_text)
+        self.assertTrue(form.is_valid())
+        self.assertEqual(form.cleaned_data["dsl"], dsl_text)
+
+
+# ---------------------------------------------------------------------------
+# Views — DSL execution on save
+# ---------------------------------------------------------------------------
+
+class TaskDSLViewTest(BaseViewTest):
+    def setUp(self):
+        super().setUp()
+        self.other_user = User.objects.create_user(username="other_user", password="pass")
+        self.project.participants.add(self.other_user)
+
+    def _post_update(self, extra_data=None):
+        data = {"title": "T", "description": "test", "progress_summary": "",
+                "status": self.status.pk, "assignee": self.user.pk}
+        if extra_data:
+            data.update(extra_data)
+        self.login()
+        return self.client.post(
+            reverse("task_update", kwargs={"pk": self.task.pk}), data
+        )
+
+    def test_update_with_assign_dsl_changes_assignee(self):
+        dsl = f"ASSIGN {self.task.pk} TO other_user"
+        self._post_update({"dsl": dsl})
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other_user)
+
+    def test_update_with_multiline_dsl_executes_all_commands(self):
+        second_task = Task.objects.create(
+            title="T2", project=self.project, assignee=self.user, status=self.status
+        )
+        dsl = f"ASSIGN {self.task.pk} TO other_user\nLINK {self.task.pk} -> {second_task.pk}"
+        self._post_update({"dsl": dsl})
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other_user)
+        self.assertIn(second_task, self.task.related_tasks.all())
+
+    def test_update_with_empty_dsl_saves_normally(self):
+        response = self._post_update({"dsl": ""})
+        self.assertEqual(response.status_code, 302)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.title, "T")
+
+    def test_create_with_dsl_executes_after_save(self):
+        dsl = f"ASSIGN {self.task.pk} TO other_user"
+        self.login()
+        self.client.post(
+            reverse("task_create") + f"?project={self.project.pk}",
+            {"title": "NewTask", "description": "test", "progress_summary": "",
+             "status": self.status.pk, "assignee": self.user.pk, "dsl": dsl},
+        )
+        self.assertTrue(Task.objects.filter(title="NewTask").exists())
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other_user)
+
+
+# ---------------------------------------------------------------------------
+# Form — CommentForm DSL field
+# ---------------------------------------------------------------------------
+
+class CommentFormDSLTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="u", password="p")
+        self.project = Project.objects.create(name="P")
+        self.status = Status.objects.create(name="Open", project=self.project)
+        self.task = Task.objects.create(
+            title="T", project=self.project, assignee=self.user, status=self.status
+        )
+
+    def _form(self, dsl=""):
+        return CommentForm(
+            data={"description": "test comment", "task": self.task.pk, "dsl": dsl},
+        )
+
+    def test_dsl_field_is_present(self):
+        self.assertIn("dsl", self._form().fields)
+
+    def test_dsl_field_is_not_required(self):
+        self.assertFalse(self._form().fields["dsl"].required)
+
+    def test_dsl_not_in_meta_fields(self):
+        self.assertNotIn("dsl", CommentForm.Meta.fields)
+
+    def test_form_valid_without_dsl(self):
+        form = self._form()
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_form_valid_with_dsl(self):
+        form = self._form(dsl=f"ASSIGN {self.task.pk} TO u")
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_dsl_value_in_cleaned_data(self):
+        dsl_text = f"ASSIGN {self.task.pk} TO u"
+        form = self._form(dsl=dsl_text)
+        self.assertTrue(form.is_valid())
+        self.assertEqual(form.cleaned_data["dsl"], dsl_text)
+
+
+# ---------------------------------------------------------------------------
+# Views — Comment DSL execution on save
+# ---------------------------------------------------------------------------
+
+class CommentDSLViewTest(BaseViewTest):
+    def setUp(self):
+        super().setUp()
+        self.other_user = User.objects.create_user(username="other_user", password="pass")
+        self.project.participants.add(self.other_user)
+        self.comment = Comment.objects.create(
+            author=self.user, task=self.task, description="Hello"
+        )
+
+    def test_create_with_assign_dsl_changes_assignee(self):
+        dsl = f"ASSIGN {self.task.pk} TO other_user"
+        self.login()
+        self.client.post(
+            reverse("comment_create"),
+            {"description": "New comment", "task": self.task.pk, "dsl": dsl},
+        )
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other_user)
+
+    def test_create_with_multiline_dsl_executes_all_commands(self):
+        second_task = Task.objects.create(
+            title="T2", project=self.project, assignee=self.user, status=self.status
+        )
+        dsl = f"ASSIGN {self.task.pk} TO other_user\nLINK {self.task.pk} -> {second_task.pk}"
+        self.login()
+        self.client.post(
+            reverse("comment_create"),
+            {"description": "Multi DSL", "task": self.task.pk, "dsl": dsl},
+        )
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other_user)
+        self.assertIn(second_task, self.task.related_tasks.all())
+
+    def test_create_with_empty_dsl_saves_normally(self):
+        self.login()
+        response = self.client.post(
+            reverse("comment_create"),
+            {"description": "No DSL", "task": self.task.pk, "dsl": ""},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Comment.objects.filter(description="No DSL").exists())
+
+    def test_update_with_assign_dsl_changes_assignee(self):
+        dsl = f"ASSIGN {self.task.pk} TO other_user"
+        self.login()
+        self.client.post(
+            reverse("comment_update", kwargs={"pk": self.comment.pk}),
+            {"description": "Updated", "task": self.task.pk, "dsl": dsl},
+        )
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other_user)

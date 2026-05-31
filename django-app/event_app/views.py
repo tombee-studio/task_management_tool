@@ -1,9 +1,11 @@
+from django.http import Http404
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.forms.models import model_to_dict
-from .models import *
-from .form import *
+from task_app.models import Project
+from .models import Event, EventStatus, Inventory, InventoryItemRelation, Item
+from .form import EventForm, InventoryForm, InventoryItemFormSet
 
 class EventListView(LoginRequiredMixin, ListView):
     model = Event
@@ -26,17 +28,32 @@ class EventCreateView(LoginRequiredMixin, CreateView):
     model = Event
     form_class = EventForm
     template_name = "event_app/event_form.html"
-    
+
+    def _get_project(self):
+        project_id = self.request.GET.get('project')
+        if project_id:
+            return Project.objects.filter(pk=project_id, participants=self.request.user).first()
+        return None
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['project'] = self._get_project()
+        return kwargs
+
     def get_success_url(self):
         return reverse_lazy("event_detail", kwargs={"pk": self.object.pk})
-    
+
     def get_initial(self):
         initial = super().get_initial()
+        project = self._get_project()
+        if project is not None:
+            initial["project"] = project
         pk = self.request.GET.get("previous", None)
-        if pk != None:
-          previous = Event.objects.get(pk=pk)
-          initial.update(model_to_dict(previous))
-          initial["previous_event"] = previous
+        if pk is not None:
+            previous = Event.objects.get(pk=pk)
+            initial.update(model_to_dict(previous))
+            initial["previous_event"] = previous
         return initial
 
 
@@ -47,7 +64,13 @@ class EventUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_queryset(self):
         return Event.objects.filter(project__participants=self.request.user)
-    
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['project'] = self.object.project
+        return kwargs
+
     def get_success_url(self):
         return reverse_lazy("event_detail", kwargs={"pk": self.object.pk})
 
@@ -158,7 +181,68 @@ class InventoryDeleteView(LoginRequiredMixin, DeleteView):
 
     def get_queryset(self):
         return Inventory.objects.filter(event__project__participants=self.request.user)
-    
+
     def get_success_url(self):
         return reverse_lazy("inventory_list")
+
+
+# ---------------------------------------------------------------------------
+# EventStatus CRUD
+# ---------------------------------------------------------------------------
+
+class EventStatusCreateView(LoginRequiredMixin, CreateView):
+    model = EventStatus
+    fields = ['name', 'is_done']
+    template_name = "event_app/event_status_form.html"
+
+    def _get_project(self):
+        pk = self.kwargs.get('project_pk')
+        if pk:
+            return Project.objects.filter(pk=pk, participants=self.request.user).first()
+        return None
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._get_project() is None:
+            raise Http404
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['project'] = self._get_project()
+        return context
+
+    def form_valid(self, form):
+        form.instance.project = self._get_project()
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        if self.object.project_id:
+            return reverse_lazy("project_detail", kwargs={"pk": self.object.project_id}) + "#tab-event-status"
+        return reverse_lazy("project_list")
+
+
+class EventStatusUpdateView(LoginRequiredMixin, UpdateView):
+    model = EventStatus
+    fields = ['name', 'is_done']
+    template_name = "event_app/event_status_form.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['project'] = self.object.project
+        return context
+
+    def get_success_url(self):
+        if self.object.project_id:
+            return reverse_lazy("project_detail", kwargs={"pk": self.object.project_id}) + "#tab-event-status"
+        return reverse_lazy("project_list")
+
+
+class EventStatusDeleteView(LoginRequiredMixin, DeleteView):
+    model = EventStatus
+
+    def get_success_url(self):
+        project_id = self.object.project_id
+        if project_id:
+            return reverse_lazy("project_detail", kwargs={"pk": project_id}) + "#tab-event-status"
+        return reverse_lazy("project_list")
 
