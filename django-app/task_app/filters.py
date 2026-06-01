@@ -20,6 +20,7 @@ TASK_FILTER_FIELDS = {
     'status': int,
     'deadline__lte': date.fromisoformat,
     'deadline__gte': date.fromisoformat,
+    'tags__name': str,
 }
 
 
@@ -28,9 +29,9 @@ class TaskFilterForm(forms.Form):
         required=False,
         label='検索',
         widget=forms.TextInput(attrs={
-            'placeholder': 'q=テスト status__is_done=False assignee=me',
+            'placeholder': 'q=テスト status__is_done=False assignee=me tag=バグ',
             'class': 'form-control',
-            'style': 'width: 420px;',
+            'style': 'width: 480px;',
         }),
     )
 
@@ -58,6 +59,9 @@ def parse_search_query(raw, user=None):
             if key == 'q':
                 # q=テスト 形式でキーワードを明示指定できる
                 q_tokens.append(value)
+            elif key == 'tag':
+                # tag=バグ は tags__name=バグ の短縮形
+                filter_parts['tags__name'] = value
             elif key not in TASK_FILTER_FIELDS:
                 continue
             elif key == 'assignee' and value == 'me':

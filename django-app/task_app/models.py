@@ -54,6 +54,13 @@ class Comment(models.Model):
   history = AuditlogHistoryField()
 
 
+class Tag(models.Model):
+  name = models.CharField(max_length=64, unique=True)
+
+  def __str__(self):
+    return self.name
+
+
 class Task(models.Model):
   title = models.CharField(max_length=256, null=False)
   project = models.ForeignKey(
@@ -97,6 +104,10 @@ class Task(models.Model):
     on_delete=models.SET_NULL,
     related_name='tasks',
     null=True,
+    blank=True)
+  tags = models.ManyToManyField(
+    'Tag',
+    related_name='tasks',
     blank=True)
   history = AuditlogHistoryField()
   
@@ -152,3 +163,4 @@ auditlog.register(Comment)
 auditlog.register(Status)
 auditlog.register(Task)
 auditlog.register(Rule)
+auditlog.register(Tag)
