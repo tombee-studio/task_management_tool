@@ -11,7 +11,7 @@ from .models import *
 from django.contrib.auth import login
 from django.http import Http404, HttpResponseRedirect
 from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm
-from .filters import TaskFilterForm, parse_search_query, apply_task_filters
+from .filters import TaskFilterMixin, apply_task_filters
 from .dsl import execute_dsl
 
 
@@ -27,7 +27,7 @@ def _parse_gantt_date(value):
 
 def build_gantt_data(project, from_date=None, to_date=None, assignee_ids=None, status_filter='active'):
     events = list(project.event_set.order_by('event_date'))
-    task_qs = Task.objects.with_tree_fields().filter(project=project)
+    task_qs = Task.objects.filter(project=project)
     if assignee_ids is not None:
         task_qs = task_qs.filter(assignee_id__in=assignee_ids)
     if status_filter == 'active':
@@ -96,7 +96,7 @@ def build_gantt_data(project, from_date=None, to_date=None, assignee_ids=None, s
                 continue
             start_pct = to_pct(start)
             width_pct = None
-        depth = getattr(task, 'tree_depth', 0)
+        depth = 0
         task_items.append({
             'task': task,
             'depth': depth,
@@ -133,82 +133,78 @@ def preprocess_description(project, _, form):
     return []
         
 
-class ProjectListView(LoginRequiredMixin, ListView):
+class ProjectListView(LoginRequiredMixin, TaskFilterMixin, ListView):
     model = Project
     template_name = "task_app/project_list.html"
     context_object_name = "projects"
-    
+
+    # 各セクションのデフォルト検索クエリ
+    TASK_FILTER_DEFAULT = 'status__is_done=False assignee=me'
+    RECENT_FILTER_DEFAULT = 'status__is_done=False'
+    WATCH_FILTER_DEFAULT = 'status__is_done=False'
+    GANTT_FILTER_DEFAULT = 'status__is_done=False assignee=me'
+
     def get_queryset(self):
         return self.request.user.projects.all()
-    
-    
-    # デフォルト検索クエリ: 未完了かつ自分に割り当て済み
-    TASK_FILTER_DEFAULT = 'status__is_done=False assignee=me'
-
-    def _get_task_filter_form(self):
-        if not hasattr(self, '_task_filter_form'):
-            raw = self.request.GET.get('search', self.TASK_FILTER_DEFAULT)
-            self._task_filter_form = TaskFilterForm(data={'search': raw})
-        return self._task_filter_form
 
     def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
-        form = self._get_task_filter_form()
-        raw = form.data.get('search', self.TASK_FILTER_DEFAULT)
-        parsed = parse_search_query(raw, user=self.request.user)
 
+        # --- 割り当てタスク（search パラメータ）---
+        parsed = self.get_parsed_filters()
         tasks_by_project = []
         for project in self.request.user.projects.order_by("name"):
-            base_qs = Task.objects.with_tree_fields().filter(project=project)
+            base_qs = Task.objects.filter(project=project)
             project_tasks = apply_task_filters(base_qs, parsed)
             active_statuses = project.statuses.filter(is_done=False)
             project_status_filter = "&".join([f"status={s.pk}" for s in active_statuses])
             if project_tasks.exists():
                 tasks_by_project.append((project, project_tasks, project_status_filter))
         context["tasks_by_project"] = tasks_by_project
-        context["filter_form"] = form
-        context["watching_tasks"] = self.request.user.watches.all()
 
-        # 最近更新されたタスク
-        period = self.request.GET.get("period", "today")
-        now = timezone.now()
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-
-        if period == "week":
-            updated_filter = {"updated_at__gte": today_start - timedelta(days=7)}
-        else:
-            period = "today"
-            updated_filter = {"updated_at__gte": today_start}
-
+        # --- 最近更新されたタスク（search_recent パラメータ）---
+        recent_raw = self.get_filter_raw('search_recent', self.RECENT_FILTER_DEFAULT)
+        recent_parsed = self.get_parsed_filters('search_recent', self.RECENT_FILTER_DEFAULT)
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
         accessible_tasks = Task.objects.filter(
             Q(project__participants=self.request.user) |
             Q(assignee=self.request.user)
         ).distinct().select_related("project", "status", "assignee")
+        recently_updated_base = accessible_tasks.filter(updated_at__gte=today_start)
+        context["recently_updated_tasks"] = apply_task_filters(recently_updated_base, recent_parsed).order_by("-updated_at")
+        context["recent_filter_value"] = recent_raw
 
-        context["recently_updated_tasks"] = accessible_tasks.filter(**updated_filter).order_by("-updated_at")
-        context["period"] = period
+        # --- ウォッチしているタスク（search_watch パラメータ）---
+        watch_raw = self.get_filter_raw('search_watch', self.WATCH_FILTER_DEFAULT)
+        watch_parsed = self.get_parsed_filters('search_watch', self.WATCH_FILTER_DEFAULT)
+        watching_base = Task.objects.filter(watched=self.request.user)
+        context["watching_tasks"] = apply_task_filters(watching_base, watch_parsed)
+        context["watch_filter_value"] = watch_raw
 
-        gantt_from = _parse_gantt_date(self.request.GET.get('gantt_from'))
-        gantt_to = _parse_gantt_date(self.request.GET.get('gantt_to'))
-        context["gantt_from"] = self.request.GET.get('gantt_from', '')
-        context["gantt_to"] = self.request.GET.get('gantt_to', '')
+        # --- ガントチャート（search_gantt パラメータ）---
+        gantt_raw = self.get_filter_raw('search_gantt', self.GANTT_FILTER_DEFAULT)
+        gantt_parsed = self.get_parsed_filters('search_gantt', self.GANTT_FILTER_DEFAULT)
+        context['gantt_filter_value'] = gantt_raw
 
-        gantt_assignees_raw = self.request.GET.get('gantt_assignees', '').strip()
-        if gantt_assignees_raw:
-            usernames = [u.strip() for u in re.split(r'[,\s]+', gantt_assignees_raw) if u.strip()]
-            assignee_ids = list(User.objects.filter(username__in=usernames).values_list('id', flat=True))
+        assignee_val = gantt_parsed.get('assignee')
+        if assignee_val is not None:
+            try:
+                gantt_assignee_ids = [int(assignee_val)]
+            except (ValueError, TypeError):
+                gantt_assignee_ids = [self.request.user.id]
         else:
-            assignee_ids = [self.request.user.id]
-        context["gantt_assignees"] = gantt_assignees_raw
+            gantt_assignee_ids = None
 
-        gantt_status = self.request.GET.get('gantt_status', 'active')
-        if gantt_status not in ('active', 'all', 'done'):
-            gantt_status = 'active'
-        context["gantt_status"] = gantt_status
+        status_val = gantt_parsed.get('status__is_done')
+        if status_val is not None:
+            is_done = status_val.lower() not in ('false', '0', 'no')
+            gantt_status = 'done' if is_done else 'active'
+        else:
+            gantt_status = 'all'
 
         gantt_by_project = []
         for project in self.request.user.projects.order_by("name"):
-            gantt_by_project.append({'project': project, 'gantt': build_gantt_data(project, gantt_from, gantt_to, assignee_ids=assignee_ids, status_filter=gantt_status)})
+            gantt_by_project.append({'project': project, 'gantt': build_gantt_data(project, assignee_ids=gantt_assignee_ids, status_filter=gantt_status)})
         context["gantt_by_project"] = gantt_by_project
         return context
     
@@ -467,7 +463,7 @@ class CommentDeleteView(LoginRequiredMixin, DeleteView):
     def get_success_url(self):
         return reverse_lazy("project_list")
 
-class TaskListView(LoginRequiredMixin, ListView):
+class TaskListView(LoginRequiredMixin, TaskFilterMixin, ListView):
     model = Task
     template_name = "task_app/task_list.html"
     context_object_name = "tasks"
@@ -475,30 +471,9 @@ class TaskListView(LoginRequiredMixin, ListView):
     # デフォルト検索クエリ: 未完了タスクのみ表示
     TASK_FILTER_DEFAULT = 'status__is_done=False'
 
-    def _get_task_filter_form(self):
-        if not hasattr(self, '_task_filter_form'):
-            raw = self.request.GET.get('search', self.TASK_FILTER_DEFAULT)
-            self._task_filter_form = TaskFilterForm(data={'search': raw})
-        return self._task_filter_form
-
     def get_queryset(self):
-        form = self._get_task_filter_form()
-        raw = form.data.get('search', self.TASK_FILTER_DEFAULT)
-        parsed = parse_search_query(raw, user=self.request.user)
-        base_qs = Task.objects.with_tree_fields().annotate(
-            completed_subtask_count=Count(
-                'tasks',
-                filter=Q(tasks__status__is_done=True),
-                distinct=True,
-            ),
-            total_subtask_count=Count('tasks', distinct=True),
-        )
-        return apply_task_filters(base_qs, parsed)
-
-    def get_context_data(self, **kwargs) -> dict[str, any]:
-        context = super().get_context_data(**kwargs)
-        context["filter_form"] = self._get_task_filter_form()
-        return context
+        parsed = self.get_parsed_filters()
+        return apply_task_filters(Task.objects.all(), parsed)
 
 class TaskDetailView(LoginRequiredMixin, DetailView):
     model = Task

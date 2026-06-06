@@ -106,3 +106,30 @@ def apply_task_filters(queryset, parsed):
         queryset = queryset.filter(**filter_kwargs)
 
     return queryset
+
+
+class TaskFilterMixin:
+    """
+    複数ビューでタスクフィルタリングを共通化するミックスイン。
+    TASK_FILTER_DEFAULT をサブクラスで上書きしてデフォルト検索を変える。
+    セクションごとに異なる param_name と default を渡して複数フィルタに対応できる。
+    """
+    TASK_FILTER_DEFAULT = ''
+
+    def get_filter_raw(self, param='search', default=None):
+        """指定 GET パラメータの生文字列を返す。未指定時は default を使う。"""
+        if default is None:
+            default = self.TASK_FILTER_DEFAULT
+        return self.request.GET.get(param, default)
+
+    def get_parsed_filters(self, param='search', default=None):
+        """生のフィルタ文字列を ORM lookup dict に変換して返す。"""
+        raw = self.get_filter_raw(param, default)
+        return parse_search_query(raw, user=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        raw = self.get_filter_raw()
+        context['filter_form'] = TaskFilterForm(data={'search': raw})
+        context['filter_value'] = raw
+        return context

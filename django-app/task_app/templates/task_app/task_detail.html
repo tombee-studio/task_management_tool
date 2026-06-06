@@ -41,7 +41,7 @@
   <div class="panel-heading">
     <h1 class="panel-title">{{ task.title }}の関連するタスク一覧</h1>
   </div>
-  {% include "task_app/components/task_list_component.html" with tasks=object.related_tasks task=object status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+  {% include "task_app/components/task_list_component.html" with tasks=related_tasks task=object status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
 </div>
 
 <div class="panel panel-default">

@@ -46,8 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'bootstrap3',
     'auditlog',
-    'tree_queries',
-    'task_app.apps.TaskAppConfig',
+'task_app.apps.TaskAppConfig',
     'event_app'
 ]
 
