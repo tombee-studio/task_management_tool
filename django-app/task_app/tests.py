@@ -1041,20 +1041,15 @@ class TaskViewsTest(BaseViewTest):
     def test_task_list_requires_login(self):
         self.assertEqual(self.client.get(reverse("task_list")).status_code, 302)
 
-    def test_task_list_annotation_clashes_with_model_property(self):
-        # Known app bug: TaskListView annotates 'completed_subtask_count' /
-        # 'total_subtask_count' which clash with Task @property of the same
-        # names.  Django raises AttributeError when iterating the queryset.
-        self.client.raise_request_exception = False
+    def test_task_list_returns_200(self):
         self.login()
         response = self.client.get(reverse("task_list"))
-        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 200)
 
-    def test_task_list_with_status_filter_annotation_bug(self):
-        self.client.raise_request_exception = False
+    def test_task_list_contains_filter_form(self):
         self.login()
-        response = self.client.get(reverse("task_list"), {"status": self.status.pk})
-        self.assertEqual(response.status_code, 500)
+        response = self.client.get(reverse("task_list"))
+        self.assertIn("filter_form", response.context)
 
     def test_task_detail_accessible_by_assignee(self):
         self.login()
@@ -2027,7 +2022,7 @@ class TagFilterApplyTest(TestCase):
         )
 
     def _apply(self, raw):
-        qs = Task.objects.with_tree_fields()
+        qs = Task.objects.all()
         return apply_task_filters(qs, parse_search_query(raw))
 
     def test_tag_filter_returns_matching_task(self):
@@ -2113,3 +2108,186 @@ class TaskTagViewTest(BaseViewTest):
         self._post_update({"tags": "バグ フロントエンド"})
         tag_names = set(self.task.tags.values_list("name", flat=True))
         self.assertEqual(tag_names, {"バグ", "フロントエンド"})
+
+
+# ---------------------------------------------------------------------------
+# TaskFilterMixin — ProjectListView デフォルトフィルタ
+# ---------------------------------------------------------------------------
+
+class ProjectListViewFilterTest(BaseViewTest):
+    """ProjectListView のデフォルトフィルタ（assignee=me, is_done=False）を検証する。"""
+
+    def setUp(self):
+        super().setUp()
+        self.other_user = User.objects.create_user(username="other2", password="pass")
+        self.project.participants.add(self.other_user)
+        self.other_task = Task.objects.create(
+            title="OtherTask", project=self.project, assignee=self.other_user, status=self.status
+        )
+        self.done_task = Task.objects.create(
+            title="DoneTask", project=self.project, assignee=self.user, status=self.done
+        )
+
+    def _task_titles(self, response):
+        return {
+            t.title
+            for _, tasks, _ in response.context["tasks_by_project"]
+            for t in tasks
+        }
+
+    def test_default_shows_own_open_tasks(self):
+        self.login()
+        response = self.client.get(reverse("project_list"))
+        self.assertIn("T", self._task_titles(response))
+
+    def test_default_hides_other_users_tasks(self):
+        self.login()
+        response = self.client.get(reverse("project_list"))
+        self.assertNotIn("OtherTask", self._task_titles(response))
+
+    def test_default_hides_done_tasks(self):
+        self.login()
+        response = self.client.get(reverse("project_list"))
+        self.assertNotIn("DoneTask", self._task_titles(response))
+
+    def test_filter_value_in_context(self):
+        self.login()
+        response = self.client.get(reverse("project_list"))
+        self.assertIn("filter_value", response.context)
+
+    def test_search_overrides_default_assignee(self):
+        # status__is_done=False だけ指定 → assignee=me が外れ他ユーザのタスクが見える
+        self.login()
+        response = self.client.get(reverse("project_list"), {"search": "status__is_done=False"})
+        self.assertIn("OtherTask", self._task_titles(response))
+
+    def test_search_empty_shows_all(self):
+        # search= 空文字でフィルタなし → 完了タスクも他ユーザタスクも表示
+        self.login()
+        response = self.client.get(reverse("project_list"), {"search": ""})
+        titles = self._task_titles(response)
+        self.assertIn("T", titles)
+        self.assertIn("OtherTask", titles)
+        self.assertIn("DoneTask", titles)
+
+    def test_keyword_search_filters_by_title(self):
+        self.login()
+        response = self.client.get(
+            reverse("project_list"), {"search": "OtherTask status__is_done=False"}
+        )
+        titles = self._task_titles(response)
+        self.assertIn("OtherTask", titles)
+        self.assertNotIn("T", titles)
+
+
+# ---------------------------------------------------------------------------
+# TaskFilterMixin — ProjectListView 最近更新・ウォッチセクション フィルタ
+# ---------------------------------------------------------------------------
+
+class ProjectListViewSectionFilterTest(BaseViewTest):
+    """recently_updated / watching 各セクションのフィルタ動作を検証する。"""
+
+    def setUp(self):
+        super().setUp()
+        self.done_task = Task.objects.create(
+            title="DoneWatch", project=self.project, assignee=self.user, status=self.done
+        )
+        self.user.watches.add(self.task)
+        self.user.watches.add(self.done_task)
+
+    # --- ウォッチセクション ---
+
+    def test_watch_default_hides_done_tasks(self):
+        self.login()
+        response = self.client.get(reverse("project_list"))
+        watching = list(response.context["watching_tasks"])
+        self.assertNotIn(self.done_task, watching)
+
+    def test_watch_default_shows_open_tasks(self):
+        self.login()
+        response = self.client.get(reverse("project_list"))
+        watching = list(response.context["watching_tasks"])
+        self.assertIn(self.task, watching)
+
+    def test_watch_search_empty_shows_all(self):
+        self.login()
+        response = self.client.get(reverse("project_list"), {"search_watch": ""})
+        watching = list(response.context["watching_tasks"])
+        self.assertIn(self.task, watching)
+        self.assertIn(self.done_task, watching)
+
+    def test_watch_filter_value_in_context(self):
+        self.login()
+        response = self.client.get(reverse("project_list"), {"search_watch": "assignee=me"})
+        self.assertEqual(response.context["watch_filter_value"], "assignee=me")
+
+    # --- 最近更新セクション ---
+
+    def test_recent_filter_value_in_context(self):
+        self.login()
+        response = self.client.get(reverse("project_list"), {"search_recent": "q=test"})
+        self.assertEqual(response.context["recent_filter_value"], "q=test")
+
+    def test_recent_filter_value_uses_default_when_absent(self):
+        self.login()
+        response = self.client.get(reverse("project_list"))
+        self.assertEqual(response.context["recent_filter_value"], "status__is_done=False")
+
+    def test_recent_search_empty_shows_all_recent(self):
+        # 空文字を渡すと完了タスクも表示される（時間フィルタは通過済み）
+        from django.utils import timezone as tz
+        self.done_task.updated_at = tz.now()
+        self.done_task.save()
+        self.login()
+        response = self.client.get(reverse("project_list"), {"search_recent": ""})
+        recently = list(response.context["recently_updated_tasks"])
+        self.assertIn(self.done_task, recently)
+
+
+# ---------------------------------------------------------------------------
+# TaskFilterMixin — TaskListView デフォルトフィルタ
+# ---------------------------------------------------------------------------
+
+class TaskListViewFilterTest(BaseViewTest):
+    """TaskListView のデフォルトフィルタ（is_done=False）を検証する。"""
+
+    def setUp(self):
+        super().setUp()
+        self.done_task = Task.objects.create(
+            title="DoneTask", project=self.project, assignee=self.user, status=self.done
+        )
+        self.other_open_task = Task.objects.create(
+            title="OtherOpen", project=self.project, assignee=self.user, status=self.status
+        )
+
+    def _titles(self, response):
+        return {t.title for t in response.context["tasks"]}
+
+    def test_default_hides_done_tasks(self):
+        self.login()
+        response = self.client.get(reverse("task_list"))
+        self.assertNotIn("DoneTask", self._titles(response))
+
+    def test_default_shows_open_tasks(self):
+        self.login()
+        response = self.client.get(reverse("task_list"))
+        self.assertIn("T", self._titles(response))
+
+    def test_search_empty_shows_all(self):
+        self.login()
+        response = self.client.get(reverse("task_list"), {"search": ""})
+        titles = self._titles(response)
+        self.assertIn("DoneTask", titles)
+        self.assertIn("T", titles)
+
+    def test_search_filters_by_keyword(self):
+        self.login()
+        response = self.client.get(reverse("task_list"), {"search": "DoneTask"})
+        titles = self._titles(response)
+        self.assertIn("DoneTask", titles)
+        self.assertNotIn("T", titles)
+
+    def test_filter_value_reflects_search_param(self):
+        self.login()
+        response = self.client.get(reverse("task_list"), {"search": "assignee=me"})
+        self.assertEqual(response.context["filter_value"], "assignee=me")

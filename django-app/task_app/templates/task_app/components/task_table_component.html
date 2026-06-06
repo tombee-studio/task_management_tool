@@ -1,4 +1,3 @@
-{% load tree_queries %}
 {% if tasks %}
 <table class="table">
   <tr>
@@ -10,9 +9,8 @@
     <th style="width: 15%;">期日</th>
     <th style="width: 10%;">ウォッチ</th>
   </tr>
-  {% recursetree tasks %}
-    {% include "task_app/components/task_list_item.html" with task=node hide_project_column=True %}
-    {{ children }}
-  {% endrecursetree %}
+  {% for task in tasks %}
+    {% include "task_app/components/task_list_item.html" with task=task hide_project_column=True %}
+  {% endfor %}
 </table>
 {% endif %}
