@@ -43,6 +43,11 @@
           <div class="panel-body"><small>タスクがありません。</small></div>
         {% endif %}
       {% elif item == 'event' %}
+        {% if project %}
+        <div class="panel-body">
+          <a href="{% url 'event_create' %}?project={{ project.id }}">イベントを追加</a>
+        </div>
+        {% endif %}
         {% if widget.events %}
           <table class="table">
             <tr>
