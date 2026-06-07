@@ -1,8 +1,19 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.contrib.auth.models import User
 from django.utils import timezone
-from .models import Task, Comment
+from .models import Task, Comment, UserPreferences
 from .rules import process_task_rules
+
+
+@receiver(post_save, sender=User)
+def create_user_preferences(sender, instance, created, **kwargs):
+    if created:
+        from .widget_loader import DEFAULT_WIDGET_CONFIG
+        UserPreferences.objects.get_or_create(
+            user=instance,
+            defaults={'config': DEFAULT_WIDGET_CONFIG},
+        )
 
 
 @receiver(post_save, sender=Task)
