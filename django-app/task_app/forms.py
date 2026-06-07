@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 
-from .models import Project, Task, Comment, Status, Tag
+from .models import Project, Task, Comment, Status, Tag, UserPreferences
 from event_app.models import Event
 
 
@@ -114,6 +114,18 @@ class UserUpdateForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ['username']
+
+
+class UserPreferencesForm(forms.ModelForm):
+    class Meta:
+        model = UserPreferences
+        fields = ['config']
+        widgets = {
+            'config': forms.Textarea(attrs={'rows': 6}),
+        }
+        labels = {
+            'config': 'Widget設定',
+        }
 
 
 class CommentForm(forms.ModelForm):

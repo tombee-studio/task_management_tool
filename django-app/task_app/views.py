@@ -10,7 +10,7 @@ from .models import *
 
 from django.contrib.auth import login
 from django.http import Http404, HttpResponseRedirect
-from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm, UserUpdateForm
+from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm, UserUpdateForm, UserPreferencesForm
 from .models import UserPreferences
 from .filters import TaskFilterMixin, apply_task_filters
 from .dsl import execute_dsl
@@ -139,10 +139,6 @@ class ProjectListView(LoginRequiredMixin, TaskFilterMixin, ListView):
     template_name = "task_app/project_list.html"
     context_object_name = "projects"
 
-    # 各セクションのデフォルト検索クエリ
-    TASK_FILTER_DEFAULT = 'status__is_done=False assignee=me'
-    RECENT_FILTER_DEFAULT = 'status__is_done=False'
-    WATCH_FILTER_DEFAULT = 'status__is_done=False'
     GANTT_FILTER_DEFAULT = 'status__is_done=False assignee=me'
 
     def get_queryset(self):
@@ -150,37 +146,6 @@ class ProjectListView(LoginRequiredMixin, TaskFilterMixin, ListView):
 
     def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
-
-        # --- 割り当てタスク（search パラメータ）---
-        parsed = self.get_parsed_filters()
-        tasks_by_project = []
-        for project in self.request.user.projects.order_by("name"):
-            base_qs = Task.objects.filter(project=project)
-            project_tasks = apply_task_filters(base_qs, parsed)
-            active_statuses = project.statuses.filter(is_done=False)
-            project_status_filter = "&".join([f"status={s.pk}" for s in active_statuses])
-            if project_tasks.exists():
-                tasks_by_project.append((project, project_tasks, project_status_filter))
-        context["tasks_by_project"] = tasks_by_project
-
-        # --- 最近更新されたタスク（search_recent パラメータ）---
-        recent_raw = self.get_filter_raw('search_recent', self.RECENT_FILTER_DEFAULT)
-        recent_parsed = self.get_parsed_filters('search_recent', self.RECENT_FILTER_DEFAULT)
-        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        accessible_tasks = Task.objects.filter(
-            Q(project__participants=self.request.user) |
-            Q(assignee=self.request.user)
-        ).distinct().select_related("project", "status", "assignee")
-        recently_updated_base = accessible_tasks.filter(updated_at__gte=today_start)
-        context["recently_updated_tasks"] = apply_task_filters(recently_updated_base, recent_parsed).order_by("-updated_at")
-        context["recent_filter_value"] = recent_raw
-
-        # --- ウォッチしているタスク（search_watch パラメータ）---
-        watch_raw = self.get_filter_raw('search_watch', self.WATCH_FILTER_DEFAULT)
-        watch_parsed = self.get_parsed_filters('search_watch', self.WATCH_FILTER_DEFAULT)
-        watching_base = Task.objects.filter(watched=self.request.user)
-        context["watching_tasks"] = apply_task_filters(watching_base, watch_parsed)
-        context["watch_filter_value"] = watch_raw
 
         # --- ガントチャート（search_gantt パラメータ）---
         gantt_raw = self.get_filter_raw('search_gantt', self.GANTT_FILTER_DEFAULT)
@@ -221,22 +186,12 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        selected_status_list = self.request.GET.getlist("status")
 
-        project_statuses = self.object.statuses.all()
-        active_statuses = project_statuses.filter(is_done=False)
-        context["status_filter"] = "&".join([f"status={s.pk}" for s in active_statuses])
-        context["status_list"] = project_statuses
-        if not selected_status_list:
-            selected_status_list = [str(s.pk) for s in active_statuses]
-        context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
-        context["tasks"] = self.object.task_set.filter(status__in=selected_status_list).prefetch_related(
-            Prefetch(
-                "tasks",
-                queryset=Task.objects.filter(status__in=selected_status_list),
-                to_attr="filtered_tasks",
-            )
-        )
+        user_preferences, _ = UserPreferences.objects.get_or_create(user=self.request.user)
+        context["user_preferences"] = user_preferences
+
+        context["status_list"] = self.object.statuses.all()
+
         gantt_from = _parse_gantt_date(self.request.GET.get('gantt_from'))
         gantt_to = _parse_gantt_date(self.request.GET.get('gantt_to'))
         context["gantt_from"] = self.request.GET.get('gantt_from', '')
@@ -264,10 +219,6 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
             selected_event_status_list = [str(s.pk) for s in active_event_statuses]
         context["event_status_list"] = event_statuses
         context["selected_event_status_list"] = list(map(int, selected_event_status_list))
-        if event_statuses.exists() and selected_event_status_list:
-            context["events"] = self.object.event_set.filter(status__in=selected_event_status_list)
-        else:
-            context["events"] = self.object.event_set.all()
 
         return context
 
@@ -464,18 +415,6 @@ class CommentDeleteView(LoginRequiredMixin, DeleteView):
     def get_success_url(self):
         return reverse_lazy("project_list")
 
-class TaskListView(LoginRequiredMixin, TaskFilterMixin, ListView):
-    model = Task
-    template_name = "task_app/task_list.html"
-    context_object_name = "tasks"
-
-    # デフォルト検索クエリ: 未完了タスクのみ表示
-    TASK_FILTER_DEFAULT = 'status__is_done=False'
-
-    def get_queryset(self):
-        parsed = self.get_parsed_filters()
-        return apply_task_filters(Task.objects.all(), parsed)
-
 class TaskDetailView(LoginRequiredMixin, DetailView):
     model = Task
     template_name = "task_app/task_detail.html"
@@ -488,14 +427,6 @@ class TaskDetailView(LoginRequiredMixin, DetailView):
     
     def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
-        selected_status_list = self.request.GET.getlist("status")
-        context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
-        context["status_list"] = Status.objects.all()
-        context["status_filter"] = "&".join(list(map(lambda status: f"status={status}", selected_status_list)))
-        context["tasks"] = self.object.tasks.filter(
-            status__in=selected_status_list)
-        context["related_tasks"] = self.object.related_tasks.filter(
-            status__in=selected_status_list)
 
         parent_objects = []
         current = self.object
@@ -503,7 +434,7 @@ class TaskDetailView(LoginRequiredMixin, DetailView):
             parent_objects.insert(0, current)
             current = current.parent
         context["parent_objects"] = parent_objects
-        
+
         return context
 
 
@@ -643,8 +574,23 @@ class UserDetailView(LoginRequiredMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user_preferences, _ = UserPreferences.objects.get_or_create(user=self.request.user)
-        context['user_preferences'] = user_preferences
+        if 'preferences_form' not in context:
+            context['preferences_form'] = UserPreferencesForm(instance=user_preferences)
         return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        user_form = UserUpdateForm(request.POST, instance=self.object)
+        user_preferences, _ = UserPreferences.objects.get_or_create(user=self.object)
+        preferences_form = UserPreferencesForm(request.POST, instance=user_preferences)
+        if user_form.is_valid() and preferences_form.is_valid():
+            user_form.save()
+            preferences_form.save()
+            return HttpResponseRedirect(self.get_success_url())
+        return self.render_to_response(self.get_context_data(
+            form=user_form,
+            preferences_form=preferences_form,
+        ))
 
     def get_success_url(self):
         return reverse_lazy('user_detail')

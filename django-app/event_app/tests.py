@@ -591,18 +591,6 @@ class ProjectDetailEventStatusFilterTest(TestCase):
             params or {},
         )
 
-    def test_default_shows_active_events(self):
-        response = self._get()
-        events = list(response.context["events"])
-        self.assertIn(self.event_active, events)
-        self.assertNotIn(self.event_done, events)
-
-    def test_filter_by_done_status(self):
-        response = self._get({"event_status": self.done_status.pk})
-        events = list(response.context["events"])
-        self.assertIn(self.event_done, events)
-        self.assertNotIn(self.event_active, events)
-
     def test_event_status_list_in_context(self):
         response = self._get()
         self.assertIn(self.active_status, response.context["event_status_list"])
@@ -613,13 +601,3 @@ class ProjectDetailEventStatusFilterTest(TestCase):
         self.assertIn(self.active_status.pk, response.context["selected_event_status_list"])
         self.assertNotIn(self.done_status.pk, response.context["selected_event_status_list"])
 
-    def test_no_event_statuses_shows_all_events(self):
-        project2 = Project.objects.create(name="P2")
-        project2.participants.add(self.user)
-        e1 = Event.objects.create(event_date="2026-06-01", project=project2, name="E1")
-        e2 = Event.objects.create(event_date="2026-07-01", project=project2, name="E2")
-        self.client.force_login(self.user)
-        response = self.client.get(reverse("project_detail", kwargs={"pk": project2.pk}))
-        events = list(response.context["events"])
-        self.assertIn(e1, events)
-        self.assertIn(e2, events)

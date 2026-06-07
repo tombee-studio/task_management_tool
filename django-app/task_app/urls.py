@@ -19,7 +19,6 @@ urlpatterns = [
     path("comments/create/", CommentCreateView.as_view(), name="comment_create"),
     re_path(r"^comments/(?P<pk>\d+)/edit/$", CommentUpdateView.as_view(), name="comment_update"),
     re_path(r"^comments/(?P<pk>\d+)/delete/$", CommentDeleteView.as_view(), name="comment_delete"),
-    path("tasks/", TaskListView.as_view(), name="task_list"),
     re_path(r"^tasks/(?P<pk>\d+)/$", TaskDetailView.as_view(), name="task_detail"),
     path("tasks/create/", TaskCreateView.as_view(), name="task_create"),
     re_path(r"^tasks/(?P<pk>\d+)/edit/$", TaskUpdateView.as_view(), name="task_update"),

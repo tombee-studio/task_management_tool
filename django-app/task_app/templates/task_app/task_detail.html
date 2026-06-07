@@ -5,11 +5,11 @@
 <div aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item active" aria-current="page">
-      <a href="{% url "project_detail" task.project.pk %}?{{ status_filter }}">{{ task.project.name }}</a>
+      <a href="{% url "project_detail" task.project.pk %}">{{ task.project.name }}</a>
     </li>
     {% for parent in parent_objects %}
     <li class="breadcrumb-item active" aria-current="page">
-      <a href="{% url "task_detail" parent.pk %}?{{ status_filter }}">#{{ parent.pk }} {{ parent.title }}</a>
+      <a href="{% url "task_detail" parent.pk %}">#{{ parent.pk }} {{ parent.title }}</a>
     </li>
     {% endfor %}
   </ol>
@@ -22,33 +22,6 @@
     </h1>
   </div>
   {% include "task_app/components/task_detail_component.html" with task=task %}
-</div>
-
-<div class="panel panel-default">
-  <div class="panel-heading">
-    <h1 class="panel-title">関連するイベント</h1>
-  </div>
-  <div class="panel-body">
-    {% if task.event %}
-      <a href="{% url 'event_detail' task.event.pk %}">{{ task.event.name }}（{{ task.event.event_date|date:"Y/m/d" }}）</a>
-    {% else %}
-      <p>関連するイベントはありません。</p>
-    {% endif %}
-  </div>
-</div>
-
-<div class="panel panel-default">
-  <div class="panel-heading">
-    <h1 class="panel-title">{{ task.title }}の関連するタスク一覧</h1>
-  </div>
-  {% include "task_app/components/task_list_component.html" with tasks=related_tasks task=object status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
-</div>
-
-<div class="panel panel-default">
-  <div class="panel-heading">
-    <h1 class="panel-title">{{ task.title }}のサブタスク一覧</h1>
-  </div>
-  {% include "task_app/components/task_list_component.html" with tasks=tasks task=object status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
 </div>
 
 <div class="panel panel-default">

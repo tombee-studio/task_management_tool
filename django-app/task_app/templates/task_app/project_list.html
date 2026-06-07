@@ -3,7 +3,7 @@
 {% block content %}
 <ul class="nav nav-tabs" role="tablist">
   <li role="presentation" class="active">
-    <a href="#tab-list" aria-controls="tab-list" role="tab" data-toggle="tab">タスク一覧</a>
+    <a href="#tab-list" aria-controls="tab-list" role="tab" data-toggle="tab">プロジェクト一覧</a>
   </li>
   <li role="presentation">
     <a href="#tab-gantt" aria-controls="tab-gantt" role="tab" data-toggle="tab">ガントチャート</a>
@@ -14,14 +14,6 @@
 
   <div role="tabpanel" class="tab-pane active" id="tab-list">
     <div class="panel panel-default">
-      <div class="panel-heading">最近更新されたタスク（当日）</div>
-      <div class="panel-body">
-        {% include "task_app/components/task_filter_component.html" with reset_url=request.path param_name='search_recent' filter_value=recent_filter_value %}
-      </div>
-      {% include "task_app/components/recently_updated_tasks_component.html" %}
-    </div>
-
-    <div class="panel panel-default">
       <div class="panel-heading">プロジェクト一覧</div>
       <div class="panel-body">
         <p>
@@ -29,29 +21,6 @@
         </p>
       </div>
       {% include "task_app/components/project_list_component.html" with projects=projects %}
-    </div>
-
-    <div class="panel panel-default">
-      <div class="panel-heading">{{user.username}}が割り当てられているタスク</div>
-      <div class="panel-body">
-        {% include "task_app/components/task_filter_component.html" with reset_url=request.path %}
-      </div>
-      {% for project, project_tasks, project_status_filter in tasks_by_project %}
-        <div class="panel-heading" style="background-color: #f5f5f5; border-top: 1px solid #ddd; font-size: 0.95em;">
-          <a href="{% url 'project_detail' project.pk %}?{{ project_status_filter }}">{{ project.name }}</a>
-        </div>
-        {% include "task_app/components/task_table_component.html" with tasks=project_tasks %}
-      {% empty %}
-        <p class="panel-body">タスクはまだ登録されていません。</p>
-      {% endfor %}
-    </div>
-
-    <div class="panel panel-default">
-      <div class="panel-heading">{{user.username}}がウォッチしているタスク</div>
-      <div class="panel-body">
-        {% include "task_app/components/task_filter_component.html" with reset_url=request.path param_name='search_watch' filter_value=watch_filter_value %}
-      </div>
-      {% include "task_app/components/task_list_component.html" with tasks=watching_tasks hide_filter=True nest_count=0 %}
     </div>
   </div>
 
