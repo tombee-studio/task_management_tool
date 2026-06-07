@@ -4,6 +4,67 @@ from .filters import parse_search_query, apply_task_filters
 from .models import Task
 from .gantt import build_gantt_data
 
+DEFAULT_WIDGET_CONFIG = """\
+pages:
+  - name: project_list
+    widgets:
+      - title: 自分のタスク一覧
+        rules:
+          - table: task
+            filter: "assignee=me status__is_done=False"
+        type: table
+        order:
+          - task
+      - title: ウォッチしているタスク一覧
+        rules:
+          - table: task
+            source: watched_tasks
+            filter: "status__is_done=False"
+        type: table
+        order:
+          - task
+  - name: project_detail
+    widgets:
+      - title: 未完了のイベント一覧
+        rules:
+          - table: event
+            filter: "status__is_done=False"
+        type: table
+        order:
+          - event
+      - title: 未完了のタスク一覧
+        rules:
+          - table: task
+            filter: "status__is_done=False"
+        type: table
+        order:
+          - task
+  - name: task_detail
+    widgets:
+      - title: 関連するイベント
+        rules:
+          - table: event
+            source: task_event
+        type: table
+        order:
+          - event
+      - title: 関連タスク
+        rules:
+          - table: task
+            source: related_tasks
+        type: table
+        order:
+          - task
+      - title: サブタスク（未完了）
+        rules:
+          - table: task
+            source: subtasks
+            filter: "status__is_done=False"
+        type: table
+        order:
+          - task
+"""
+
 
 def parse_widget_config(config_str):
     """YAML 文字列をパースして dict を返す。エラー時は {} を返す。"""
@@ -48,7 +109,7 @@ def _base_event_qs(user, project=None):
 
 
 def _apply_event_filter(qs, filter_str):
-    """イベントへの基本フィルタ（将来的に拡張可能）。"""
+    """イベントへの基本フィルタ。"""
     if not filter_str or not filter_str.strip():
         return qs
     for token in filter_str.split():
@@ -60,7 +121,42 @@ def _apply_event_filter(qs, filter_str):
     return qs
 
 
-def resolve_widget_data(widget_config, user, project=None):
+def _resolve_source_task_qs(source, user, project, task, filter_str):
+    """source フィールドに基づいてタスク QuerySet を返す。"""
+    if source == 'watched_tasks':
+        qs = user.watches.all().select_related('project', 'status', 'assignee')
+        if project is not None:
+            qs = qs.filter(project=project)
+        parsed = parse_search_query(filter_str, user=user)
+        return apply_task_filters(qs, parsed)
+
+    if task is None:
+        return Task.objects.none()
+
+    if source == 'subtasks':
+        qs = task.tasks.all().select_related('project', 'status', 'assignee')
+        parsed = parse_search_query(filter_str, user=user)
+        return apply_task_filters(qs, parsed)
+
+    if source == 'related_tasks':
+        qs = task.related_tasks.all().select_related('project', 'status', 'assignee')
+        parsed = parse_search_query(filter_str, user=user)
+        return apply_task_filters(qs, parsed)
+
+    return Task.objects.none()
+
+
+def _resolve_source_event_qs(source, task):
+    """source フィールドに基づいてイベント QuerySet を返す。"""
+    if source == 'task_event' and task is not None:
+        from event_app.models import Event
+        if task.event_id is not None:
+            return Event.objects.filter(pk=task.event_id).select_related('project', 'status')
+        return Event.objects.none()
+    return None
+
+
+def resolve_widget_data(widget_config, user, project=None, task=None):
     """
     ウィジェット設定 dict からデータを解決して返す。
 
@@ -83,15 +179,24 @@ def resolve_widget_data(widget_config, user, project=None):
         if not isinstance(rule, dict):
             continue
         table = rule.get('table', '')
+        source = rule.get('source') or ''
         filter_str = rule.get('filter') or ''
 
         if table == 'task':
-            base = _base_task_qs(user, project=project)
-            parsed = parse_search_query(filter_str, user=user)
-            task_qs = apply_task_filters(base, parsed)
+            if source:
+                task_qs = _resolve_source_task_qs(source, user, project, task, filter_str)
+            else:
+                base = _base_task_qs(user, project=project)
+                parsed = parse_search_query(filter_str, user=user)
+                task_qs = apply_task_filters(base, parsed)
         elif table == 'event':
-            base = _base_event_qs(user, project=project)
-            event_qs = _apply_event_filter(base, filter_str)
+            if source:
+                resolved = _resolve_source_event_qs(source, task)
+                if resolved is not None:
+                    event_qs = resolved
+            else:
+                base = _base_event_qs(user, project=project)
+                event_qs = _apply_event_filter(base, filter_str)
 
     gantt = None
     gantt_per_project = None
@@ -100,8 +205,6 @@ def resolve_widget_data(widget_config, user, project=None):
         if project is not None:
             gantt = build_gantt_data(project, task_qs=task_qs, event_qs=event_qs)
         else:
-            # project_list コンテキスト: プロジェクトごとにガントを生成
-            from django.contrib.auth.models import User as AuthUser
             user_projects = user.projects.all()
             gantt_per_project = []
             for proj in user_projects:

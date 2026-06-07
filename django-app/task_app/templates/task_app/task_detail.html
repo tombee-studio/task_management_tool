@@ -24,6 +24,10 @@
   {% include "task_app/components/task_detail_component.html" with task=task %}
 </div>
 
+{% for widget in page_widgets %}
+  {% include "task_app/components/widget_component.html" with widget=widget %}
+{% endfor %}
+
 <div class="panel panel-default">
   <div class="panel-heading">
     <h1 class="panel-title">コメント一覧</h1>

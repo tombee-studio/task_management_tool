@@ -9,7 +9,11 @@ from .rules import process_task_rules
 @receiver(post_save, sender=User)
 def create_user_preferences(sender, instance, created, **kwargs):
     if created:
-        UserPreferences.objects.get_or_create(user=instance)
+        from .widget_loader import DEFAULT_WIDGET_CONFIG
+        UserPreferences.objects.get_or_create(
+            user=instance,
+            defaults={'config': DEFAULT_WIDGET_CONFIG},
+        )
 
 
 @receiver(post_save, sender=Task)

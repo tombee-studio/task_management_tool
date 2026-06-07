@@ -358,6 +358,15 @@ class TaskDetailView(LoginRequiredMixin, DetailView):
             current = current.parent
         context["parent_objects"] = parent_objects
 
+        user_preferences, _ = UserPreferences.objects.get_or_create(user=self.request.user)
+        config = user_preferences.config or ''
+        from .widget_loader import get_page_widgets, resolve_widget_data as _resolve
+        widget_configs = get_page_widgets(config, 'task_detail')
+        context["page_widgets"] = [
+            _resolve(w, self.request.user, project=self.object.project, task=self.object)
+            for w in widget_configs
+        ]
+
         return context
 
 
