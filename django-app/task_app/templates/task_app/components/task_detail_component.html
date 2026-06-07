@@ -1,6 +1,8 @@
 {% load markdown_extras %}
 <div class="panel-body">
   <p>
+    <a href="{% url 'task_create' %}?project={{ task.project.id }}" class="btn btn-primary btn-sm">タスク追加</a>
+    <a href="{% url 'task_create' %}?task={{ task.id }}" class="btn btn-default btn-sm">サブタスク追加</a>
     <a href="{% url 'task_update' task.id %}">編集</a>
     <a href="{% url 'task_delete' task.id %}">削除</a>
     <a href="{% url 'project_list' %}">一覧へ戻る</a>

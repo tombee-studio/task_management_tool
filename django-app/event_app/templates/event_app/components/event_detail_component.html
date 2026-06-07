@@ -32,11 +32,12 @@
       </td>
     </tr>
   </table>
-  {% if not event.next_event %}
   <div class="panel-body">
+    <a href="{% url 'event_update' pk=event.pk %}" class="btn btn-default btn-sm">編集</a>
+    {% if not event.next_event %}
     <a href="{% url 'event_create' %}?previous={{ object.pk }}">次回のイベントを追加</a>
+    {% endif %}
   </div>
-  {% endif %}
 </div>
 
 <div class="panel panel-default">
