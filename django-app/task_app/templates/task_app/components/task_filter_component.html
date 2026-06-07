@@ -1,0 +1,19 @@
+<form method="get" class="form-inline" style="margin-bottom: 12px;">
+  {% with current_param=param_name|default:'search' %}
+    {% for key, val in request.GET.items %}
+      {% if key != current_param %}
+        <input type="hidden" name="{{ key }}" value="{{ val }}">
+      {% endif %}
+    {% endfor %}
+  {% endwith %}
+  <div class="form-group">
+    <input type="text"
+           name="{{ param_name|default:'search' }}"
+           value="{{ filter_value }}"
+           class="form-control"
+           style="width: 480px;"
+           placeholder="q=テスト status__is_done=False assignee=me tag=バグ">
+  </div>
+  <button type="submit" class="btn btn-default btn-sm" style="margin-left: 6px;">検索</button>
+  <a href="{{ reset_url }}" class="btn btn-link btn-sm">リセット</a>
+</form>

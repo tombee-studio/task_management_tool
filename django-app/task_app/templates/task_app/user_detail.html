@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% load bootstrap3 %}
+
+{% block content %}
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h3 class="panel-title">ユーザー詳細</h3>
+  </div>
+  <div class="panel-body">
+
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="form-group">
+        <label>ユーザー名</label>
+        {% bootstrap_field form.username %}
+      </div>
+
+      <div class="form-group">
+        <label>作成日時</label>
+        <p class="form-control-static">{{ object.date_joined|date:"Y/m/d H:i" }}</p>
+      </div>
+
+      <div class="form-group">
+        {% bootstrap_field preferences_form.config %}
+      </div>
+
+      <div class="panel panel-default" style="font-size: 0.9em;">
+        <div class="panel-heading"><strong>Widget設定 記法ヘルプ</strong></div>
+        <div class="panel-body">
+
+          <p>YAML 形式で記述します。<code>pages</code> にページ名とウィジェット一覧を定義します。</p>
+
+          <h5><strong>基本構造</strong></h5>
+          <pre style="font-size: 0.85em;">pages:
+  - name: &lt;ページ名&gt;
+    widgets:
+      - title: &lt;タイトル&gt;
+        rules:
+          - table: task   # または event
+            filter: &lt;フィルタ文字列&gt;
+        type: table       # または gantt
+        order:
+          - task
+          - event</pre>
+
+          <h5><strong>ページ名</strong></h5>
+          <table class="table table-condensed table-bordered">
+            <tr><th>値</th><th>対象画面</th></tr>
+            <tr><td><code>project_list</code></td><td>プロジェクト一覧</td></tr>
+            <tr><td><code>project_detail</code></td><td>プロジェクト詳細</td></tr>
+          </table>
+
+          <h5><strong>type（表示形式）</strong></h5>
+          <table class="table table-condensed table-bordered">
+            <tr><th>値</th><th>内容</th></tr>
+            <tr><td><code>table</code></td><td>テーブル一覧表示</td></tr>
+            <tr><td><code>gantt</code></td><td>ガントチャート表示</td></tr>
+          </table>
+
+          <h5><strong>タスクフィルタ（filter）</strong></h5>
+          <table class="table table-condensed table-bordered">
+            <tr><th>フィルタキー</th><th>例</th><th>説明</th></tr>
+            <tr><td><code>assignee=me</code></td><td><code>assignee=me</code></td><td>自分に割り当てられたタスク</td></tr>
+            <tr><td><code>status__is_done</code></td><td><code>status__is_done=False</code></td><td>完了フラグ（True / False）</td></tr>
+            <tr><td><code>status</code></td><td><code>status=1</code></td><td>ステータス ID で絞り込み</td></tr>
+            <tr><td><code>deadline__lte</code></td><td><code>deadline__lte=2026-12-31</code></td><td>期日が指定日以前</td></tr>
+            <tr><td><code>deadline__gte</code></td><td><code>deadline__gte=2026-01-01</code></td><td>期日が指定日以降</td></tr>
+            <tr><td><code>tag</code></td><td><code>tag=バグ</code></td><td>タグ名で絞り込み</td></tr>
+            <tr><td>キーワード</td><td><code>バグ修正</code></td><td>タイトル・説明・進捗を横断検索</td></tr>
+          </table>
+          <p>複数のフィルタはスペース区切りで組み合わせられます。例：<code>assignee=me status__is_done=False</code></p>
+
+          <h5><strong>イベントフィルタ（table: event）</strong></h5>
+          <table class="table table-condensed table-bordered">
+            <tr><th>フィルタキー</th><th>例</th><th>説明</th></tr>
+            <tr><td><code>status__is_done</code></td><td><code>status__is_done=False</code></td><td>完了フラグ（True / False）</td></tr>
+          </table>
+
+          <h5><strong>設定例</strong></h5>
+          <pre style="font-size: 0.85em;">pages:
+  - name: project_list
+    widgets:
+      - title: 自分のタスク一覧
+        rules:
+          - table: task
+            filter: "assignee=me status__is_done=False"
+        type: table
+        order:
+          - task
+  - name: project_detail
+    widgets:
+      - title: 未完了タスク ガント
+        rules:
+          - table: task
+            filter: "status__is_done=False"
+          - table: event
+            filter: ""
+        type: gantt
+        order:
+          - event
+          - task</pre>
+
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">保存</button>
+      <a href="{% url 'project_list' %}" class="btn btn-default">キャンセル</a>
+    </form>
+
+  </div>
+</div>
+{% endblock %}

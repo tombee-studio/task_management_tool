@@ -3,7 +3,7 @@
 {% block content %}
 <ul class="nav nav-tabs" role="tablist">
   <li role="presentation" class="active">
-    <a href="#tab-list" aria-controls="tab-list" role="tab" data-toggle="tab">タスク一覧</a>
+    <a href="#tab-list" aria-controls="tab-list" role="tab" data-toggle="tab">プロジェクト一覧</a>
   </li>
   <li role="presentation">
     <a href="#tab-gantt" aria-controls="tab-gantt" role="tab" data-toggle="tab">ガントチャート</a>
@@ -14,11 +14,6 @@
 
   <div role="tabpanel" class="tab-pane active" id="tab-list">
     <div class="panel panel-default">
-      <div class="panel-heading">最近更新されたタスク</div>
-      {% include "task_app/components/recently_updated_tasks_component.html" %}
-    </div>
-
-    <div class="panel panel-default">
       <div class="panel-heading">プロジェクト一覧</div>
       <div class="panel-body">
         <p>
@@ -28,46 +23,13 @@
       {% include "task_app/components/project_list_component.html" with projects=projects %}
     </div>
 
-    <div class="panel panel-default">
-      <div class="panel-heading">{{user.username}}が割り当てられているタスク</div>
-      {% for project, project_tasks, project_status_filter in tasks_by_project %}
-        <div class="panel-heading" style="background-color: #f5f5f5; border-top: 1px solid #ddd; font-size: 0.95em;">
-          <a href="{% url 'project_detail' project.pk %}?{{ project_status_filter }}">{{ project.name }}</a>
-        </div>
-        {% include "task_app/components/task_table_component.html" with tasks=project_tasks %}
-      {% empty %}
-        <p class="panel-body">タスクはまだ登録されていません。</p>
-      {% endfor %}
-    </div>
-
-    <div class="panel panel-default">
-      <div class="panel-heading">{{user.username}}がウォッチしているタスク</div>
-      {% include "task_app/components/task_list_component.html" with tasks=watching_tasks %}
-    </div>
+    {% for widget in page_widgets %}
+      {% include "task_app/components/widget_component.html" with widget=widget %}
+    {% endfor %}
   </div>
 
   <div role="tabpanel" class="tab-pane" id="tab-gantt">
-    <form class="form-inline" method="get" style="margin: 12px 0;">
-      <div class="form-group">
-        <label>開始日&nbsp;<input type="date" name="gantt_from" class="form-control input-sm" value="{{ gantt_from }}"></label>
-      </div>
-      &nbsp;〜&nbsp;
-      <div class="form-group">
-        <label>終了日&nbsp;<input type="date" name="gantt_to" class="form-control input-sm" value="{{ gantt_to }}"></label>
-      </div>
-      &nbsp;
-      <div class="form-group">
-        <label>担当者&nbsp;<input type="text" name="gantt_assignees" class="form-control input-sm" value="{{ gantt_assignees }}" placeholder="ユーザ名（カンマ区切り）" style="width: 200px;"></label>
-      </div>
-      &nbsp;
-      <div class="form-group">
-        <label class="radio-inline"><input type="radio" name="gantt_status" value="active" {% if gantt_status == 'active' or not gantt_status %}checked{% endif %}>&nbsp;進行中</label>
-        <label class="radio-inline"><input type="radio" name="gantt_status" value="done" {% if gantt_status == 'done' %}checked{% endif %}>&nbsp;完了</label>
-        <label class="radio-inline"><input type="radio" name="gantt_status" value="all" {% if gantt_status == 'all' %}checked{% endif %}>&nbsp;すべて</label>
-      </div>
-      &nbsp;<button type="submit" class="btn btn-default btn-sm">表示</button>
-      <a href="{% url 'project_list' %}#tab-gantt" class="btn btn-link btn-sm">リセット</a>
-    </form>
+    {% include "task_app/components/task_filter_component.html" with reset_url=request.path param_name='search_gantt' filter_value=gantt_filter_value %}
     {% for item in gantt_by_project %}
     <div class="panel panel-default">
       <div class="panel-heading">
@@ -91,7 +53,7 @@
     var hash = window.location.hash;
     if (hash) {
       $('a[href="' + hash + '"]').tab('show');
-    } else if (params.has('gantt_from') || params.has('gantt_to') || params.has('gantt_assignees') || params.has('gantt_status')) {
+    } else if (params.has('search_gantt')) {
       $('a[href="#tab-gantt"]').tab('show');
     }
     $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {

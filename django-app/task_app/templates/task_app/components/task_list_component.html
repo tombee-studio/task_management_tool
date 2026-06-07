@@ -1,21 +1,9 @@
-{% load tree_queries %}
-
 <div class="panel-body">
   {% if project %}
   <a href="{% url 'task_create' %}?project={{ project.id }}">タスク追加</a>
   {% elif task %}
   <a href="{% url 'task_create' %}?task={{ task.id }}">タスク追加</a>
   {% endif %}
-  <form method="get">
-    {% for status in status_list %}
-    <input 
-      type="checkbox" 
-      name="status" 
-      value="{{ status.pk }}"
-      {% if status.pk in selected_status_list %}checked{% endif %}>{{ status.name }}</input>
-    {% endfor %}
-    <button type="submit">更新</button>
-  </form>
 </div>
 {% if tasks %}
 <table class="table">
@@ -29,10 +17,9 @@
     <th style="width: 14%;">期日</th>
     <th style="width: 10%;">ウォッチ</th>
   </tr>
-  {% recursetree tasks %}
-    {% include "task_app/components/task_list_item.html" with task=node %}
-    {{ children }}
-  {% endrecursetree %}
+  {% for task in tasks %}
+    {% include "task_app/components/task_list_item.html" with task=task %}
+  {% endfor %}
 </table>
 {% else %}
 <p>タスクはまだ登録されていません。</p>

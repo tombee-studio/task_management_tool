@@ -3,6 +3,7 @@ from .views import *
 
 urlpatterns = [
     path('signup/', SignUpView.as_view(), name='signup'),
+    path('users/me/', UserDetailView.as_view(), name='user_detail'),
     path("projects/", ProjectListView.as_view(), name="project_list"),
     re_path(r"^projects/(?P<pk>\d+)/$", ProjectDetailView.as_view(), name="project_detail"),
     path("projects/create/", ProjectCreateView.as_view(), name="project_create"),
@@ -18,7 +19,6 @@ urlpatterns = [
     path("comments/create/", CommentCreateView.as_view(), name="comment_create"),
     re_path(r"^comments/(?P<pk>\d+)/edit/$", CommentUpdateView.as_view(), name="comment_update"),
     re_path(r"^comments/(?P<pk>\d+)/delete/$", CommentDeleteView.as_view(), name="comment_delete"),
-    path("tasks/", TaskListView.as_view(), name="task_list"),
     re_path(r"^tasks/(?P<pk>\d+)/$", TaskDetailView.as_view(), name="task_detail"),
     path("tasks/create/", TaskCreateView.as_view(), name="task_create"),
     re_path(r"^tasks/(?P<pk>\d+)/edit/$", TaskUpdateView.as_view(), name="task_update"),

@@ -1,9 +1,3 @@
-<div class="panel-body">
-  <div class="btn-group" role="group">
-    <a href="?period=today" class="btn btn-{% if period == 'today' %}primary{% else %}default{% endif %} btn-sm">当日</a>
-    <a href="?period=week" class="btn btn-{% if period == 'week' %}primary{% else %}default{% endif %} btn-sm">一週間</a>
-  </div>
-</div>
 {% if recently_updated_tasks %}
 <table class="table">
   <tr>

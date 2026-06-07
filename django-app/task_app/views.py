@@ -10,8 +10,12 @@ from .models import *
 
 from django.contrib.auth import login
 from django.http import Http404, HttpResponseRedirect
-from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm
+from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm, UserUpdateForm, UserPreferencesForm
+from .models import UserPreferences
+from .filters import TaskFilterMixin, apply_task_filters
 from .dsl import execute_dsl
+from .gantt import build_gantt_data
+from .widget_loader import get_page_widgets, resolve_widget_data
 
 
 def _parse_gantt_date(value):
@@ -22,98 +26,6 @@ def _parse_gantt_date(value):
         return date.fromisoformat(value)
     except ValueError:
         return None
-
-
-def build_gantt_data(project, from_date=None, to_date=None, assignee_ids=None, status_filter='active'):
-    events = list(project.event_set.order_by('event_date'))
-    task_qs = Task.objects.with_tree_fields().filter(project=project)
-    if assignee_ids is not None:
-        task_qs = task_qs.filter(assignee_id__in=assignee_ids)
-    if status_filter == 'active':
-        task_qs = task_qs.filter(status__is_done=False)
-    elif status_filter == 'done':
-        task_qs = task_qs.filter(status__is_done=True)
-    tasks = list(task_qs)
-
-    today = date.today()
-
-    # 指定がない軸は自動計算
-    if from_date is None or to_date is None:
-        dates = [today]
-        for event in events:
-            dates.append(event.event_date)
-        for task in tasks:
-            if task.created_at:
-                dates.append(task.created_at.date())
-            if task.deadline:
-                dates.append(task.deadline)
-        auto_min = min(dates) - timedelta(days=7)
-        auto_max = max(dates) + timedelta(days=14)
-        if from_date is None:
-            from_date = auto_min
-        if to_date is None:
-            to_date = auto_max
-
-    if from_date > to_date:
-        from_date, to_date = to_date, from_date
-
-    min_date, max_date = from_date, to_date
-    total_days = (max_date - min_date).days or 1
-
-    def to_pct(d):
-        return round((d - min_date).days / total_days * 100, 2)
-
-    date_labels = []
-    d = date(min_date.year, min_date.month, 1)
-    while d <= max_date:
-        pct = to_pct(d)
-        if 0 <= pct <= 100:
-            date_labels.append({'label': d.strftime('%Y/%m'), 'pct': pct})
-        d = date(d.year + 1, 1, 1) if d.month == 12 else date(d.year, d.month + 1, 1)
-
-    today_pct = to_pct(today)
-
-    event_items = []
-    for event in events:
-        if min_date <= event.event_date <= max_date:
-            event_items.append({'event': event, 'pct': to_pct(event.event_date)})
-
-    task_items = []
-    for task in tasks:
-        start = task.created_at.date() if task.created_at else today
-        end = task.deadline
-        if end:
-            if end < start:
-                start = end
-            # 範囲外のタスクはスキップ
-            if end < min_date or start > max_date:
-                continue
-            start_pct = to_pct(start)
-            width_pct = round(max(to_pct(end) - start_pct, 0.5), 2)
-        else:
-            if not (min_date <= start <= max_date):
-                continue
-            start_pct = to_pct(start)
-            width_pct = None
-        depth = getattr(task, 'tree_depth', 0)
-        task_items.append({
-            'task': task,
-            'depth': depth,
-            'margin_left': depth * 16,
-            'start_pct': start_pct,
-            'width_pct': width_pct,
-            'has_deadline': bool(task.deadline),
-        })
-
-    return {
-        'min_date': min_date,
-        'max_date': max_date,
-        'today_pct': today_pct,
-        'date_labels': date_labels,
-        'events': event_items,
-        'tasks': task_items,
-        'day_pct': round(100 / total_days, 4),
-    }
 
 
 def preprocess_description(project, _, form):
@@ -132,72 +44,51 @@ def preprocess_description(project, _, form):
     return []
         
 
-class ProjectListView(LoginRequiredMixin, ListView):
+class ProjectListView(LoginRequiredMixin, TaskFilterMixin, ListView):
     model = Project
     template_name = "task_app/project_list.html"
     context_object_name = "projects"
-    
+
+    GANTT_FILTER_DEFAULT = 'status__is_done=False assignee=me'
+
     def get_queryset(self):
         return self.request.user.projects.all()
-    
-    
+
     def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
-        tasks_by_project = []
-        for project in self.request.user.projects.order_by("name"):
-            active_statuses = project.statuses.filter(is_done=False)
-            project_tasks = Task.objects.with_tree_fields().filter(
-                status__is_done=False,
-                assignee=self.request.user,
-                project=project,
-            )
-            project_status_filter = "&".join([f"status={s.pk}" for s in active_statuses])
-            if project_tasks.exists():
-                tasks_by_project.append((project, project_tasks, project_status_filter))
-        context["tasks_by_project"] = tasks_by_project
-        context["watching_tasks"] = self.request.user.watches.all()
 
-        # 最近更新されたタスク
-        period = self.request.GET.get("period", "today")
-        now = timezone.now()
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        # --- ガントチャート（search_gantt パラメータ）---
+        gantt_raw = self.get_filter_raw('search_gantt', self.GANTT_FILTER_DEFAULT)
+        gantt_parsed = self.get_parsed_filters('search_gantt', self.GANTT_FILTER_DEFAULT)
+        context['gantt_filter_value'] = gantt_raw
 
-        if period == "week":
-            updated_filter = {"updated_at__gte": today_start - timedelta(days=7)}
+        assignee_val = gantt_parsed.get('assignee')
+        if assignee_val is not None:
+            try:
+                gantt_assignee_ids = [int(assignee_val)]
+            except (ValueError, TypeError):
+                gantt_assignee_ids = [self.request.user.id]
         else:
-            period = "today"
-            updated_filter = {"updated_at__gte": today_start}
+            gantt_assignee_ids = None
 
-        accessible_tasks = Task.objects.filter(
-            Q(project__participants=self.request.user) |
-            Q(assignee=self.request.user)
-        ).distinct().select_related("project", "status", "assignee")
-
-        context["recently_updated_tasks"] = accessible_tasks.filter(**updated_filter).order_by("-updated_at")
-        context["period"] = period
-
-        gantt_from = _parse_gantt_date(self.request.GET.get('gantt_from'))
-        gantt_to = _parse_gantt_date(self.request.GET.get('gantt_to'))
-        context["gantt_from"] = self.request.GET.get('gantt_from', '')
-        context["gantt_to"] = self.request.GET.get('gantt_to', '')
-
-        gantt_assignees_raw = self.request.GET.get('gantt_assignees', '').strip()
-        if gantt_assignees_raw:
-            usernames = [u.strip() for u in re.split(r'[,\s]+', gantt_assignees_raw) if u.strip()]
-            assignee_ids = list(User.objects.filter(username__in=usernames).values_list('id', flat=True))
+        status_val = gantt_parsed.get('status__is_done')
+        if status_val is not None:
+            is_done = status_val.lower() not in ('false', '0', 'no')
+            gantt_status = 'done' if is_done else 'active'
         else:
-            assignee_ids = [self.request.user.id]
-        context["gantt_assignees"] = gantt_assignees_raw
-
-        gantt_status = self.request.GET.get('gantt_status', 'active')
-        if gantt_status not in ('active', 'all', 'done'):
-            gantt_status = 'active'
-        context["gantt_status"] = gantt_status
+            gantt_status = 'all'
 
         gantt_by_project = []
         for project in self.request.user.projects.order_by("name"):
-            gantt_by_project.append({'project': project, 'gantt': build_gantt_data(project, gantt_from, gantt_to, assignee_ids=assignee_ids, status_filter=gantt_status)})
+            gantt_by_project.append({'project': project, 'gantt': build_gantt_data(project, assignee_ids=gantt_assignee_ids, status_filter=gantt_status)})
         context["gantt_by_project"] = gantt_by_project
+
+        user_preferences, _ = UserPreferences.objects.get_or_create(user=self.request.user)
+        widget_configs = get_page_widgets(user_preferences.config, 'project_list')
+        context["page_widgets"] = [
+            resolve_widget_data(w, self.request.user)
+            for w in widget_configs
+        ]
         return context
     
 
@@ -212,22 +103,12 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        selected_status_list = self.request.GET.getlist("status")
 
-        project_statuses = self.object.statuses.all()
-        active_statuses = project_statuses.filter(is_done=False)
-        context["status_filter"] = "&".join([f"status={s.pk}" for s in active_statuses])
-        context["status_list"] = project_statuses
-        if not selected_status_list:
-            selected_status_list = [str(s.pk) for s in active_statuses]
-        context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
-        context["tasks"] = self.object.task_set.filter(status__in=selected_status_list).prefetch_related(
-            Prefetch(
-                "tasks",
-                queryset=Task.objects.filter(status__in=selected_status_list),
-                to_attr="filtered_tasks",
-            )
-        )
+        user_preferences, _ = UserPreferences.objects.get_or_create(user=self.request.user)
+        context["user_preferences"] = user_preferences
+
+        context["status_list"] = self.object.statuses.all()
+
         gantt_from = _parse_gantt_date(self.request.GET.get('gantt_from'))
         gantt_to = _parse_gantt_date(self.request.GET.get('gantt_to'))
         context["gantt_from"] = self.request.GET.get('gantt_from', '')
@@ -255,10 +136,12 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
             selected_event_status_list = [str(s.pk) for s in active_event_statuses]
         context["event_status_list"] = event_statuses
         context["selected_event_status_list"] = list(map(int, selected_event_status_list))
-        if event_statuses.exists() and selected_event_status_list:
-            context["events"] = self.object.event_set.filter(status__in=selected_event_status_list)
-        else:
-            context["events"] = self.object.event_set.all()
+
+        widget_configs = get_page_widgets(user_preferences.config, 'project_detail')
+        context["page_widgets"] = [
+            resolve_widget_data(w, self.request.user, project=self.object)
+            for w in widget_configs
+        ]
 
         return context
 
@@ -455,35 +338,6 @@ class CommentDeleteView(LoginRequiredMixin, DeleteView):
     def get_success_url(self):
         return reverse_lazy("project_list")
 
-class TaskListView(LoginRequiredMixin, ListView):
-    model = Task
-    template_name = "task_app/task_list.html"
-    context_object_name = "tasks"
-    
-    def get_context_data(self, **kwargs) -> dict[str, any]:
-        context = super().get_context_data(**kwargs)
-        selected_status_list = self.request.GET.getlist("status")
-        selected_status_ids = list(map(lambda x: int(x), selected_status_list))
-        context["selected_status_list"] = selected_status_ids
-        context["status_list"] = Status.objects.all()
-
-        tasks = self.get_queryset()
-        if selected_status_ids:
-            tasks = tasks.filter(status__in=selected_status_ids)
-
-        context["tasks"] = tasks
-        return context
-
-    def get_queryset(self):
-        return Task.objects.with_tree_fields().annotate(
-            completed_subtask_count=Count(
-                'tasks',
-                filter=Q(tasks__status__is_done=True),
-                distinct=True,
-            ),
-            total_subtask_count=Count('tasks', distinct=True),
-        )
-
 class TaskDetailView(LoginRequiredMixin, DetailView):
     model = Task
     template_name = "task_app/task_detail.html"
@@ -496,14 +350,6 @@ class TaskDetailView(LoginRequiredMixin, DetailView):
     
     def get_context_data(self, **kwargs) -> dict[str, any]:
         context = super().get_context_data(**kwargs)
-        selected_status_list = self.request.GET.getlist("status")
-        context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
-        context["status_list"] = Status.objects.all()
-        context["status_filter"] = "&".join(list(map(lambda status: f"status={status}", selected_status_list)))
-        context["tasks"] = self.object.tasks.filter(
-            status__in=selected_status_list)
-        context["related_tasks"] = self.object.related_tasks.filter(
-            status__in=selected_status_list)
 
         parent_objects = []
         current = self.object
@@ -511,7 +357,16 @@ class TaskDetailView(LoginRequiredMixin, DetailView):
             parent_objects.insert(0, current)
             current = current.parent
         context["parent_objects"] = parent_objects
-        
+
+        user_preferences, _ = UserPreferences.objects.get_or_create(user=self.request.user)
+        config = user_preferences.config or ''
+        from .widget_loader import get_page_widgets, resolve_widget_data as _resolve
+        widget_configs = get_page_widgets(config, 'task_detail')
+        context["page_widgets"] = [
+            _resolve(w, self.request.user, project=self.object.project, task=self.object)
+            for w in widget_configs
+        ]
+
         return context
 
 
@@ -638,6 +493,39 @@ class TaskDeleteView(LoginRequiredMixin, DeleteView):
     
     def get_success_url(self):
         return reverse_lazy("project_list")
+
+
+class UserDetailView(LoginRequiredMixin, UpdateView):
+    model = User
+    form_class = UserUpdateForm
+    template_name = 'task_app/user_detail.html'
+
+    def get_object(self, queryset=None):
+        return self.request.user
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user_preferences, _ = UserPreferences.objects.get_or_create(user=self.request.user)
+        if 'preferences_form' not in context:
+            context['preferences_form'] = UserPreferencesForm(instance=user_preferences)
+        return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        user_form = UserUpdateForm(request.POST, instance=self.object)
+        user_preferences, _ = UserPreferences.objects.get_or_create(user=self.object)
+        preferences_form = UserPreferencesForm(request.POST, instance=user_preferences)
+        if user_form.is_valid() and preferences_form.is_valid():
+            user_form.save()
+            preferences_form.save()
+            return HttpResponseRedirect(self.get_success_url())
+        return self.render_to_response(self.get_context_data(
+            form=user_form,
+            preferences_form=preferences_form,
+        ))
+
+    def get_success_url(self):
+        return reverse_lazy('user_detail')
 
 
 class SignUpView(CreateView):

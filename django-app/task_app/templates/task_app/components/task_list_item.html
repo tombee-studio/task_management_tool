@@ -3,11 +3,14 @@
 <tr class="accordion{% if task.status.is_done %} task-done{% elif task.is_deadline_urgent %} task-deadline-urgent{% elif task.is_deadline_warning %} task-deadline-warning{% endif %}">
   <td class="flex-grow-1">
     <div class="line-clamp-1">
-      <span class="tree-item" style="--depth: {{ task.tree_depth }};" >
+      <span>
         <a href="{% url 'task_detail' task.pk %}?{{ status_filter }}">
           <strong>{{ task.title }}</strong>
         </a>
       </span>
+      {% for tag in task.tags.all %}
+        <span class="badge" style="background-color: #6c757d; font-size: 0.75em;">{{ tag.name }}</span>
+      {% endfor %}
     </div>
   </td>
   <td class="text-center">

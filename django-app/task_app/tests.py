@@ -4,8 +4,9 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .dsl import execute_assign, execute_dsl, execute_event, execute_link, parse_dsl
+from .filters import apply_task_filters, parse_search_query
 from .forms import CommentForm, TaskForm
-from .models import Comment, Project, Rule, Status, Task
+from .models import Comment, Project, Rule, Status, Tag, Task
 from event_app.models import Event
 from .rules import process_task_rules
 
@@ -897,15 +898,6 @@ class ProjectViewsTest(BaseViewTest):
             self.client.get(reverse("project_detail", kwargs={"pk": other.pk})).status_code, 404
         )
 
-    def test_project_detail_with_status_filter(self):
-        self.login()
-        response = self.client.get(
-            reverse("project_detail", kwargs={"pk": self.project.pk}),
-            {"status": self.status.pk},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(self.status.pk, response.context["selected_status_list"])
-
     def test_project_create_adds_user_as_participant(self):
         self.login()
         self.client.post(reverse("project_create"), {"name": "New", "git_url": ""})
@@ -1037,24 +1029,6 @@ class StatusViewsTest(BaseViewTest):
 # ---------------------------------------------------------------------------
 
 class TaskViewsTest(BaseViewTest):
-    def test_task_list_requires_login(self):
-        self.assertEqual(self.client.get(reverse("task_list")).status_code, 302)
-
-    def test_task_list_annotation_clashes_with_model_property(self):
-        # Known app bug: TaskListView annotates 'completed_subtask_count' /
-        # 'total_subtask_count' which clash with Task @property of the same
-        # names.  Django raises AttributeError when iterating the queryset.
-        self.client.raise_request_exception = False
-        self.login()
-        response = self.client.get(reverse("task_list"))
-        self.assertEqual(response.status_code, 500)
-
-    def test_task_list_with_status_filter_annotation_bug(self):
-        self.client.raise_request_exception = False
-        self.login()
-        response = self.client.get(reverse("task_list"), {"status": self.status.pk})
-        self.assertEqual(response.status_code, 500)
-
     def test_task_detail_accessible_by_assignee(self):
         self.login()
         self.assertEqual(
@@ -1441,19 +1415,6 @@ class ProjectDetailStatusContextTest(BaseViewTest):
         response = self.client.get(reverse("project_detail", kwargs={"pk": self.project.pk}))
         self.assertNotIn(self.other_status, response.context["status_list"])
 
-    def test_status_filter_uses_project_active_statuses(self):
-        self.login()
-        response = self.client.get(reverse("project_detail", kwargs={"pk": self.project.pk}))
-        status_filter = response.context["status_filter"]
-        self.assertIn(str(self.status.pk), status_filter)
-        self.assertNotIn(str(self.other_status.pk), status_filter)
-
-    def test_status_filter_excludes_done_statuses(self):
-        self.login()
-        response = self.client.get(reverse("project_detail", kwargs={"pk": self.project.pk}))
-        status_filter = response.context["status_filter"]
-        self.assertNotIn(str(self.done.pk), status_filter)
-
 
 # ---------------------------------------------------------------------------
 # build_gantt_data — assignee_ids / status_filter
@@ -1834,3 +1795,282 @@ class CommentDSLViewTest(BaseViewTest):
         )
         self.task.refresh_from_db()
         self.assertEqual(self.task.assignee, self.other_user)
+
+
+# ---------------------------------------------------------------------------
+# Tag — モデル
+# ---------------------------------------------------------------------------
+
+class TagModelTest(TestCase):
+    def test_str(self):
+        self.assertEqual(str(Tag.objects.create(name="bug")), "bug")
+
+    def test_name_is_unique(self):
+        Tag.objects.create(name="unique")
+        from django.db import IntegrityError
+        with self.assertRaises(IntegrityError):
+            Tag.objects.create(name="unique")
+
+    def test_utf8_name(self):
+        tag = Tag.objects.create(name="バグ修正")
+        self.assertEqual(tag.name, "バグ修正")
+
+
+class TaskTagModelTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="u", password="p")
+        self.status = Status.objects.create(name="Open")
+        self.project = Project.objects.create(name="P")
+        self.task = Task.objects.create(
+            title="T", project=self.project, assignee=self.user, status=self.status
+        )
+
+    def test_task_has_no_tags_by_default(self):
+        self.assertEqual(self.task.tags.count(), 0)
+
+    def test_task_can_have_tag(self):
+        tag = Tag.objects.create(name="bug")
+        self.task.tags.add(tag)
+        self.assertIn(tag, self.task.tags.all())
+
+    def test_task_can_have_multiple_tags(self):
+        t1 = Tag.objects.create(name="bug")
+        t2 = Tag.objects.create(name="urgent")
+        self.task.tags.set([t1, t2])
+        self.assertEqual(self.task.tags.count(), 2)
+
+    def test_tag_reverse_accessor_returns_linked_task(self):
+        tag = Tag.objects.create(name="frontend")
+        self.task.tags.add(tag)
+        self.assertIn(self.task, tag.tasks.all())
+
+
+# ---------------------------------------------------------------------------
+# Form — タグフィールド
+# ---------------------------------------------------------------------------
+
+class TaskFormTagFieldTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="u", password="p")
+        self.project = Project.objects.create(name="P")
+        self.project.participants.add(self.user)
+        self.status = Status.objects.create(name="Open", project=self.project)
+        self.task = Task.objects.create(
+            title="T", project=self.project, assignee=self.user, status=self.status
+        )
+
+    def _form(self, tags="", instance=None):
+        return TaskForm(
+            data={"title": "T", "description": "test", "progress_summary": "",
+                  "status": self.status.pk, "assignee": self.user.pk, "tags": tags},
+            user=self.user, project=self.project,
+            instance=instance or self.task,
+        )
+
+    def test_tags_field_is_present(self):
+        self.assertIn("tags", self._form().fields)
+
+    def test_tags_field_is_not_required(self):
+        self.assertFalse(self._form().fields["tags"].required)
+
+    def test_tags_not_in_meta_fields(self):
+        self.assertNotIn("tags", TaskForm.Meta.fields)
+
+    def test_form_valid_without_tags(self):
+        form = self._form()
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_form_valid_with_single_tag(self):
+        form = self._form(tags="bug")
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_form_valid_with_multiple_tags(self):
+        form = self._form(tags="bug urgent frontend")
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_save_creates_new_tag(self):
+        form = self._form(tags="newbug")
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        self.assertTrue(Tag.objects.filter(name="newbug").exists())
+
+    def test_save_assigns_tag_to_task(self):
+        form = self._form(tags="mytag")
+        self.assertTrue(form.is_valid(), form.errors)
+        task = form.save()
+        self.assertIn(Tag.objects.get(name="mytag"), task.tags.all())
+
+    def test_save_assigns_multiple_tags(self):
+        form = self._form(tags="alpha beta gamma")
+        self.assertTrue(form.is_valid(), form.errors)
+        task = form.save()
+        tag_names = set(task.tags.values_list("name", flat=True))
+        self.assertEqual(tag_names, {"alpha", "beta", "gamma"})
+
+    def test_save_reuses_existing_tag(self):
+        existing = Tag.objects.create(name="existing")
+        form = self._form(tags="existing")
+        self.assertTrue(form.is_valid(), form.errors)
+        task = form.save()
+        self.assertEqual(Tag.objects.filter(name="existing").count(), 1)
+        self.assertIn(existing, task.tags.all())
+
+    def test_save_clears_tags_when_field_is_empty(self):
+        tag = Tag.objects.create(name="old")
+        self.task.tags.add(tag)
+        form = self._form(tags="")
+        self.assertTrue(form.is_valid(), form.errors)
+        task = form.save()
+        self.assertEqual(task.tags.count(), 0)
+
+    def test_initial_shows_existing_tags_on_edit(self):
+        tag1 = Tag.objects.create(name="foo")
+        tag2 = Tag.objects.create(name="bar")
+        self.task.tags.set([tag1, tag2])
+        form = TaskForm(user=self.user, project=self.project, instance=self.task)
+        initial_tags = form.initial.get("tags", "")
+        self.assertIn("foo", initial_tags)
+        self.assertIn("bar", initial_tags)
+
+    def test_save_utf8_tag(self):
+        form = self._form(tags="バグ修正 重要")
+        self.assertTrue(form.is_valid(), form.errors)
+        task = form.save()
+        tag_names = set(task.tags.values_list("name", flat=True))
+        self.assertEqual(tag_names, {"バグ修正", "重要"})
+
+
+# ---------------------------------------------------------------------------
+# Filters — タグフィルタ
+# ---------------------------------------------------------------------------
+
+class TagFilterParseTest(TestCase):
+    def test_tag_shortcut_maps_to_tags_name(self):
+        parsed = parse_search_query("tag=bug")
+        self.assertEqual(parsed.get("tags__name"), "bug")
+
+    def test_tags_name_direct_key(self):
+        parsed = parse_search_query("tags__name=urgent")
+        self.assertEqual(parsed.get("tags__name"), "urgent")
+
+    def test_tag_with_utf8_value(self):
+        parsed = parse_search_query("tag=バグ")
+        self.assertEqual(parsed.get("tags__name"), "バグ")
+
+    def test_tag_combined_with_other_filters(self):
+        parsed = parse_search_query("tag=bug status__is_done=False")
+        self.assertEqual(parsed.get("tags__name"), "bug")
+        self.assertIn("status__is_done", parsed)
+
+    def test_tag_not_present_when_omitted(self):
+        parsed = parse_search_query("status__is_done=False")
+        self.assertNotIn("tags__name", parsed)
+
+
+class TagFilterApplyTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="u", password="p")
+        self.status = Status.objects.create(name="Open")
+        self.project = Project.objects.create(name="P")
+        self.bug_tag = Tag.objects.create(name="bug")
+        self.urgent_tag = Tag.objects.create(name="urgent")
+        self.task_with_bug = Task.objects.create(
+            title="BugTask", project=self.project, assignee=self.user, status=self.status
+        )
+        self.task_with_bug.tags.add(self.bug_tag)
+        self.task_with_urgent = Task.objects.create(
+            title="UrgentTask", project=self.project, assignee=self.user, status=self.status
+        )
+        self.task_with_urgent.tags.add(self.urgent_tag)
+        self.task_no_tags = Task.objects.create(
+            title="NoTagTask", project=self.project, assignee=self.user, status=self.status
+        )
+
+    def _apply(self, raw):
+        qs = Task.objects.all()
+        return apply_task_filters(qs, parse_search_query(raw))
+
+    def test_tag_filter_returns_matching_task(self):
+        self.assertIn(self.task_with_bug, self._apply("tag=bug"))
+
+    def test_tag_filter_excludes_untagged_task(self):
+        self.assertNotIn(self.task_no_tags, self._apply("tag=bug"))
+
+    def test_tag_filter_excludes_different_tag(self):
+        self.assertNotIn(self.task_with_urgent, self._apply("tag=bug"))
+
+    def test_tags_name_direct_filter(self):
+        self.assertIn(self.task_with_urgent, self._apply("tags__name=urgent"))
+
+    def test_tag_filter_nonexistent_returns_empty(self):
+        self.assertFalse(self._apply("tag=nonexistent").exists())
+
+    def test_tag_filter_utf8(self):
+        jp_tag = Tag.objects.create(name="重要")
+        self.task_no_tags.tags.add(jp_tag)
+        self.assertIn(self.task_no_tags, self._apply("tag=重要"))
+
+
+# ---------------------------------------------------------------------------
+# Views — タグの保存
+# ---------------------------------------------------------------------------
+
+class TaskTagViewTest(BaseViewTest):
+    def _post_create(self, extra_data=None):
+        data = {"title": "NewTask", "description": "test", "progress_summary": "",
+                "status": self.status.pk, "assignee": self.user.pk}
+        if extra_data:
+            data.update(extra_data)
+        self.login()
+        self.client.post(
+            reverse("task_create") + f"?project={self.project.pk}", data
+        )
+        return Task.objects.get(title="NewTask")
+
+    def _post_update(self, extra_data=None):
+        data = {"title": "T", "description": "test", "progress_summary": "",
+                "status": self.status.pk, "assignee": self.user.pk}
+        if extra_data:
+            data.update(extra_data)
+        self.login()
+        self.client.post(
+            reverse("task_update", kwargs={"pk": self.task.pk}), data
+        )
+        self.task.refresh_from_db()
+        return self.task
+
+    def test_create_task_with_tags_assigns_tags(self):
+        task = self._post_create({"tags": "bug urgent"})
+        tag_names = set(task.tags.values_list("name", flat=True))
+        self.assertEqual(tag_names, {"bug", "urgent"})
+
+    def test_create_task_creates_new_tags_automatically(self):
+        self._post_create({"tags": "brand-new-tag"})
+        self.assertTrue(Tag.objects.filter(name="brand-new-tag").exists())
+
+    def test_create_task_without_tags_has_no_tags(self):
+        task = self._post_create()
+        self.assertEqual(task.tags.count(), 0)
+
+    def test_update_task_adds_tags(self):
+        self._post_update({"tags": "frontend"})
+        self.assertIn("frontend", self.task.tags.values_list("name", flat=True))
+
+    def test_update_task_replaces_existing_tags(self):
+        old_tag = Tag.objects.create(name="old")
+        self.task.tags.add(old_tag)
+        self._post_update({"tags": "new"})
+        tag_names = set(self.task.tags.values_list("name", flat=True))
+        self.assertEqual(tag_names, {"new"})
+
+    def test_update_task_clears_tags_when_empty(self):
+        tag = Tag.objects.create(name="remove-me")
+        self.task.tags.add(tag)
+        self._post_update({"tags": ""})
+        self.assertEqual(self.task.tags.count(), 0)
+
+    def test_update_task_with_utf8_tags(self):
+        self._post_update({"tags": "バグ フロントエンド"})
+        tag_names = set(self.task.tags.values_list("name", flat=True))
+        self.assertEqual(tag_names, {"バグ", "フロントエンド"})
+

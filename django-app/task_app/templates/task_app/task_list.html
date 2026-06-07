@@ -7,5 +7,7 @@
   <a href="{% url 'task_create' %}">新規タスク作成</a>
 </p>
 
-{% include "task_app/components/task_list_component.html" with tasks=tasks status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
+{% include "task_app/components/task_filter_component.html" with reset_url=request.path %}
+
+{% include "task_app/components/task_list_component.html" with tasks=tasks hide_filter=True nest_count=0 %}
 {% endblock %}

@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 
-from .models import Project, Task, Comment, Status
+from .models import Project, Task, Comment, Status, Tag, UserPreferences
 from event_app.models import Event
 
 
@@ -34,6 +34,12 @@ class TaskForm(forms.ModelForm):
         required=True,
         label='担当者',
     )
+    tags = forms.CharField(
+        required=False,
+        label='タグ',
+        help_text='スペース区切りで複数指定できます（例: bug 重要 frontend）。存在しないタグは自動作成されます。',
+        widget=forms.TextInput(attrs={'placeholder': 'bug 重要 frontend'}),
+    )
     dsl = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={
@@ -48,6 +54,8 @@ class TaskForm(forms.ModelForm):
         user = kwargs.pop('user', None)
         project = kwargs.pop('project', None)
         super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.initial['tags'] = ' '.join(self.instance.tags.values_list('name', flat=True))
         if user is not None:
             self.fields['event'].queryset = Event.objects.filter(
                 project__participants=user
@@ -68,7 +76,7 @@ class TaskForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         status = cleaned_data.get('status')
-        
+
         # チェック：ステータスが完了状態に変更されようとしている場合
         # 新規タスク（pk なし）はサブタスクを持てないのでスキップ
         if status and status.is_done and self.instance.pk:
@@ -78,8 +86,46 @@ class TaskForm(forms.ModelForm):
                 raise forms.ValidationError(
                     '子タスクが未完了のため、親タスクを完了状態にすることはできません。'
                 )
-        
+
         return cleaned_data
+
+    def save(self, commit=True):
+        task = super().save(commit=commit)
+
+        def _save_tags():
+            tags_input = self.cleaned_data.get('tags', '')
+            tag_names = [t for t in tags_input.split() if t]
+            tag_objs = [Tag.objects.get_or_create(name=name)[0] for name in tag_names]
+            task.tags.set(tag_objs)
+
+        if commit:
+            _save_tags()
+        else:
+            old_save_m2m = self.save_m2m
+            def _new_save_m2m():
+                old_save_m2m()
+                _save_tags()
+            self.save_m2m = _new_save_m2m
+
+        return task
+
+
+class UserUpdateForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['username']
+
+
+class UserPreferencesForm(forms.ModelForm):
+    class Meta:
+        model = UserPreferences
+        fields = ['config']
+        widgets = {
+            'config': forms.Textarea(attrs={'rows': 6}),
+        }
+        labels = {
+            'config': 'Widget設定',
+        }
 
 
 class CommentForm(forms.ModelForm):

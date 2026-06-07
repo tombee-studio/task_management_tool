@@ -2,7 +2,6 @@ from django.db import models
 from django.conf import settings
 from auditlog.models import AuditlogHistoryField
 from auditlog.registry import auditlog
-from tree_queries.query import TreeQuerySet
 
 
 class Project(models.Model):
@@ -54,6 +53,13 @@ class Comment(models.Model):
   history = AuditlogHistoryField()
 
 
+class Tag(models.Model):
+  name = models.CharField(max_length=64, unique=True)
+
+  def __str__(self):
+    return self.name
+
+
 class Task(models.Model):
   title = models.CharField(max_length=256, null=False)
   project = models.ForeignKey(
@@ -98,9 +104,11 @@ class Task(models.Model):
     related_name='tasks',
     null=True,
     blank=True)
+  tags = models.ManyToManyField(
+    'Tag',
+    related_name='tasks',
+    blank=True)
   history = AuditlogHistoryField()
-  
-  objects = TreeQuerySet.as_manager(with_tree_fields=True)
   
   def __str__(self):
     return self.title
@@ -131,6 +139,18 @@ class Task(models.Model):
     return days is not None and not self.status.is_done and 2 <= days <= 3
 
 
+class UserPreferences(models.Model):
+  user = models.OneToOneField(
+    settings.AUTH_USER_MODEL,
+    on_delete=models.CASCADE,
+    related_name='preferences',
+  )
+  config = models.TextField(blank=True, default='')
+
+  def __str__(self):
+    return self.user.username
+
+
 class Rule(models.Model):
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
@@ -152,3 +172,4 @@ auditlog.register(Comment)
 auditlog.register(Status)
 auditlog.register(Task)
 auditlog.register(Rule)
+auditlog.register(Tag)
