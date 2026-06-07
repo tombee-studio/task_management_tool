@@ -20,7 +20,7 @@ pages:
           - table: task
             source: watched_tasks
             filter: "status__is_done=False"
-        type: table
+        type: tree
         order:
           - task
   - name: project_detail
@@ -29,7 +29,7 @@ pages:
         rules:
           - table: event
             filter: "status__is_done=False"
-        type: table
+        type: tree
         order:
           - event
       - title: 未完了のタスク一覧
@@ -156,6 +156,40 @@ def _resolve_source_event_qs(source, task):
     return None
 
 
+def build_task_tree(task_qs):
+    """タスク QuerySet を親子関係に基づいて木構造に変換する。
+    各タスクに _tree_children 属性を付与し、ルートタスクのリストを返す。
+    """
+    tasks = list(task_qs)
+    task_map = {t.pk: t for t in tasks}
+    task_ids = set(task_map.keys())
+
+    for t in tasks:
+        t._tree_children = []
+
+    roots = []
+    for t in tasks:
+        if t.parent_id is not None and t.parent_id in task_ids:
+            task_map[t.parent_id]._tree_children.append(t)
+        else:
+            roots.append(t)
+
+    return roots
+
+
+def flatten_task_tree(roots):
+    """build_task_tree の結果を {'task': task, 'depth': int} のフラットリストに変換する。"""
+    result = []
+
+    def _traverse(tasks, depth):
+        for t in tasks:
+            result.append({'task': t, 'depth': depth})
+            _traverse(t._tree_children, depth + 1)
+
+    _traverse(roots, 0)
+    return result
+
+
 def resolve_widget_data(widget_config, user, project=None, task=None):
     """
     ウィジェット設定 dict からデータを解決して返す。
@@ -198,8 +232,13 @@ def resolve_widget_data(widget_config, user, project=None, task=None):
                 base = _base_event_qs(user, project=project)
                 event_qs = _apply_event_filter(base, filter_str)
 
+    task_tree = None
     gantt = None
     gantt_per_project = None
+
+    if widget_type == 'tree' and task_qs is not None:
+        roots = build_task_tree(task_qs)
+        task_tree = flatten_task_tree(roots)
 
     if widget_type == 'gantt':
         if project is not None:
@@ -219,6 +258,7 @@ def resolve_widget_data(widget_config, user, project=None, task=None):
         'title': title,
         'type': widget_type,
         'tasks': task_qs,
+        'task_tree': task_tree,
         'events': event_qs,
         'gantt': gantt,
         'gantt_per_project': gantt_per_project,
