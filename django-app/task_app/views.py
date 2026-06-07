@@ -14,6 +14,8 @@ from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm, UserUpdateFor
 from .models import UserPreferences
 from .filters import TaskFilterMixin, apply_task_filters
 from .dsl import execute_dsl
+from .gantt import build_gantt_data
+from .widget_loader import get_page_widgets, resolve_widget_data
 
 
 def _parse_gantt_date(value):
@@ -24,98 +26,6 @@ def _parse_gantt_date(value):
         return date.fromisoformat(value)
     except ValueError:
         return None
-
-
-def build_gantt_data(project, from_date=None, to_date=None, assignee_ids=None, status_filter='active'):
-    events = list(project.event_set.order_by('event_date'))
-    task_qs = Task.objects.filter(project=project)
-    if assignee_ids is not None:
-        task_qs = task_qs.filter(assignee_id__in=assignee_ids)
-    if status_filter == 'active':
-        task_qs = task_qs.filter(status__is_done=False)
-    elif status_filter == 'done':
-        task_qs = task_qs.filter(status__is_done=True)
-    tasks = list(task_qs)
-
-    today = date.today()
-
-    # 指定がない軸は自動計算
-    if from_date is None or to_date is None:
-        dates = [today]
-        for event in events:
-            dates.append(event.event_date)
-        for task in tasks:
-            if task.created_at:
-                dates.append(task.created_at.date())
-            if task.deadline:
-                dates.append(task.deadline)
-        auto_min = min(dates) - timedelta(days=7)
-        auto_max = max(dates) + timedelta(days=14)
-        if from_date is None:
-            from_date = auto_min
-        if to_date is None:
-            to_date = auto_max
-
-    if from_date > to_date:
-        from_date, to_date = to_date, from_date
-
-    min_date, max_date = from_date, to_date
-    total_days = (max_date - min_date).days or 1
-
-    def to_pct(d):
-        return round((d - min_date).days / total_days * 100, 2)
-
-    date_labels = []
-    d = date(min_date.year, min_date.month, 1)
-    while d <= max_date:
-        pct = to_pct(d)
-        if 0 <= pct <= 100:
-            date_labels.append({'label': d.strftime('%Y/%m'), 'pct': pct})
-        d = date(d.year + 1, 1, 1) if d.month == 12 else date(d.year, d.month + 1, 1)
-
-    today_pct = to_pct(today)
-
-    event_items = []
-    for event in events:
-        if min_date <= event.event_date <= max_date:
-            event_items.append({'event': event, 'pct': to_pct(event.event_date)})
-
-    task_items = []
-    for task in tasks:
-        start = task.created_at.date() if task.created_at else today
-        end = task.deadline
-        if end:
-            if end < start:
-                start = end
-            # 範囲外のタスクはスキップ
-            if end < min_date or start > max_date:
-                continue
-            start_pct = to_pct(start)
-            width_pct = round(max(to_pct(end) - start_pct, 0.5), 2)
-        else:
-            if not (min_date <= start <= max_date):
-                continue
-            start_pct = to_pct(start)
-            width_pct = None
-        depth = 0
-        task_items.append({
-            'task': task,
-            'depth': depth,
-            'margin_left': depth * 16,
-            'start_pct': start_pct,
-            'width_pct': width_pct,
-            'has_deadline': bool(task.deadline),
-        })
-
-    return {
-        'min_date': min_date,
-        'max_date': max_date,
-        'today_pct': today_pct,
-        'date_labels': date_labels,
-        'events': event_items,
-        'tasks': task_items,
-        'day_pct': round(100 / total_days, 4),
-    }
 
 
 def preprocess_description(project, _, form):
@@ -172,6 +82,13 @@ class ProjectListView(LoginRequiredMixin, TaskFilterMixin, ListView):
         for project in self.request.user.projects.order_by("name"):
             gantt_by_project.append({'project': project, 'gantt': build_gantt_data(project, assignee_ids=gantt_assignee_ids, status_filter=gantt_status)})
         context["gantt_by_project"] = gantt_by_project
+
+        user_preferences, _ = UserPreferences.objects.get_or_create(user=self.request.user)
+        widget_configs = get_page_widgets(user_preferences.config, 'project_list')
+        context["page_widgets"] = [
+            resolve_widget_data(w, self.request.user)
+            for w in widget_configs
+        ]
         return context
     
 
@@ -219,6 +136,12 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
             selected_event_status_list = [str(s.pk) for s in active_event_statuses]
         context["event_status_list"] = event_statuses
         context["selected_event_status_list"] = list(map(int, selected_event_status_list))
+
+        widget_configs = get_page_widgets(user_preferences.config, 'project_detail')
+        context["page_widgets"] = [
+            resolve_widget_data(w, self.request.user, project=self.object)
+            for w in widget_configs
+        ]
 
         return context
 

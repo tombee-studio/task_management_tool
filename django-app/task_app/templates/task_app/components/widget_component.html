@@ -1,0 +1,60 @@
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <strong>{{ widget.title }}</strong>
+  </div>
+
+  {% if widget.error %}
+    <div class="panel-body text-danger">{{ widget.error }}</div>
+
+  {% elif widget.type == 'gantt' %}
+    {% if widget.gantt %}
+      <div class="panel-body" style="padding: 8px;">
+        {% include "task_app/components/gantt_component.html" with gantt=widget.gantt %}
+      </div>
+    {% elif widget.gantt_per_project %}
+      {% for item in widget.gantt_per_project %}
+      <div class="panel-heading" style="background-color: #f5f5f5; border-top: 1px solid #ddd; font-size: 0.9em;">
+        <a href="{% url 'project_detail' item.project.pk %}">{{ item.project.name }}</a>
+      </div>
+      <div class="panel-body" style="padding: 8px;">
+        {% include "task_app/components/gantt_component.html" with gantt=item.gantt %}
+      </div>
+      {% empty %}
+        <div class="panel-body">表示できるプロジェクトがありません。</div>
+      {% endfor %}
+    {% else %}
+      <div class="panel-body">表示できるデータがありません。</div>
+    {% endif %}
+
+  {% else %}
+    {# table type: order リストに従い task → event の順で描画 #}
+    {% for item in widget.order %}
+      {% if item == 'task' %}
+        {% if widget.tasks %}
+          {% include "task_app/components/task_table_component.html" with tasks=widget.tasks %}
+        {% else %}
+          <div class="panel-body"><small>タスクがありません。</small></div>
+        {% endif %}
+      {% elif item == 'event' %}
+        {% if widget.events %}
+          <table class="table">
+            <tr>
+              <th>イベント名</th>
+              <th>日付</th>
+              <th>ステータス</th>
+            </tr>
+            {% for event in widget.events %}
+            <tr>
+              <td><a href="{% url 'event_detail' event.pk %}">{{ event.name }}</a></td>
+              <td>{{ event.event_date|date:"Y/m/d" }}</td>
+              <td>{% if event.status %}{{ event.status.name }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        {% else %}
+          <div class="panel-body"><small>イベントがありません。</small></div>
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+</div>

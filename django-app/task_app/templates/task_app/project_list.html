@@ -22,6 +22,10 @@
       </div>
       {% include "task_app/components/project_list_component.html" with projects=projects %}
     </div>
+
+    {% for widget in page_widgets %}
+      {% include "task_app/components/widget_component.html" with widget=widget %}
+    {% endfor %}
   </div>
 
   <div role="tabpanel" class="tab-pane" id="tab-gantt">

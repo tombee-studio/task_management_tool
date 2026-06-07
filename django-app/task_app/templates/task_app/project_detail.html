@@ -26,19 +26,18 @@
 <div class="tab-content">
 
   <div role="tabpanel" class="tab-pane active" id="tab-widget">
-    <div class="panel panel-default">
-      <div class="panel-heading">Widget</div>
-      {% if user_preferences.config %}
-        <div class="panel-body">
-          <pre>{{ user_preferences.config }}</pre>
-        </div>
-      {% else %}
+    {% if page_widgets %}
+      {% for widget in page_widgets %}
+        {% include "task_app/components/widget_component.html" with widget=widget %}
+      {% endfor %}
+    {% else %}
+      <div class="panel panel-default">
         <div class="panel-body">
           <p>Widgetが登録されていません。</p>
           <a href="{% url 'user_detail' %}">ユーザー詳細画面で設定する</a>
         </div>
-      {% endif %}
-    </div>
+      </div>
+    {% endif %}
   </div>
 
   <div role="tabpanel" class="tab-pane" id="tab-status">
