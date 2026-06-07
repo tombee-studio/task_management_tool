@@ -26,6 +26,13 @@
       <div class="panel-body">表示できるデータがありません。</div>
     {% endif %}
 
+  {% elif widget.type == 'tree' %}
+    {% if widget.task_tree %}
+      {% include "task_app/components/task_tree_component.html" with task_tree=widget.task_tree %}
+    {% else %}
+      <div class="panel-body"><small>タスクがありません。</small></div>
+    {% endif %}
+
   {% else %}
     {# table type: order リストに従い task → event の順で描画 #}
     {% for item in widget.order %}
