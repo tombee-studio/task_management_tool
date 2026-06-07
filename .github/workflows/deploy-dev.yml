@@ -20,6 +20,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Sync system clock
+        run: sudo chronyc makestep
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:

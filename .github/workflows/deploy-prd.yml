@@ -44,6 +44,9 @@ jobs:
           git tag ${{ steps.version.outputs.tag }}
           git push origin ${{ steps.version.outputs.tag }}
 
+      - name: Sync system clock
+        run: sudo chronyc makestep
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
