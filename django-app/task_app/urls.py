@@ -3,6 +3,7 @@ from .views import *
 
 urlpatterns = [
     path('signup/', SignUpView.as_view(), name='signup'),
+    path('users/me/', UserDetailView.as_view(), name='user_detail'),
     path("projects/", ProjectListView.as_view(), name="project_list"),
     re_path(r"^projects/(?P<pk>\d+)/$", ProjectDetailView.as_view(), name="project_detail"),
     path("projects/create/", ProjectCreateView.as_view(), name="project_create"),

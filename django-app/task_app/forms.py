@@ -110,6 +110,12 @@ class TaskForm(forms.ModelForm):
         return task
 
 
+class UserUpdateForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['username']
+
+
 class CommentForm(forms.ModelForm):
     dsl = forms.CharField(
         required=False,

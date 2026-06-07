@@ -10,7 +10,8 @@ from .models import *
 
 from django.contrib.auth import login
 from django.http import Http404, HttpResponseRedirect
-from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm
+from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm, UserUpdateForm
+from .models import UserPreferences
 from .filters import TaskFilterMixin, apply_task_filters
 from .dsl import execute_dsl
 
@@ -629,6 +630,24 @@ class TaskDeleteView(LoginRequiredMixin, DeleteView):
     
     def get_success_url(self):
         return reverse_lazy("project_list")
+
+
+class UserDetailView(LoginRequiredMixin, UpdateView):
+    model = User
+    form_class = UserUpdateForm
+    template_name = 'task_app/user_detail.html'
+
+    def get_object(self, queryset=None):
+        return self.request.user
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user_preferences, _ = UserPreferences.objects.get_or_create(user=self.request.user)
+        context['user_preferences'] = user_preferences
+        return context
+
+    def get_success_url(self):
+        return reverse_lazy('user_detail')
 
 
 class SignUpView(CreateView):

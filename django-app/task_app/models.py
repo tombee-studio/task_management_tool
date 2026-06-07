@@ -139,6 +139,18 @@ class Task(models.Model):
     return days is not None and not self.status.is_done and 2 <= days <= 3
 
 
+class UserPreferences(models.Model):
+  user = models.OneToOneField(
+    settings.AUTH_USER_MODEL,
+    on_delete=models.CASCADE,
+    related_name='preferences',
+  )
+  config = models.TextField(blank=True, default='')
+
+  def __str__(self):
+    return self.user.username
+
+
 class Rule(models.Model):
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
