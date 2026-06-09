@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
+from django.db.models import Q
 
 from .models import Project, Task, Comment, Status, Tag, UserPreferences
 from event_app.models import Event
@@ -56,12 +57,22 @@ class TaskForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             self.initial['tags'] = ' '.join(self.instance.tags.values_list('name', flat=True))
-        if user is not None:
+        if project is not None:
             self.fields['event'].queryset = Event.objects.filter(
-                project__participants=user
+                project=project,
+            ).filter(
+                Q(status__is_done=False) | Q(status__isnull=True)
+            ).order_by('-event_date')
+        elif user is not None:
+            self.fields['event'].queryset = Event.objects.filter(
+                project__participants=user,
+            ).filter(
+                Q(status__is_done=False) | Q(status__isnull=True)
             ).order_by('-event_date')
         else:
-            self.fields['event'].queryset = Event.objects.all().order_by('-event_date')
+            self.fields['event'].queryset = Event.objects.filter(
+                Q(status__is_done=False) | Q(status__isnull=True)
+            ).order_by('-event_date')
         if project is not None:
             self.fields['assignee'].queryset = project.participants.all()
             self.fields['status'].queryset = Status.objects.filter(project=project)
