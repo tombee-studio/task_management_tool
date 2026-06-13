@@ -156,6 +156,25 @@ def _resolve_source_event_qs(source, task):
     return None
 
 
+def _expand_tree_with_descendants(base_qs, effective_filter, user):
+    """base_qs を起点に子孫タスクを BFS で展開し、effective_filter を適用したクエリセットを返す。"""
+    parsed = parse_search_query(effective_filter, user=user)
+    all_pks = set(base_qs.values_list('pk', flat=True))
+    frontier = set(all_pks)
+    while frontier:
+        children_qs = Task.objects.filter(
+            parent_id__in=frontier,
+        ).select_related('project', 'status', 'assignee')
+        new_pks = set(
+            apply_task_filters(children_qs, parsed).values_list('pk', flat=True)
+        ) - all_pks
+        if not new_pks:
+            break
+        all_pks |= new_pks
+        frontier = new_pks
+    return Task.objects.filter(pk__in=all_pks).select_related('project', 'status', 'assignee')
+
+
 def build_task_tree(task_qs):
     """タスク QuerySet を親子関係に基づいて木構造に変換する。
     各タスクに _tree_children 属性を付与し、ルートタスクのリストを返す。
@@ -217,12 +236,17 @@ def resolve_widget_data(widget_config, user, project=None, task=None):
         filter_str = rule.get('filter') or ''
 
         if table == 'task':
+            effective_filter = filter_str
+            if widget_type == 'tree' and 'status__is_done' not in filter_str:
+                effective_filter = (filter_str + ' status__is_done=False').strip()
             if source:
-                task_qs = _resolve_source_task_qs(source, user, project, task, filter_str)
+                task_qs = _resolve_source_task_qs(source, user, project, task, effective_filter)
             else:
                 base = _base_task_qs(user, project=project)
-                parsed = parse_search_query(filter_str, user=user)
+                parsed = parse_search_query(effective_filter, user=user)
                 task_qs = apply_task_filters(base, parsed)
+            if widget_type == 'tree' and task_qs is not None:
+                task_qs = _expand_tree_with_descendants(task_qs, effective_filter, user)
         elif table == 'event':
             if source:
                 resolved = _resolve_source_event_qs(source, task)
