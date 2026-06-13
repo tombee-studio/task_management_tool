@@ -1,0 +1,47 @@
+name: Update Task Status on Merge
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  update-task-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update merged tasks status
+        env:
+          TOOL_API_URL: ${{ secrets.TOOL_API_URL }}
+          TOOL_API_KEY: ${{ secrets.TOOL_API_KEY }}
+          TASK_STAUS_MERGE_ID: ${{ secrets.TASK_STAUS_MERGE_ID }}
+        run: |
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "Initial push to develop, skipping."
+            exit 0
+          fi
+
+          TASK_IDS=$(git log --pretty=format:"%B" "$BEFORE..$AFTER" \
+            | grep -oE 'Task: \[?[0-9]+' | grep -oE '[0-9]+' | sort -u)
+
+          if [ -z "$TASK_IDS" ]; then
+            echo "No tasks found in pushed commits."
+            exit 0
+          fi
+
+          for TASK_ID in $TASK_IDS; do
+            echo "Updating Task $TASK_ID to status $TASK_STAUS_MERGE_ID..."
+            HTTP_STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+              -X PATCH "${TOOL_API_URL%/}/task_app/tasks/$TASK_ID/" \
+              -H "X-API-Key: $TOOL_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"status\": $TASK_STAUS_MERGE_ID}")
+            echo "Task $TASK_ID: HTTP $HTTP_STATUS - $(cat /tmp/response.json)"
+          done

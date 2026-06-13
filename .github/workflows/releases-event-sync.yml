@@ -1,0 +1,54 @@
+name: Releases Event Sync
+
+on:
+  pull_request:
+    branches:
+      - releases
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+      - closed
+
+jobs:
+  validate-event-id:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Event ID in PR body
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if ! echo "$PR_BODY" | grep -qE 'Event: [0-9]+'; then
+            echo "::error::PR body must contain 'Event: <event_id>'."
+            exit 1
+          fi
+          EVENT_ID=$(echo "$PR_BODY" | grep -oE 'Event: [0-9]+' | grep -oE '[0-9]+' | head -1)
+          echo "Event ID: $EVENT_ID — OK"
+
+  update-event-status:
+    if: github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update event status to release
+        env:
+          TOOL_API_URL: ${{ secrets.TOOL_API_URL }}
+          TOOL_API_KEY: ${{ secrets.TOOL_API_KEY }}
+          EVENT_STAUS_RELEASE_ID: ${{ secrets.EVENT_STAUS_RELEASE_ID }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          EVENT_ID=$(echo "$PR_BODY" | grep -oE 'Event: [0-9]+' | grep -oE '[0-9]+' | head -1)
+
+          if [ -z "$EVENT_ID" ]; then
+            echo "No Event ID found in PR body, skipping."
+            exit 0
+          fi
+
+          echo "Updating Event $EVENT_ID to status $EVENT_STAUS_RELEASE_ID..."
+          HTTP_STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X PATCH "${TOOL_API_URL%/}/event_app/events/$EVENT_ID/" \
+            -H "X-API-Key: $TOOL_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"status\": $EVENT_STAUS_RELEASE_ID}")
+          echo "Event $EVENT_ID: HTTP $HTTP_STATUS - $(cat /tmp/response.json)"

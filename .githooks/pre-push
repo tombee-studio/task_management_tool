@@ -1,3 +1,95 @@
-#!/bin/sh
+#!/usr/bin/env python3
+"""pre-push hook: run tests, then post comments for all pushed commits with Task links."""
+import json
+import os
+import re
+import subprocess
+import sys
+import urllib.request
 
-cd django-app && DJANGO_SETTINGS_MODULE=task_management.test_settings python manage.py test task_app event_app --verbosity=1
+NULL_SHA = "0" * 40
+
+
+def post_comment(api_url, api_key, user_id, task_id, commit_id):
+    payload = json.dumps({
+        "author": int(user_id),
+        "task": task_id,
+        "description": f"commit: {commit_id}",
+    }).encode()
+    req = urllib.request.Request(
+        f"{api_url}/task_app/comments/",
+        data=payload,
+        headers={
+            "X-API-Key": api_key,
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            print(f"[pre-push] Comment posted to Task {task_id} (HTTP {resp.status})")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")
+        print(f"[pre-push] API error {e.code}: {body}", file=sys.stderr)
+    except Exception as e:
+        print(f"[pre-push] Failed to post comment: {e}", file=sys.stderr)
+
+
+def get_task_id(commit_hash):
+    msg = subprocess.check_output(["git", "log", "-1", "--pretty=%B", commit_hash], text=True)
+    m = re.search(r"Task: \[?(\d+)\]?", msg)
+    return int(m.group(1)) if m else None
+
+
+def get_pushed_commits(local_sha, remote_sha):
+    if remote_sha == NULL_SHA:
+        return subprocess.check_output(
+            ["git", "rev-list", local_sha, "--not", "--remotes"],
+            text=True,
+        ).splitlines()
+    return subprocess.check_output(
+        ["git", "rev-list", f"{remote_sha}..{local_sha}"],
+        text=True,
+    ).splitlines()
+
+
+def main():
+    # Read stdin first — git closes it after pre-push starts
+    push_refs = sys.stdin.read().splitlines()
+
+    # Run tests
+    repo_root = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
+    result = subprocess.run(
+        ["python", "manage.py", "test", "task_app", "event_app", "--verbosity=1"],
+        cwd=os.path.join(repo_root, "django-app"),
+        env={**os.environ, "DJANGO_SETTINGS_MODULE": "task_management.test_settings"},
+    )
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+
+    # Post comments for all pushed commits that reference a task
+    api_url = os.environ.get("TOOL_API_URL", "").rstrip("/")
+    api_key = os.environ.get("TOOL_API_KEY", "")
+    user_id = os.environ.get("TOOL_USER_ID", "")
+
+    if not api_url or not api_key or not user_id:
+        print("[pre-push] TOOL_API_URL / TOOL_API_KEY / TOOL_USER_ID not set; skipping comments.", file=sys.stderr)
+        return
+
+    for line in push_refs:
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+        _local_ref, local_sha, _remote_ref, remote_sha = parts[:4]
+
+        if local_sha == NULL_SHA:
+            continue  # branch deletion
+
+        for commit_hash in get_pushed_commits(local_sha, remote_sha):
+            task_id = get_task_id(commit_hash)
+            if task_id is not None:
+                post_comment(api_url, api_key, user_id, task_id, commit_hash)
+
+
+if __name__ == "__main__":
+    main()
