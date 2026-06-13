@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'bootstrap3',
     'auditlog',
+    'rest_framework',
     'tree_queries',
     'task_app.apps.TaskAppConfig',
     'event_app',
@@ -75,6 +76,17 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 AUDITLOG_INCLUDE_ALL_MODELS = True
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'task_app.api.authentication.APIKeyAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
 
 LOGIN_REDIRECT_URL = 'project_list'
 LOGOUT_REDIRECT_URL = 'project_list'

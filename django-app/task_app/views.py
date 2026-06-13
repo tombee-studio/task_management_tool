@@ -508,6 +508,7 @@ class UserDetailView(LoginRequiredMixin, UpdateView):
         user_preferences, _ = UserPreferences.objects.get_or_create(user=self.request.user)
         if 'preferences_form' not in context:
             context['preferences_form'] = UserPreferencesForm(instance=user_preferences)
+        context['user_preferences'] = user_preferences
         return context
 
     def post(self, request, *args, **kwargs):
@@ -526,6 +527,15 @@ class UserDetailView(LoginRequiredMixin, UpdateView):
 
     def get_success_url(self):
         return reverse_lazy('user_detail')
+
+
+class RegenerateAPIKeyView(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        from .signals import generate_api_key
+        prefs, _ = UserPreferences.objects.get_or_create(user=request.user)
+        prefs.api_key = generate_api_key()
+        prefs.save(update_fields=['api_key'])
+        return HttpResponseRedirect(reverse_lazy('user_detail'))
 
 
 class SignUpView(CreateView):
