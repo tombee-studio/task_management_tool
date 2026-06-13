@@ -47,8 +47,8 @@ class TaskSerializer(serializers.ModelSerializer):
 class UserPreferencesSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserPreferences
-        fields = ['id', 'user', 'config']
-        read_only_fields = ['id']
+        fields = ['id', 'user', 'config', 'api_key']
+        read_only_fields = ['id', 'api_key']
 
 
 class RuleSerializer(serializers.ModelSerializer):

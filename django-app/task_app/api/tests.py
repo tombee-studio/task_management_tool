@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from task_app.models import Comment, Project, Rule, Status, Tag, Task, UserPreferences
+from task_app.signals import generate_api_key
 
 User = get_user_model()
 
@@ -35,8 +36,8 @@ class BaseAPITest(APITestCase):
 
 class AuthenticationTest(BaseAPITest):
     """
-    SessionAuthentication returns 403 (not 401) for unauthenticated requests
-    because it provides no WWW-Authenticate header.
+    Requests with no credentials → 403 (no WWW-Authenticate challenge).
+    Requests with an invalid API key → 401 (authentication attempted but failed).
     """
     endpoints = [
         f'{BASE}/projects/',
@@ -516,3 +517,133 @@ class RuleAPITest(BaseAPITest):
         data = self.client.get(self.detail()).data
         self.assertIn('created_at', data)
         self.assertIn('updated_at', data)
+
+
+# ---------------------------------------------------------------------------
+# API key authentication
+# ---------------------------------------------------------------------------
+
+class APIKeyAuthenticationTest(BaseAPITest):
+    """Requests authenticated via X-API-Key header."""
+
+    URL = f'{BASE}/projects/'
+
+    def _key_header(self, key):
+        return {'HTTP_X_API_KEY': key}
+
+    def setUp(self):
+        super().setUp()
+        self.prefs = UserPreferences.objects.get(user=self.user)
+        self.prefs.api_key = generate_api_key()
+        self.prefs.save()
+
+    def test_valid_key_returns_200(self):
+        r = self.client.get(self.URL, **self._key_header(self.prefs.api_key))
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+
+    def test_invalid_key_returns_401(self):
+        r = self.client.get(self.URL, **self._key_header('invalid-key'))
+        self.assertEqual(r.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_no_key_and_no_session_returns_403(self):
+        r = self.client.get(self.URL)
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_key_identifies_correct_user(self):
+        r = self.client.get(self.URL, **self._key_header(self.prefs.api_key))
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.wsgi_request.user, self.user)
+
+    def test_other_users_key_authenticates_as_that_user(self):
+        other_prefs = UserPreferences.objects.get(user=self.other)
+        r = self.client.get(self.URL, **self._key_header(other_prefs.api_key))
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.wsgi_request.user, self.other)
+
+    def test_key_is_auto_generated_on_user_creation(self):
+        new_user = User.objects.create_user(username='newuser', password='pass')
+        prefs = UserPreferences.objects.get(user=new_user)
+        self.assertIsNotNone(prefs.api_key)
+        self.assertGreater(len(prefs.api_key), 0)
+
+    def test_api_key_in_serializer_response(self):
+        self.auth()
+        r = self.client.get(f'{BASE}/user-preferences/{self.prefs.pk}/')
+        self.assertIn('api_key', r.data)
+        self.assertEqual(r.data['api_key'], self.prefs.api_key)
+
+    def test_api_key_is_read_only_via_patch(self):
+        self.auth()
+        original_key = self.prefs.api_key
+        self.client.patch(
+            f'{BASE}/user-preferences/{self.prefs.pk}/',
+            {'api_key': 'manually-set-key'},
+        )
+        self.prefs.refresh_from_db()
+        self.assertEqual(self.prefs.api_key, original_key)
+
+
+# ---------------------------------------------------------------------------
+# generate-api-key action
+# ---------------------------------------------------------------------------
+
+class GenerateAPIKeyActionTest(BaseAPITest):
+    URL_TPL = f'{BASE}/user-preferences/{{pk}}/generate-api-key/'
+
+    def setUp(self):
+        super().setUp()
+        self.prefs = UserPreferences.objects.get(user=self.user)
+        self.prefs.api_key = generate_api_key()
+        self.prefs.save()
+
+    def url(self, pk=None):
+        return self.URL_TPL.format(pk=pk or self.prefs.pk)
+
+    def test_generate_returns_200(self):
+        self.auth()
+        r = self.client.post(self.url())
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+
+    def test_generate_returns_new_key_in_response(self):
+        self.auth()
+        r = self.client.post(self.url())
+        self.assertIn('api_key', r.data)
+        self.assertIsNotNone(r.data['api_key'])
+
+    def test_generate_rotates_key(self):
+        old_key = self.prefs.api_key
+        self.auth()
+        self.client.post(self.url())
+        self.prefs.refresh_from_db()
+        self.assertNotEqual(self.prefs.api_key, old_key)
+
+    def test_generated_key_persists_to_db(self):
+        self.auth()
+        r = self.client.post(self.url())
+        self.prefs.refresh_from_db()
+        self.assertEqual(self.prefs.api_key, r.data['api_key'])
+
+    def test_new_key_authenticates_successfully(self):
+        self.auth()
+        r = self.client.post(self.url())
+        new_key = r.data['api_key']
+        self.client.force_authenticate(user=None)
+        check = self.client.get(f'{BASE}/projects/', HTTP_X_API_KEY=new_key)
+        self.assertEqual(check.status_code, status.HTTP_200_OK)
+
+    def test_old_key_no_longer_authenticates_after_rotation(self):
+        old_key = self.prefs.api_key
+        self.auth()
+        self.client.post(self.url())
+        self.client.force_authenticate(user=None)
+        check = self.client.get(f'{BASE}/projects/', HTTP_X_API_KEY=old_key)
+        self.assertEqual(check.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_generate_requires_authentication(self):
+        r = self.client.post(self.url())
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_get_method_not_allowed(self):
+        self.auth()
+        r = self.client.get(self.url())
+        self.assertEqual(r.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
