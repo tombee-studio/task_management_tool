@@ -24,4 +24,6 @@ urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
     path('task_app/', include('task_app.urls')),
     path('event_app/', include('event_app.urls')),
+    path('api/task_app/', include('task_app.api.urls')),
+    path('api/event_app/', include('event_app.api.urls')),
 ]
