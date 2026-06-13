@@ -22,6 +22,37 @@
       </div>
 
       <div class="form-group">
+        <label>API キー</label>
+        <div class="input-group">
+          <input id="api-key-input"
+                 type="password"
+                 class="form-control"
+                 value="{{ user_preferences.api_key }}"
+                 readonly>
+          <span class="input-group-btn">
+            <button type="button" class="btn btn-default" onclick="toggleApiKey()" title="表示 / 非表示">
+              <span class="glyphicon glyphicon-eye-open" id="api-key-eye"></span>
+            </button>
+            <button type="button" class="btn btn-default" onclick="copyApiKey()" title="コピー">
+              <span class="glyphicon glyphicon-copy"></span>
+            </button>
+          </span>
+        </div>
+        <p class="help-block">このキーを <code>X-API-Key</code> ヘッダに付けてリクエストを送信します。他人に見せないでください。</p>
+      </div>
+
+      <div class="form-group">
+        <label>API キーの再発行</label>
+        <div>
+          <button type="button" class="btn btn-warning"
+                  onclick="if(confirm('APIキーを再発行しますか？現在のキーは無効になります。')) document.getElementById('regenerate-form').submit();">
+            <span class="glyphicon glyphicon-refresh"></span> 再発行する
+          </button>
+        </div>
+        <p class="help-block">再発行すると現在のキーはすぐに使えなくなります。</p>
+      </div>
+
+      <div class="form-group">
         {% bootstrap_field preferences_form.config %}
       </div>
 
@@ -108,6 +139,31 @@
       <a href="{% url 'project_list' %}" class="btn btn-default">キャンセル</a>
     </form>
 
+    <form id="regenerate-form" method="post" action="{% url 'regenerate_api_key' %}">
+      {% csrf_token %}
+    </form>
+
   </div>
 </div>
+
+<script>
+  function toggleApiKey() {
+    var input = document.getElementById('api-key-input');
+    var eye   = document.getElementById('api-key-eye');
+    if (input.type === 'password') {
+      input.type = 'text';
+      eye.className = 'glyphicon glyphicon-eye-close';
+    } else {
+      input.type = 'password';
+      eye.className = 'glyphicon glyphicon-eye-open';
+    }
+  }
+
+  function copyApiKey() {
+    var input = document.getElementById('api-key-input');
+    navigator.clipboard.writeText(input.value).then(function() {
+      alert('APIキーをクリップボードにコピーしました。');
+    });
+  }
+</script>
 {% endblock %}

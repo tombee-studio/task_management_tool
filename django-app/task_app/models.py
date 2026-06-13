@@ -146,6 +146,7 @@ class UserPreferences(models.Model):
     related_name='preferences',
   )
   config = models.TextField(blank=True, default='')
+  api_key = models.CharField(max_length=64, unique=True, null=True, blank=True, default=None)
 
   def __str__(self):
     return self.user.username
