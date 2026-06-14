@@ -51,6 +51,8 @@ jobs:
           echo "ecr_url=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
           echo "lambda_web=$(terraform output -raw web_lambda_name)" >> $GITHUB_OUTPUT
           echo "lambda_migrate=$(terraform output -raw migrate_lambda_name)" >> $GITHUB_OUTPUT
+          echo "claude_agent_ecr_url=$(terraform output -raw claude_agent_ecr_url)" >> $GITHUB_OUTPUT
+          echo "dispatcher_lambda=$(terraform output -raw dispatcher_lambda_name)" >> $GITHUB_OUTPUT
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -108,3 +110,16 @@ jobs:
             --cli-binary-format raw-in-base64-out \
             /tmp/migrate-response.json
           cat /tmp/migrate-response.json
+
+      - name: Build and push claude-agent image to ECR
+        env:
+          CLAUDE_AGENT_ECR_URL: ${{ steps.tf.outputs.claude_agent_ecr_url }}
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            --provenance=false \
+            --sbom=false \
+            -t $CLAUDE_AGENT_ECR_URL:latest \
+            --push \
+            --no-cache \
+            ./claude-agent

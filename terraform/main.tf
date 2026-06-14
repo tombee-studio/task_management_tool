@@ -772,3 +772,11 @@ output "createsuperuser_lambda_name" {
 output "db_endpoint" {
   value = aws_db_instance.db.address
 }
+
+output "claude_agent_ecr_url" {
+  value = aws_ecr_repository.claude_agent.repository_url
+}
+
+output "dispatcher_lambda_name" {
+  value = aws_lambda_function.dispatcher.function_name
+}
