@@ -10,6 +10,22 @@ import urllib.request
 NULL_SHA = "0" * 40
 
 
+def load_envrc(repo_root):
+    """Load missing env vars from .envrc (handles 'export KEY=VALUE' lines)."""
+    envrc_path = os.path.join(repo_root, ".envrc")
+    if not os.path.exists(envrc_path):
+        return
+    with open(envrc_path) as f:
+        for line in f:
+            m = re.match(r'^export\s+(\w+)=(.*)', line.strip())
+            if not m:
+                continue
+            key, val = m.group(1), m.group(2)
+            if len(val) >= 2 and val[0] in ('"', "'") and val[-1] == val[0]:
+                val = val[1:-1]
+            os.environ.setdefault(key, val)
+
+
 def post_comment(api_url, api_key, user_id, task_id, commit_id):
     payload = json.dumps({
         "author": int(user_id),
@@ -57,8 +73,11 @@ def main():
     # Read stdin first — git closes it after pre-push starts
     push_refs = sys.stdin.read().splitlines()
 
-    # Run tests
+    # Load .envrc so env vars are available even when direnv didn't export them
     repo_root = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
+    load_envrc(repo_root)
+
+    # Run tests
     result = subprocess.run(
         ["python", "manage.py", "test", "task_app", "event_app", "--verbosity=1"],
         cwd=os.path.join(repo_root, "django-app"),
