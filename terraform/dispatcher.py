@@ -36,7 +36,7 @@ def handler(event, context):
                 "awsvpcConfiguration": {
                     "subnets": subnets,
                     "securityGroups": [sg],
-                    "assignPublicIp": "DISABLED",
+                    "assignPublicIp": "ENABLED",
                 }
             },
             overrides={
