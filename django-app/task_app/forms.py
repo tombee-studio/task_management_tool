@@ -45,10 +45,13 @@ class TaskForm(forms.ModelForm):
         required=False,
         widget=forms.Textarea(attrs={
             'rows': 3,
-            'placeholder': 'ASSIGN {task_id} TO {username}\nLINK {src_id} -> {dst_id}\nEVENT {task_id} {event_id}',
+            'placeholder': 'ASSIGN {task_id} TO {username}\nLINK {src_id} -> {dst_id}\nEVENT {task_id} {event_id}\nPARENT {child_id} -> {parent_id}',
         }),
         label='DSL（保存後実行）',
-        help_text='保存後に実行するDSLコマンドを入力してください（DBには保存されません）。',
+        help_text=(
+            '保存後に実行するDSLコマンドを入力してください（DBには保存されません）。'
+            ' PARENT {child_id} -> {parent_id} で子タスクの親を変更できます。'
+        ),
     )
 
     def __init__(self, *args, **kwargs):
@@ -144,10 +147,13 @@ class CommentForm(forms.ModelForm):
         required=False,
         widget=forms.Textarea(attrs={
             'rows': 3,
-            'placeholder': 'ASSIGN {task_id} TO {username}\nLINK {src_id} -> {dst_id}\nEVENT {task_id} {event_id}',
+            'placeholder': 'ASSIGN {task_id} TO {username}\nLINK {src_id} -> {dst_id}\nEVENT {task_id} {event_id}\nPARENT {child_id} -> {parent_id}',
         }),
         label='DSL（保存後実行）',
-        help_text='保存後に実行するDSLコマンドを入力してください（DBには保存されません）。',
+        help_text=(
+            '保存後に実行するDSLコマンドを入力してください（DBには保存されません）。'
+            ' PARENT {child_id} -> {parent_id} で子タスクの親を変更できます。'
+        ),
     )
 
     class Meta:

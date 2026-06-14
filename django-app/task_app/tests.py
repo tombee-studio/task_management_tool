@@ -3,7 +3,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .dsl import execute_assign, execute_dsl, execute_event, execute_link, parse_dsl
+from .dsl import execute_assign, execute_dsl, execute_event, execute_link, execute_parent, parse_dsl
 from .filters import apply_task_filters, parse_search_query
 from .forms import CommentForm, TaskForm
 from .models import Comment, Project, Rule, Status, Tag, Task
@@ -397,6 +397,43 @@ class DSLExecuteTest(TestCase):
         execute_dsl(f"LINK {self.src.id} -> {self.dst.id}\nLINK {self.src.id} -> {third.id}")
         self.assertIn(self.dst, self.src.related_tasks.all())
         self.assertIn(third, self.src.related_tasks.all())
+
+
+# ---------------------------------------------------------------------------
+# DSL — execute PARENT
+# ---------------------------------------------------------------------------
+
+class DSLExecuteParentTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="u", password="p")
+        self.status = Status.objects.create(name="Open")
+        self.project = Project.objects.create(name="P")
+        self.child = Task.objects.create(title="Child", project=self.project, assignee=self.user, status=self.status)
+        self.parent = Task.objects.create(title="Parent", project=self.project, assignee=self.user, status=self.status)
+
+    def test_sets_parent(self):
+        execute_dsl(f"PARENT {self.child.id} -> {self.parent.id}")
+        self.child.refresh_from_db()
+        self.assertEqual(self.child.parent, self.parent)
+
+    def test_execute_parent_directly(self):
+        execute_parent(self.child.id, self.parent.id)
+        self.child.refresh_from_db()
+        self.assertEqual(self.child.parent, self.parent)
+
+    def test_nonexistent_child_does_not_raise(self):
+        execute_parent(99999, self.parent.id)
+
+    def test_nonexistent_parent_does_not_raise(self):
+        execute_parent(self.child.id, 99999)
+
+    def test_changes_existing_parent(self):
+        other = Task.objects.create(title="Other", project=self.project, assignee=self.user, status=self.status)
+        self.child.parent = other
+        self.child.save()
+        execute_dsl(f"PARENT {self.child.id} -> {self.parent.id}")
+        self.child.refresh_from_db()
+        self.assertEqual(self.child.parent, self.parent)
 
 
 # ---------------------------------------------------------------------------
