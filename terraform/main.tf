@@ -115,10 +115,22 @@ variable "task_status_merge_id" {
   default = 12
 }
 
+variable "create_sqs_vpc_endpoint" {
+  type    = bool
+  default = true
+}
+
+variable "sqs_vpce_sg_id" {
+  type    = string
+  default = ""
+}
+
 locals {
   name      = "${var.project}-${var.stage}"
   db_port   = 5432
   image_uri = "${aws_ecr_repository.app.repository_url}:${var.image_tag}"
+
+  effective_sqs_vpce_sg_id = var.create_sqs_vpc_endpoint ? aws_security_group.vpc_endpoint[0].id : var.sqs_vpce_sg_id
 }
 
 # -----------------------------
@@ -152,7 +164,7 @@ resource "aws_security_group" "rds" {
 # Lambda -> VPC Endpoints (SQS etc.)
 resource "aws_vpc_security_group_egress_rule" "lambda_to_vpce" {
   security_group_id            = aws_security_group.lambda.id
-  referenced_security_group_id = aws_security_group.vpc_endpoint.id
+  referenced_security_group_id = local.effective_sqs_vpce_sg_id
   ip_protocol                  = "tcp"
   from_port                    = 443
   to_port                      = 443
@@ -510,27 +522,30 @@ resource "aws_api_gateway_stage" "api" {
 # -----------------------------
 
 resource "aws_security_group" "vpc_endpoint" {
+  count       = var.create_sqs_vpc_endpoint ? 1 : 0
   name        = "${local.name}-vpce-sg"
   description = "Security group for VPC endpoints"
   vpc_id      = var.vpc_id
 }
 
-resource "aws_vpc_security_group_ingress_rule" "vpce_from_lambda" {
-  security_group_id            = aws_security_group.vpc_endpoint.id
-  referenced_security_group_id = aws_security_group.lambda.id
-  ip_protocol                  = "tcp"
-  from_port                    = 443
-  to_port                      = 443
-  description                  = "Allow Lambda to reach VPC endpoints"
-}
-
 resource "aws_vpc_endpoint" "sqs" {
+  count               = var.create_sqs_vpc_endpoint ? 1 : 0
   vpc_id              = var.vpc_id
   service_name        = "com.amazonaws.${var.aws_region}.sqs"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = var.private_subnet_ids
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [aws_security_group.vpc_endpoint[0].id]
   private_dns_enabled = true
+}
+
+# Each env adds its own Lambda SG as allowed ingress on the shared VPCE SG
+resource "aws_vpc_security_group_ingress_rule" "vpce_from_lambda" {
+  security_group_id            = local.effective_sqs_vpce_sg_id
+  referenced_security_group_id = aws_security_group.lambda.id
+  ip_protocol                  = "tcp"
+  from_port                    = 443
+  to_port                      = 443
+  description                  = "Allow ${local.name} Lambda to reach VPC endpoints"
 }
 
 # -----------------------------
