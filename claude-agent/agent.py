@@ -10,6 +10,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from urllib.parse import urlparse
 
 import anthropic
 import requests
@@ -24,8 +25,6 @@ TASK_API_KEY = os.environ["TASK_API_KEY"]
 TASK_STATUS_MERGE_ID = int(os.environ.get("TASK_STAUS_MERGE_ID", "12"))
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 GITHUB_PAT = os.environ["GITHUB_PAT"]
-GITHUB_REPO = os.environ.get("GITHUB_REPO", "tombee-studio/task_management_tool")
-GITHUB_REMOTE = f"https://{GITHUB_PAT}@github.com/{GITHUB_REPO}.git"
 MODEL = "claude-sonnet-4-6"
 
 api_headers = {"X-API-Key": TASK_API_KEY, "Content-Type": "application/json"}
@@ -115,22 +114,33 @@ def main():
     task = api_get(f"task_app/tasks/{TASK_ID}/")
     print(f"[agent] Task #{TASK_ID}: {task['title']}")
 
-    # 2. Update status -> 着手済み
+    # 2. Resolve git remote from project's git_url
+    project = api_get(f"task_app/projects/{task['project']}/")
+    git_url = (project.get("git_url") or "").rstrip("/").removesuffix(".git")
+    if not git_url:
+        print("[agent] Project has no git_url set.", file=sys.stderr)
+        sys.exit(1)
+    parsed = urlparse(git_url)
+    github_repo = parsed.path.lstrip("/")  # "owner/repo"
+    github_remote = f"https://{GITHUB_PAT}@{parsed.netloc}{parsed.path}.git"
+    print(f"[agent] Repo: {github_repo}")
+
+    # 3. Update status -> 着手済み
     api_patch(f"task_app/tasks/{TASK_ID}/", {"status": 2})
 
-    # 3. Classify kind
+    # 4. Classify kind
     kind = classify_kind(task, client)
     branch = re.sub(r"[^a-z0-9_]", "_", f"{kind}/#{TASK_ID}_{task['title'].lower()}")[:60]
     print(f"[agent] Branch: {branch}")
 
     with tempfile.TemporaryDirectory() as workdir:
-        # 4. Clone repo
-        run(["git", "clone", GITHUB_REMOTE, workdir])
+        # 5. Clone repo
+        run(["git", "clone", github_remote, workdir])
         git(["config", "user.email", "claude-agent@example.com"], workdir)
         git(["config", "user.name", "Claude Agent"], workdir)
         git(["checkout", "-b", branch], workdir)
 
-        # 5. Read codebase context
+        # 6. Read codebase context
         context_files = []
         for root, dirs, files in os.walk(workdir):
             dirs[:] = [d for d in dirs if d not in {".git", "venv", "__pycache__", ".venv", "node_modules"}]
@@ -146,7 +156,7 @@ def main():
 
         context = "\n\n".join(context_files[:60])  # cap to avoid token overflow
 
-        # 6. Ask Claude to implement
+        # 7. Ask Claude to implement
         prompt = (
             f"You are an expert Django developer working on the task-management project.\n\n"
             f"Task #{TASK_ID}: {task['title']}\n"
@@ -167,7 +177,7 @@ def main():
         )
         implementation = response.content[0].text
 
-        # 7. Apply changes
+        # 8. Apply changes
         file_pattern = re.compile(r"FILE:\s*(\S+)\n```(?:\w*)\n(.*?)```", re.DOTALL)
         changed_files = []
         for match in file_pattern.finditer(implementation):
@@ -183,7 +193,7 @@ def main():
             print("[agent] No files changed — nothing to commit.", file=sys.stderr)
             return
 
-        # 8. Run tests
+        # 9. Run tests
         django_dir = os.path.join(workdir, "django-app")
         test_result = run(
             ["python", "manage.py", "test", "task_app", "event_app", "--verbosity=1"],
@@ -196,7 +206,7 @@ def main():
             sys.exit(1)
         print("[agent] Tests passed.")
 
-        # 9. Commit
+        # 10. Commit
         env_patch = {**os.environ, "DJANGO_SETTINGS_MODULE": "task_management.test_settings"}
         git(["add", "-A"], workdir)
         summary = task["title"][:44]
@@ -208,12 +218,12 @@ def main():
             check=True,
         )
 
-        # 10. Push branch
+        # 11. Push branch
         git(["push", "origin", branch], workdir)
 
-        # 11. Merge to develop via GitHub API
+        # 12. Merge to develop via GitHub API
         merge_resp = requests.post(
-            f"https://api.github.com/repos/{GITHUB_REPO}/merges",
+            f"https://api.github.com/repos/{github_repo}/merges",
             headers={
                 "Authorization": f"token {GITHUB_PAT}",
                 "Accept": "application/vnd.github.v3+json",
@@ -225,7 +235,7 @@ def main():
         else:
             print(f"[agent] Merge failed: {merge_resp.status_code} {merge_resp.text}", file=sys.stderr)
 
-        # 12. Update task status to merged
+        # 13. Update task status to merged
         api_patch(f"task_app/tasks/{TASK_ID}/", {"status": TASK_STATUS_MERGE_ID})
         print(f"[agent] Task #{TASK_ID} marked as merged.")
 

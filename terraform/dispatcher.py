@@ -29,7 +29,6 @@ def handler(event, context):
         ecs.run_task(
             cluster=cluster,
             taskDefinition=task_def,
-            launchType="FARGATE",
             capacityProviderStrategy=[
                 {"capacityProvider": "FARGATE_SPOT", "weight": 1},
             ],
