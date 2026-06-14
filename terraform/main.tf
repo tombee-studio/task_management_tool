@@ -91,6 +91,30 @@ variable "db_ssl_use" {
   default = "require"
 }
 
+variable "anthropic_api_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "github_pat" {
+  type      = string
+  sensitive = true
+}
+
+variable "task_api_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "task_api_url" {
+  type = string
+}
+
+variable "task_status_merge_id" {
+  type    = number
+  default = 12
+}
+
 locals {
   name      = "${var.project}-${var.stage}"
   db_port   = 5432
@@ -194,6 +218,38 @@ resource "aws_db_instance" "db" {
 # Lambda IAM Role
 # -----------------------------
 
+# -----------------------------
+# SQS — task automation queue
+# -----------------------------
+
+resource "aws_sqs_queue" "task_automation_dlq" {
+  name                      = "${local.name}-task-automation-dlq"
+  message_retention_seconds = 1209600
+}
+
+resource "aws_sqs_queue" "task_automation" {
+  name                       = "${local.name}-task-automation"
+  visibility_timeout_seconds = 900
+  message_retention_seconds  = 86400
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.task_automation_dlq.arn
+    maxReceiveCount     = 3
+  })
+}
+
+output "task_automation_queue_url" {
+  value = aws_sqs_queue.task_automation.url
+}
+
+output "task_automation_queue_arn" {
+  value = aws_sqs_queue.task_automation.arn
+}
+
+# -----------------------------
+# Lambda IAM Role
+# -----------------------------
+
 resource "aws_iam_role" "lambda" {
   name = "${local.name}-lambda-role"
 
@@ -249,12 +305,13 @@ resource "aws_lambda_function" "web" {
       ALLOWED_HOSTS          = trimspace(var.allowed_hosts) != "" ? var.allowed_hosts : "${aws_api_gateway_rest_api.api.id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
       DEBUG          = var.debug_mode
 
-      DB_NAME     = var.db_name
-      DB_USER     = var.db_username
-      DB_PASSWORD = random_password.db.result
-      DB_HOST     = aws_db_instance.db.address
-      DB_PORT     = tostring(local.db_port)
-      DB_SSL_USE  = var.db_ssl_use
+      DB_NAME       = var.db_name
+      DB_USER       = var.db_username
+      DB_PASSWORD   = random_password.db.result
+      DB_HOST       = aws_db_instance.db.address
+      DB_PORT       = tostring(local.db_port)
+      DB_SSL_USE    = var.db_ssl_use
+      SQS_QUEUE_URL = aws_sqs_queue.task_automation.url
     }
   }
 
@@ -436,6 +493,207 @@ resource "aws_api_gateway_stage" "api" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   deployment_id = aws_api_gateway_deployment.api.id
   stage_name    = var.stage
+}
+
+# -----------------------------
+# ECR — claude-agent image
+# -----------------------------
+
+resource "aws_ecr_repository" "claude_agent" {
+  name = "${local.name}-claude-agent"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
+
+# -----------------------------
+# ECS — claude-agent (Fargate Spot)
+# -----------------------------
+
+resource "aws_ecs_cluster" "agent" {
+  name = "${local.name}-agent"
+}
+
+resource "aws_iam_role" "ecs_task_execution" {
+  name = "${local.name}-ecs-exec-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_execution_basic" {
+  role       = aws_iam_role.ecs_task_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_role" "ecs_task" {
+  name = "${local.name}-ecs-task-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "ecs_task_sqs" {
+  name = "${local.name}-ecs-task-sqs"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
+      Resource = aws_sqs_queue.task_automation.arn
+    }]
+  })
+}
+
+resource "aws_security_group" "ecs_agent" {
+  name        = "${local.name}-ecs-agent-sg"
+  description = "ECS claude-agent outbound only"
+  vpc_id      = var.vpc_id
+}
+
+resource "aws_vpc_security_group_egress_rule" "ecs_agent_https" {
+  security_group_id = aws_security_group.ecs_agent.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  description       = "HTTPS outbound for Claude API and GitHub"
+}
+
+resource "aws_cloudwatch_log_group" "ecs_agent" {
+  name              = "/ecs/${local.name}-claude-agent"
+  retention_in_days = 7
+}
+
+resource "aws_ecs_task_definition" "claude_agent" {
+  family                   = "${local.name}-claude-agent"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "512"
+  memory                   = "1024"
+  runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "ARM64"
+  }
+
+  execution_role_arn = aws_iam_role.ecs_task_execution.arn
+  task_role_arn      = aws_iam_role.ecs_task.arn
+
+  container_definitions = jsonencode([{
+    name      = "claude-agent"
+    image     = "${aws_ecr_repository.claude_agent.repository_url}:latest"
+    essential = true
+
+    environment = [
+      { name = "TASK_API_URL",    value = var.task_api_url },
+      { name = "TASK_API_KEY",    value = var.task_api_key },
+      { name = "TASK_STAUS_MERGE_ID", value = tostring(var.task_status_merge_id) },
+    ]
+
+    secrets = []
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.ecs_agent.name
+        "awslogs-region"        = data.aws_region.current.region
+        "awslogs-stream-prefix" = "agent"
+      }
+    }
+  }])
+}
+
+# -----------------------------
+# Lambda — SQS dispatcher -> ECS
+# -----------------------------
+
+resource "aws_iam_role" "lambda_dispatcher" {
+  name = "${local.name}-dispatcher-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "dispatcher_basic" {
+  role       = aws_iam_role.lambda_dispatcher.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "dispatcher_ecs_run" {
+  name = "${local.name}-dispatcher-ecs-run"
+  role = aws_iam_role.lambda_dispatcher.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ecs:RunTask"]
+        Resource = aws_ecs_task_definition.claude_agent.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
+        Resource = [
+          aws_iam_role.ecs_task_execution.arn,
+          aws_iam_role.ecs_task.arn,
+        ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
+        Resource = aws_sqs_queue.task_automation.arn
+      }
+    ]
+  })
+}
+
+resource "aws_lambda_function" "dispatcher" {
+  function_name = "${local.name}-dispatcher"
+  role          = aws_iam_role.lambda_dispatcher.arn
+  runtime       = "python3.12"
+  handler       = "dispatcher.handler"
+  filename      = "${path.module}/dispatcher.zip"
+  timeout       = 30
+
+  environment {
+    variables = {
+      ECS_CLUSTER          = aws_ecs_cluster.agent.arn
+      ECS_TASK_DEFINITION  = aws_ecs_task_definition.claude_agent.arn
+      ECS_SUBNET_IDS       = join(",", var.private_subnet_ids)
+      ECS_SECURITY_GROUP   = aws_security_group.ecs_agent.id
+      ANTHROPIC_API_KEY    = var.anthropic_api_key
+      GITHUB_PAT           = var.github_pat
+      TASK_API_KEY         = var.task_api_key
+    }
+  }
+}
+
+resource "aws_lambda_event_source_mapping" "sqs_to_dispatcher" {
+  event_source_arn = aws_sqs_queue.task_automation.arn
+  function_name    = aws_lambda_function.dispatcher.arn
+  batch_size       = 1
 }
 
 output "ecr_repository_url" {
