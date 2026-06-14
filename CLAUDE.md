@@ -8,7 +8,20 @@ This file documents the standard workflow for implementing a task in this projec
 
 Tasks arrive with a task ID (e.g., `#128`). Confirm the scope before starting.
 
+Set status to 着手済み (status=2) when starting work:
+
+```bash
+eval "$(direnv export bash)"
+curl -s -X PATCH \
+  "${TOOL_API_URL}task_app/tasks/<task_id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"status": 2}'
+```
+
 ### 2. Create a feature branch
+
+Create **one** feature branch for the received task (★). Subtasks never get their own branch.
 
 Branch naming convention: `<kind>/#<task_id>_<short_description>`
 
@@ -19,16 +32,37 @@ Branch naming convention: `<kind>/#<task_id>_<short_description>`
 | `hotfix` | urgent production fix |
 | `enhancement` | improvement to existing feature |
 
-Example:
-```
-git checkout -b feature/#128_add_parent_change_dsl
+```bash
+git checkout develop
+git checkout -b feature/#<task_id>_<desc>
 ```
 
-### 3. Implement changes
+### 3. Assess scope and create subtasks if needed
+
+**Small task** (no subtask division needed) → skip this step and proceed to implementation.
+
+**Large task** (needs subtask division):
+
+1. Decide subtasks upfront and create them all at once via the API:
+   - `parent`: set to the received task (★)
+   - `event`: same as the received task (★)
+2. Proceed to implementation within the single feature branch created in step 2.
+
+```bash
+# Create a subtask
+eval "$(direnv export bash)"
+curl -s -X POST "${TOOL_API_URL}task_app/tasks/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "...", "project": <project_id>, "assignee": <user_id>,
+       "status": 1, "parent": <parent_task_id>, "event": <event_id>}'
+```
+
+### 4. Implement changes
 
 Work inside `django-app/`. Edit models, views, forms, DSL, templates, etc.
 
-### 4. Run tests
+### 5. Run tests
 
 Always use `task_management.test_settings` when running tests:
 
@@ -45,7 +79,7 @@ make test
 
 All tests must pass before committing.
 
-### 5. Commit
+### 6. Commit
 
 The `commit-msg` hook enforces the following format (all lines ASCII only):
 
@@ -66,6 +100,13 @@ Rules:
 - Blank line immediately before `Task:`
 - Last line: `Task: <task_id>` — the hook rewrites this to a Markdown link automatically
 
+**Which task ID to use in the commit:**
+
+| Situation | Task ID in commit |
+|-----------|------------------|
+| Small task (no subtasks) | ★ (received task) |
+| Large task — commit implements a subtask | Subtask ID |
+
 `TASK_URL` must be set (loaded automatically via `direnv allow`):
 
 ```bash
@@ -82,41 +123,73 @@ EOF
 )"
 ```
 
-### 6. Task status
+### 7. After each subtask commit — update subtask status
 
-Set status to 着手済み (status=2) when starting work:
+After committing a subtask's changes, set the **subtask** status to レビュー (status=4):
 
 ```bash
 eval "$(direnv export bash)"
 curl -s -X PATCH \
-  "${TOOL_API_URL}task_app/tasks/<task_id>/" \
+  "${TOOL_API_URL}task_app/tasks/<subtask_id>/" \
   -H "X-API-Key: ${TOOL_API_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"status": 2}'
+  -d '{"status": 4}'
 ```
 
 マージ済み (status=12) への更新は GitHub Actions が develop へのマージ時に自動で行うため、手動での変更は不要。
 
+### 8. Push
+
+```bash
+git push -u origin <branch>
+```
+
+The pre-push hook runs all tests automatically before pushing.
+
+## API Reference
+
+- **API docs**: https://8hzryl7735.execute-api.ap-northeast-1.amazonaws.com/prd/api/docs/
+- **Base URL**: defined in `.envrc` as `TOOL_API_URL`
+- **Auth**: `X-API-Key` header using `TOOL_API_KEY` from `.envrc`
+
 ## Quick reference
 
 ```
+# -- Small task --
 # 1. Set status to 着手済み
 curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
   -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
   -d '{"status": 2}'
 
-# 2. Branch (parent task only; subtasks commit to same branch)
+# 2. Branch
 git checkout -b feature/#<id>_<desc>
 
 # 3. Implement & test
 make test
 
-# 4. Commit
+# 4. Commit (use ★ task ID)
 eval "$(direnv export bash)"
 git add <files>
 git commit -m "Ftr: <summary> #<id>\n\n- <detail>\n\nTask: <id>"
 
 # 5. Push
 git push -u origin <branch>
-# -> GitHub Actions sets status=12 automatically on merge to develop
+
+
+# -- Large task (with subtasks) --
+# 1. Set status to 着手済み
+# 2. Create subtasks via API (parent=★, event=★)
+# 3. Branch (one branch for ★, no branch per subtask)
+git checkout -b feature/#<★id>_<desc>
+
+# 4. For each subtask: implement, test, then commit with SUBTASK ID
+git commit -m "Ftr: <summary> #<subtask_id>\n\n...\n\nTask: <subtask_id>"
+
+# 5. After each subtask commit: set subtask status to レビュー
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<subtask_id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"status": 4}'
+
+# 6. Push when all subtasks are done
+git push -u origin <branch>
 ```
