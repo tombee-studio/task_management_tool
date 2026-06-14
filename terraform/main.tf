@@ -191,7 +191,7 @@ resource "aws_db_instance" "db" {
   identifier = "${local.name}-db"
 
   engine         = "postgres"
-  engine_version = "16.12"
+  engine_version = "16.13"
 
   instance_class = "db.t4g.micro"
 
