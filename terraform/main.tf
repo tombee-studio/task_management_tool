@@ -149,6 +149,16 @@ resource "aws_security_group" "rds" {
   vpc_id      = var.vpc_id
 }
 
+# Lambda -> VPC Endpoints (SQS etc.)
+resource "aws_vpc_security_group_egress_rule" "lambda_to_vpce" {
+  security_group_id            = aws_security_group.lambda.id
+  referenced_security_group_id = aws_security_group.vpc_endpoint.id
+  ip_protocol                  = "tcp"
+  from_port                    = 443
+  to_port                      = 443
+  description                  = "Allow Lambda to reach VPC endpoints"
+}
+
 # Lambda -> RDS
 resource "aws_vpc_security_group_egress_rule" "lambda_to_rds" {
   security_group_id = aws_security_group.lambda.id
@@ -191,7 +201,7 @@ resource "aws_db_instance" "db" {
   identifier = "${local.name}-db"
 
   engine         = "postgres"
-  engine_version = "16.12"
+  engine_version = "16.13"
 
   instance_class = "db.t4g.micro"
 
@@ -493,6 +503,34 @@ resource "aws_api_gateway_stage" "api" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   deployment_id = aws_api_gateway_deployment.api.id
   stage_name    = var.stage
+}
+
+# -----------------------------
+# VPC Endpoints
+# -----------------------------
+
+resource "aws_security_group" "vpc_endpoint" {
+  name        = "${local.name}-vpce-sg"
+  description = "Security group for VPC endpoints"
+  vpc_id      = var.vpc_id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "vpce_from_lambda" {
+  security_group_id            = aws_security_group.vpc_endpoint.id
+  referenced_security_group_id = aws_security_group.lambda.id
+  ip_protocol                  = "tcp"
+  from_port                    = 443
+  to_port                      = 443
+  description                  = "Allow Lambda to reach VPC endpoints"
+}
+
+resource "aws_vpc_endpoint" "sqs" {
+  vpc_id              = var.vpc_id
+  service_name        = "com.amazonaws.${var.aws_region}.sqs"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = var.private_subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  private_dns_enabled = true
 }
 
 # -----------------------------
