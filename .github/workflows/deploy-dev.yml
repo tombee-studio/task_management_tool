@@ -111,6 +111,16 @@ jobs:
             /tmp/migrate-response.json
           cat /tmp/migrate-response.json
 
+      - name: Deploy dispatcher Lambda
+        working-directory: terraform
+        run: |
+          bash build_dispatcher.sh
+          aws lambda update-function-code \
+            --function-name ${{ steps.tf.outputs.dispatcher_lambda }} \
+            --zip-file fileb://dispatcher.zip
+          aws lambda wait function-updated \
+            --function-name ${{ steps.tf.outputs.dispatcher_lambda }}
+
       - name: Build and push claude-agent image to ECR
         env:
           CLAUDE_AGENT_ECR_URL: ${{ steps.tf.outputs.claude_agent_ecr_url }}
