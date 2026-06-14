@@ -45,6 +45,35 @@ def api_patch(path, data):
     return resp.json()
 
 
+def api_post(path, data):
+    resp = requests.post(f"{TASK_API_URL}/{path}", headers=api_headers, json=data)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def create_pr(github_repo, branch, task_id, title, kind):
+    prefix = KIND_PREFIX.get(kind, "Ftr")
+    pr_resp = requests.post(
+        f"https://api.github.com/repos/{github_repo}/pulls",
+        headers={
+            "Authorization": f"token {GITHUB_PAT}",
+            "Accept": "application/vnd.github.v3+json",
+        },
+        json={
+            "title": f"{prefix}: {title[:60]} #{task_id}",
+            "head": branch,
+            "base": "develop",
+            "body": f"Task: {task_id}",
+        },
+    )
+    if pr_resp.status_code == 201:
+        print(f"[agent] PR created: {pr_resp.json()['html_url']}")
+        return pr_resp.json()
+    else:
+        print(f"[agent] PR creation failed: {pr_resp.status_code} {pr_resp.text}", file=sys.stderr)
+        return None
+
+
 def run(cmd, cwd=None, check=True):
     return subprocess.run(cmd, cwd=cwd, check=check, text=True, capture_output=True)
 
@@ -221,23 +250,12 @@ def main():
         # 11. Push branch
         git(["push", "origin", branch], workdir)
 
-        # 12. Merge to develop via GitHub API
-        merge_resp = requests.post(
-            f"https://api.github.com/repos/{github_repo}/merges",
-            headers={
-                "Authorization": f"token {GITHUB_PAT}",
-                "Accept": "application/vnd.github.v3+json",
-            },
-            json={"base": "develop", "head": branch, "commit_message": f"Merge {branch} into develop"},
-        )
-        if merge_resp.status_code in (201, 204):
-            print(f"[agent] Merged {branch} -> develop")
-        else:
-            print(f"[agent] Merge failed: {merge_resp.status_code} {merge_resp.text}", file=sys.stderr)
+        # 12. Create PR -> develop
+        create_pr(github_repo, branch, TASK_ID, task["title"], kind)
 
-        # 13. Update task status to merged
-        api_patch(f"task_app/tasks/{TASK_ID}/", {"status": TASK_STATUS_MERGE_ID})
-        print(f"[agent] Task #{TASK_ID} marked as merged.")
+        # 13. Update task status to レビュー
+        api_patch(f"task_app/tasks/{TASK_ID}/", {"status": 4})
+        print(f"[agent] Task #{TASK_ID} marked as review.")
 
 
 if __name__ == "__main__":
