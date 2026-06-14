@@ -82,9 +82,9 @@ EOF
 )"
 ```
 
-### 6. Update task status
+### 6. Task status
 
-After committing (or after merging), update the task status in the task management tool via the API:
+Set status to 着手済み (status=2) when starting work:
 
 ```bash
 eval "$(direnv export bash)"
@@ -92,30 +92,31 @@ curl -s -X PATCH \
   "${TOOL_API_URL}task_app/tasks/<task_id>/" \
   -H "X-API-Key: ${TOOL_API_KEY}" \
   -H "Content-Type: application/json" \
-  -d "{\"status\": ${TASK_STAUS_MERGE_ID}}"
+  -d '{"status": 2}'
 ```
 
-- `TOOL_API_URL`, `TOOL_API_KEY`, `TASK_STAUS_MERGE_ID` are all defined in `.envrc`.
-- `TASK_STAUS_MERGE_ID` is the status ID that represents "merged / done".
+マージ済み (status=12) への更新は GitHub Actions が develop へのマージ時に自動で行うため、手動での変更は不要。
 
 ## Quick reference
 
 ```
-# 1. Branch
+# 1. Set status to 着手済み
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"status": 2}'
+
+# 2. Branch (parent task only; subtasks commit to same branch)
 git checkout -b feature/#<id>_<desc>
 
-# 2. Implement & test
+# 3. Implement & test
 make test
 
-# 3. Commit
+# 4. Commit
 eval "$(direnv export bash)"
 git add <files>
 git commit -m "Ftr: <summary> #<id>\n\n- <detail>\n\nTask: <id>"
 
-# 4. Update task status
-eval "$(direnv export bash)"
-curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
-  -H "X-API-Key: ${TOOL_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d "{\"status\": ${TASK_STAUS_MERGE_ID}}"
+# 5. Push
+git push -u origin <branch>
+# -> GitHub Actions sets status=12 automatically on merge to develop
 ```
