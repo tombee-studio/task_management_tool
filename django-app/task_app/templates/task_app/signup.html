@@ -1,1 +1,8 @@
 {% extends "base_form.html" %}
+
+{% block header_links %}
+<p class="text-muted">
+  <a href="{% url 'swagger-ui' %}">API Docs (Swagger)</a> &middot;
+  <a href="{% url 'redoc' %}">API Docs (ReDoc)</a>
+</p>
+{% endblock %}

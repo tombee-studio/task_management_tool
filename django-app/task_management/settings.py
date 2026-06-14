@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'bootstrap3',
     'auditlog',
     'rest_framework',
+    'drf_spectacular',
     'task_app.apps.TaskAppConfig',
     'event_app',
 ]
@@ -181,6 +182,14 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Task Management API',
+    'DESCRIPTION': 'REST API for managing projects, tasks, events, and inventories.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
 }
 
 LOGIN_REDIRECT_URL = "project_list"

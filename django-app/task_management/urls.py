@@ -17,6 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+from rest_framework.permissions import AllowAny
 
 urlpatterns = [
     path('', RedirectView.as_view(pattern_name='project_list')),
@@ -26,4 +28,7 @@ urlpatterns = [
     path('event_app/', include('event_app.urls')),
     path('api/task_app/', include('task_app.api.urls')),
     path('api/event_app/', include('event_app.api.urls')),
+    path('api/schema/', SpectacularAPIView.as_view(permission_classes=[AllowAny]), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema', permission_classes=[AllowAny]), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema', permission_classes=[AllowAny]), name='redoc'),
 ]

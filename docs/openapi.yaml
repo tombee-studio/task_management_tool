@@ -1,0 +1,2597 @@
+openapi: 3.0.3
+info:
+  title: Task Management API
+  version: 1.0.0
+  description: REST API for managing projects, tasks, events, and inventories.
+paths:
+  /api/event_app/event-statuses/:
+    get:
+      operationId: event_app_event_statuses_list
+      summary: List event statuses
+      tags:
+      - Event Statuses
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventStatus'
+          description: ''
+    post:
+      operationId: event_app_event_statuses_create
+      summary: Create an event status
+      tags:
+      - Event Statuses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventStatus'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EventStatus'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EventStatus'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventStatus'
+          description: ''
+  /api/event_app/event-statuses/{id}/:
+    get:
+      operationId: event_app_event_statuses_retrieve
+      summary: Retrieve an event status
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this event status.
+        required: true
+      tags:
+      - Event Statuses
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventStatus'
+          description: ''
+    put:
+      operationId: event_app_event_statuses_update
+      summary: Update an event status
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this event status.
+        required: true
+      tags:
+      - Event Statuses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventStatus'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EventStatus'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EventStatus'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventStatus'
+          description: ''
+    patch:
+      operationId: event_app_event_statuses_partial_update
+      summary: Partially update an event status
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this event status.
+        required: true
+      tags:
+      - Event Statuses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEventStatus'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEventStatus'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEventStatus'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventStatus'
+          description: ''
+    delete:
+      operationId: event_app_event_statuses_destroy
+      summary: Delete an event status
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this event status.
+        required: true
+      tags:
+      - Event Statuses
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/event_app/events/:
+    get:
+      operationId: event_app_events_list
+      summary: List events
+      tags:
+      - Events
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+          description: ''
+    post:
+      operationId: event_app_events_create
+      summary: Create an event
+      tags:
+      - Events
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Event'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Event'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+          description: ''
+  /api/event_app/events/{id}/:
+    get:
+      operationId: event_app_events_retrieve
+      summary: Retrieve an event
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this event.
+        required: true
+      tags:
+      - Events
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+          description: ''
+    put:
+      operationId: event_app_events_update
+      summary: Update an event
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this event.
+        required: true
+      tags:
+      - Events
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Event'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Event'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+          description: ''
+    patch:
+      operationId: event_app_events_partial_update
+      summary: Partially update an event
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this event.
+        required: true
+      tags:
+      - Events
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEvent'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEvent'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEvent'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+          description: ''
+    delete:
+      operationId: event_app_events_destroy
+      summary: Delete an event
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this event.
+        required: true
+      tags:
+      - Events
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/event_app/inventories/:
+    get:
+      operationId: event_app_inventories_list
+      summary: List inventories
+      tags:
+      - Inventories
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Inventory'
+          description: ''
+    post:
+      operationId: event_app_inventories_create
+      summary: Create an inventory
+      tags:
+      - Inventories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Inventory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Inventory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Inventory'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+          description: ''
+  /api/event_app/inventories/{id}/:
+    get:
+      operationId: event_app_inventories_retrieve
+      summary: Retrieve an inventory
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this inventory.
+        required: true
+      tags:
+      - Inventories
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+          description: ''
+    put:
+      operationId: event_app_inventories_update
+      summary: Update an inventory
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this inventory.
+        required: true
+      tags:
+      - Inventories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Inventory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Inventory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Inventory'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+          description: ''
+    patch:
+      operationId: event_app_inventories_partial_update
+      summary: Partially update an inventory
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this inventory.
+        required: true
+      tags:
+      - Inventories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInventory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInventory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInventory'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+          description: ''
+    delete:
+      operationId: event_app_inventories_destroy
+      summary: Delete an inventory
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this inventory.
+        required: true
+      tags:
+      - Inventories
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/event_app/inventory-item-relations/:
+    get:
+      operationId: event_app_inventory_item_relations_list
+      summary: List inventory-item relations
+      tags:
+      - Inventory Items
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InventoryItemRelation'
+          description: ''
+    post:
+      operationId: event_app_inventory_item_relations_create
+      summary: Create an inventory-item relation
+      tags:
+      - Inventory Items
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryItemRelation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InventoryItemRelation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InventoryItemRelation'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItemRelation'
+          description: ''
+  /api/event_app/inventory-item-relations/{id}/:
+    get:
+      operationId: event_app_inventory_item_relations_retrieve
+      summary: Retrieve an inventory-item relation
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this inventory item relation.
+        required: true
+      tags:
+      - Inventory Items
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItemRelation'
+          description: ''
+    put:
+      operationId: event_app_inventory_item_relations_update
+      summary: Update an inventory-item relation
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this inventory item relation.
+        required: true
+      tags:
+      - Inventory Items
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryItemRelation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InventoryItemRelation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InventoryItemRelation'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItemRelation'
+          description: ''
+    patch:
+      operationId: event_app_inventory_item_relations_partial_update
+      summary: Partially update an inventory-item relation
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this inventory item relation.
+        required: true
+      tags:
+      - Inventory Items
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedInventoryItemRelation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedInventoryItemRelation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedInventoryItemRelation'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItemRelation'
+          description: ''
+    delete:
+      operationId: event_app_inventory_item_relations_destroy
+      summary: Delete an inventory-item relation
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this inventory item relation.
+        required: true
+      tags:
+      - Inventory Items
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/event_app/items/:
+    get:
+      operationId: event_app_items_list
+      summary: List items
+      tags:
+      - Items
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Item'
+          description: ''
+    post:
+      operationId: event_app_items_create
+      summary: Create an item
+      tags:
+      - Items
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Item'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Item'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Item'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+          description: ''
+  /api/event_app/items/{id}/:
+    get:
+      operationId: event_app_items_retrieve
+      summary: Retrieve an item
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this item.
+        required: true
+      tags:
+      - Items
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+          description: ''
+    put:
+      operationId: event_app_items_update
+      summary: Update an item
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this item.
+        required: true
+      tags:
+      - Items
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Item'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Item'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Item'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+          description: ''
+    patch:
+      operationId: event_app_items_partial_update
+      summary: Partially update an item
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this item.
+        required: true
+      tags:
+      - Items
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedItem'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedItem'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedItem'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+          description: ''
+    delete:
+      operationId: event_app_items_destroy
+      summary: Delete an item
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this item.
+        required: true
+      tags:
+      - Items
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/task_app/comments/:
+    get:
+      operationId: task_app_comments_list
+      summary: List comments
+      tags:
+      - Comments
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comment'
+          description: ''
+    post:
+      operationId: task_app_comments_create
+      summary: Create a comment
+      tags:
+      - Comments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Comment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Comment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Comment'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+  /api/task_app/comments/{id}/:
+    get:
+      operationId: task_app_comments_retrieve
+      summary: Retrieve a comment
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this comment.
+        required: true
+      tags:
+      - Comments
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+    put:
+      operationId: task_app_comments_update
+      summary: Update a comment
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this comment.
+        required: true
+      tags:
+      - Comments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Comment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Comment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Comment'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+    patch:
+      operationId: task_app_comments_partial_update
+      summary: Partially update a comment
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this comment.
+        required: true
+      tags:
+      - Comments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedComment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedComment'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+    delete:
+      operationId: task_app_comments_destroy
+      summary: Delete a comment
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this comment.
+        required: true
+      tags:
+      - Comments
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/task_app/projects/:
+    get:
+      operationId: task_app_projects_list
+      summary: List projects
+      tags:
+      - Projects
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+          description: ''
+    post:
+      operationId: task_app_projects_create
+      summary: Create a project
+      tags:
+      - Projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Project'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Project'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Project'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+  /api/task_app/projects/{id}/:
+    get:
+      operationId: task_app_projects_retrieve
+      summary: Retrieve a project
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this project.
+        required: true
+      tags:
+      - Projects
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+    put:
+      operationId: task_app_projects_update
+      summary: Update a project
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this project.
+        required: true
+      tags:
+      - Projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Project'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Project'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Project'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+    patch:
+      operationId: task_app_projects_partial_update
+      summary: Partially update a project
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this project.
+        required: true
+      tags:
+      - Projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProject'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProject'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProject'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+    delete:
+      operationId: task_app_projects_destroy
+      summary: Delete a project
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this project.
+        required: true
+      tags:
+      - Projects
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/task_app/rules/:
+    get:
+      operationId: task_app_rules_list
+      summary: List rules
+      tags:
+      - Rules
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Rule'
+          description: ''
+    post:
+      operationId: task_app_rules_create
+      summary: Create a rule
+      tags:
+      - Rules
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Rule'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Rule'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Rule'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+          description: ''
+  /api/task_app/rules/{id}/:
+    get:
+      operationId: task_app_rules_retrieve
+      summary: Retrieve a rule
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this rule.
+        required: true
+      tags:
+      - Rules
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+          description: ''
+    put:
+      operationId: task_app_rules_update
+      summary: Update a rule
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this rule.
+        required: true
+      tags:
+      - Rules
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Rule'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Rule'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Rule'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+          description: ''
+    patch:
+      operationId: task_app_rules_partial_update
+      summary: Partially update a rule
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this rule.
+        required: true
+      tags:
+      - Rules
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRule'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRule'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRule'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+          description: ''
+    delete:
+      operationId: task_app_rules_destroy
+      summary: Delete a rule
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this rule.
+        required: true
+      tags:
+      - Rules
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/task_app/statuses/:
+    get:
+      operationId: task_app_statuses_list
+      summary: List statuses
+      tags:
+      - Statuses
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Status'
+          description: ''
+    post:
+      operationId: task_app_statuses_create
+      summary: Create a status
+      tags:
+      - Statuses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Status'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Status'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Status'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+          description: ''
+  /api/task_app/statuses/{id}/:
+    get:
+      operationId: task_app_statuses_retrieve
+      summary: Retrieve a status
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this status.
+        required: true
+      tags:
+      - Statuses
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+          description: ''
+    put:
+      operationId: task_app_statuses_update
+      summary: Update a status
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this status.
+        required: true
+      tags:
+      - Statuses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Status'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Status'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Status'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+          description: ''
+    patch:
+      operationId: task_app_statuses_partial_update
+      summary: Partially update a status
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this status.
+        required: true
+      tags:
+      - Statuses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStatus'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStatus'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStatus'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+          description: ''
+    delete:
+      operationId: task_app_statuses_destroy
+      summary: Delete a status
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this status.
+        required: true
+      tags:
+      - Statuses
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/task_app/tags/:
+    get:
+      operationId: task_app_tags_list
+      summary: List tags
+      tags:
+      - Tags
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+          description: ''
+    post:
+      operationId: task_app_tags_create
+      summary: Create a tag
+      tags:
+      - Tags
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Tag'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Tag'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Tag'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+          description: ''
+  /api/task_app/tags/{id}/:
+    get:
+      operationId: task_app_tags_retrieve
+      summary: Retrieve a tag
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this tag.
+        required: true
+      tags:
+      - Tags
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+          description: ''
+    put:
+      operationId: task_app_tags_update
+      summary: Update a tag
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this tag.
+        required: true
+      tags:
+      - Tags
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Tag'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Tag'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Tag'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+          description: ''
+    patch:
+      operationId: task_app_tags_partial_update
+      summary: Partially update a tag
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this tag.
+        required: true
+      tags:
+      - Tags
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTag'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTag'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTag'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+          description: ''
+    delete:
+      operationId: task_app_tags_destroy
+      summary: Delete a tag
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this tag.
+        required: true
+      tags:
+      - Tags
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/task_app/tasks/:
+    get:
+      operationId: task_app_tasks_list
+      summary: List tasks
+      tags:
+      - Tasks
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+          description: ''
+    post:
+      operationId: task_app_tasks_create
+      summary: Create a task
+      tags:
+      - Tasks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Task'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Task'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Task'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+  /api/task_app/tasks/{id}/:
+    get:
+      operationId: task_app_tasks_retrieve
+      summary: Retrieve a task
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this task.
+        required: true
+      tags:
+      - Tasks
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+    put:
+      operationId: task_app_tasks_update
+      summary: Update a task
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this task.
+        required: true
+      tags:
+      - Tasks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Task'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Task'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Task'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+    patch:
+      operationId: task_app_tasks_partial_update
+      summary: Partially update a task
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this task.
+        required: true
+      tags:
+      - Tasks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTask'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTask'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTask'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+          description: ''
+    delete:
+      operationId: task_app_tasks_destroy
+      summary: Delete a task
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this task.
+        required: true
+      tags:
+      - Tasks
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/task_app/user-preferences/:
+    get:
+      operationId: task_app_user_preferences_list
+      summary: List user preferences
+      tags:
+      - User Preferences
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserPreferences'
+          description: ''
+    post:
+      operationId: task_app_user_preferences_create
+      summary: Create user preferences
+      tags:
+      - User Preferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferences'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserPreferences'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserPreferences'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+          description: ''
+  /api/task_app/user-preferences/{id}/:
+    get:
+      operationId: task_app_user_preferences_retrieve
+      summary: Retrieve user preferences
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user preferences.
+        required: true
+      tags:
+      - User Preferences
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+          description: ''
+    put:
+      operationId: task_app_user_preferences_update
+      summary: Update user preferences
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user preferences.
+        required: true
+      tags:
+      - User Preferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferences'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserPreferences'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserPreferences'
+        required: true
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+          description: ''
+    patch:
+      operationId: task_app_user_preferences_partial_update
+      summary: Partially update user preferences
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user preferences.
+        required: true
+      tags:
+      - User Preferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserPreferences'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserPreferences'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserPreferences'
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+          description: ''
+    delete:
+      operationId: task_app_user_preferences_destroy
+      summary: Delete user preferences
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user preferences.
+        required: true
+      tags:
+      - User Preferences
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/task_app/user-preferences/{id}/generate-api-key/:
+    post:
+      operationId: task_app_user_preferences_generate_api_key_create
+      summary: Generate a new API key
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user preferences.
+        required: true
+      tags:
+      - User Preferences
+      security:
+      - ApiKeyAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyResponse'
+          description: ''
+components:
+  schemas:
+    ApiKeyResponse:
+      type: object
+      properties:
+        api_key:
+          type: string
+      required:
+      - api_key
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        author:
+          type: integer
+        description:
+          type: string
+        task:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - author
+      - created_at
+      - description
+      - id
+      - updated_at
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+        event_date:
+          type: string
+          format: date
+        participant_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        project:
+          type: integer
+        status:
+          type: integer
+          nullable: true
+        previous_event:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - event_date
+      - id
+      - project
+      - updated_at
+    EventStatus:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+        is_done:
+          type: boolean
+        project:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+      - updated_at
+    Inventory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+        event:
+          type: integer
+          nullable: true
+        previous_inventory:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - updated_at
+    InventoryItemRelation:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        item:
+          type: integer
+        inventory:
+          type: integer
+        case_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        item_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - inventory
+      - item
+      - updated_at
+    Item:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        company:
+          type: string
+          maxLength: 128
+        name:
+          type: string
+          maxLength: 128
+        count_per_case:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - updated_at
+    PatchedComment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        author:
+          type: integer
+        description:
+          type: string
+        task:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+        event_date:
+          type: string
+          format: date
+        participant_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        project:
+          type: integer
+        status:
+          type: integer
+          nullable: true
+        previous_event:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedEventStatus:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+        is_done:
+          type: boolean
+        project:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedInventory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+        event:
+          type: integer
+          nullable: true
+        previous_inventory:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedInventoryItemRelation:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        item:
+          type: integer
+        inventory:
+          type: integer
+        case_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        item_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        company:
+          type: string
+          maxLength: 128
+        name:
+          type: string
+          maxLength: 128
+        count_per_case:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedProject:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 256
+        git_url:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 200
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedRule:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        project:
+          type: integer
+        name:
+          type: string
+          maxLength: 255
+        pattern:
+          type: string
+        dsl_template:
+          type: string
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedStatus:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+        is_done:
+          type: boolean
+        project:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedTag:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 64
+    PatchedTask:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 256
+        project:
+          type: integer
+        description:
+          type: string
+        progress_summary:
+          type: string
+          maxLength: 256
+        assignee:
+          type: integer
+        parent:
+          type: integer
+          nullable: true
+        status:
+          type: integer
+        deadline:
+          type: string
+          format: date
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        event:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedUserPreferences:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+        config:
+          type: string
+        api_key:
+          type: string
+          readOnly: true
+          nullable: true
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 256
+        git_url:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 200
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+      - updated_at
+    Rule:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        project:
+          type: integer
+        name:
+          type: string
+          maxLength: 255
+        pattern:
+          type: string
+        dsl_template:
+          type: string
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - dsl_template
+      - id
+      - name
+      - pattern
+      - project
+      - updated_at
+    Status:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+        is_done:
+          type: boolean
+        project:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+      - updated_at
+    Tag:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 64
+      required:
+      - id
+      - name
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 256
+        project:
+          type: integer
+        description:
+          type: string
+        progress_summary:
+          type: string
+          maxLength: 256
+        assignee:
+          type: integer
+        parent:
+          type: integer
+          nullable: true
+        status:
+          type: integer
+        deadline:
+          type: string
+          format: date
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        event:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - assignee
+      - created_at
+      - id
+      - project
+      - status
+      - title
+      - updated_at
+    UserPreferences:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+        config:
+          type: string
+        api_key:
+          type: string
+          readOnly: true
+          nullable: true
+      required:
+      - api_key
+      - id
+      - user
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    basicAuth:
+      type: http
+      scheme: basic
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
