@@ -113,6 +113,20 @@ def execute_event(task_id, event_id):
     Task.objects.filter(pk=task_id).update(event=event)
 
 
+def execute_parent(child_id, parent_id):
+    """子タスクの parent を変更する。
+
+    タスクが存在しない場合は何もしない。
+    """
+    try:
+        child = Task.objects.get(pk=child_id)
+        parent = Task.objects.get(pk=parent_id)
+    except Task.DoesNotExist:
+        return
+    child.parent = parent
+    child.save(update_fields=["parent"])
+
+
 def execute_assign(task_id, username):
     """タスクの担当者をユーザー名で変更する。
 
@@ -137,6 +151,9 @@ def execute_ast(ast):
         if command_type == "link":
             _, src_id, dst_id = command
             execute_link(src_id, dst_id)
+        elif command_type == "parent":
+            _, child_id, parent_id = command
+            execute_parent(child_id, parent_id)
         elif command_type == "assign":
             _, task_id, username = command
             execute_assign(task_id, username)
