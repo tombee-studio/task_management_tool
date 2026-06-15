@@ -283,6 +283,60 @@ def git(args, cwd, check=True):
 
 
 # ---------------------------------------------------------------------------
+# Branch name helpers
+# ---------------------------------------------------------------------------
+
+def _ask_claude_for_slug(client, title):
+    """Ask Claude to translate/summarize a task title into a short ASCII slug."""
+    msg = client.messages.create(
+        model=MODEL,
+        max_tokens=30,
+        messages=[{
+            "role": "user",
+            "content": (
+                f"Convert this task title to a short English slug suitable for a git branch name.\n"
+                f"Rules:\n"
+                f"- Use only lowercase ASCII letters, digits, and hyphens\n"
+                f"- Maximum 40 characters\n"
+                f"- No leading or trailing hyphens\n"
+                f"- Capture the meaning concisely\n\n"
+                f"Task title: {title}\n\n"
+                f"Reply with ONLY the slug, nothing else."
+            ),
+        }],
+    )
+    raw = msg.content[0].text.strip().lower()
+    # Sanitize just in case Claude returns something unexpected
+    slug = re.sub(r"[^a-z0-9-]", "-", raw)
+    slug = re.sub(r"-{2,}", "-", slug).strip("-")
+    return slug[:40] or "task"
+
+
+def make_branch_name(kind, task_id, title, client):
+    """Build a meaningful ASCII branch name from a task ID and title.
+
+    If the title is already ASCII-only, use it directly (lowercased, spaces→hyphens).
+    If it contains non-ASCII characters (e.g. Japanese), ask Claude for a translation slug.
+    """
+    # Check if the title is ASCII-only
+    try:
+        title.encode("ascii")
+        is_ascii = True
+    except UnicodeEncodeError:
+        is_ascii = False
+
+    if is_ascii:
+        # Convert to lowercase slug: replace non-alphanumeric with hyphens
+        slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+        slug = slug[:40] or "task"
+    else:
+        slug = _ask_claude_for_slug(client, title)
+
+    branch = f"{kind}/#{task_id}_{slug}"
+    return branch
+
+
+# ---------------------------------------------------------------------------
 # Tag classification
 # ---------------------------------------------------------------------------
 
@@ -363,8 +417,7 @@ def main():
     if task.get("parent"):
         parent_task = api_get(f"task_app/tasks/{task['parent']}/")
         kind = classify_kind(parent_task, client)
-        branch = re.sub(r"[^a-z0-9/_#-]", "_",
-                        f"{kind}/#{parent_task['id']}_{parent_task['title'].lower()}")[:60]
+        branch = make_branch_name(kind, parent_task["id"], parent_task["title"], client)
         commit_task_id = TASK_ID
 
         # Collect sibling subtask IDs (to check completion later)
@@ -375,7 +428,7 @@ def main():
         ]
     else:
         kind = classify_kind(task, client)
-        branch = re.sub(r"[^a-z0-9/_#-]", "_", f"{kind}/#{TASK_ID}_{task['title'].lower()}")[:60]
+        branch = make_branch_name(kind, TASK_ID, task["title"], client)
         commit_task_id = TASK_ID
     print(f"[agent] Branch: {branch}")
 
@@ -397,4 +450,123 @@ def main():
                     rel = os.path.relpath(path, workdir)
                     try:
                         content = open(path).read()
-                        context_files.append(f"### {rel}\n
+                        context_files.append(f"### {rel}\n```\n{content}\n```")
+                    except Exception:
+                        pass
+
+        context = "\n\n".join(context_files[:60])  # cap to avoid token overflow
+
+        # 7a. Fetch task comments
+        comments_resp = requests.get(
+            f"{TASK_API_URL}/task_app/comments/",
+            headers=api_headers,
+            params={"task": TASK_ID},
+        )
+        comments = comments_resp.json() if comments_resp.ok else []
+        comments_text = "\n".join(
+            f"[Comment #{c['id']}] {c['description']}" for c in comments
+        ) if comments else "(no comments)"
+
+        # 7b. Ask Claude to implement
+        prompt = (
+            f"You are an expert Django developer working on the task-management project.\n\n"
+            f"Task #{TASK_ID}: {task['title']}\n"
+            f"Description:\n{task['description']}\n\n"
+            f"Comments on this task:\n{comments_text}\n\n"
+            f"CLAUDE.md workflow is in the repo. Follow it.\n\n"
+            f"Here is the relevant codebase:\n{context}\n\n"
+            f"Provide the complete content of each file you need to create or modify. "
+            f"Format each file as:\n"
+            f"FILE: <relative/path/to/file>\n```\n<content>\n```\n\n"
+            f"Only output FILE blocks. No explanations."
+        )
+
+        print("[agent] Calling Claude for implementation...")
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=8096,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        implementation = response.content[0].text
+
+        # 8. Apply changes
+        file_pattern = re.compile(r"FILE:\s*(\S+)\n```(?:\w*)\n(.*?)```", re.DOTALL)
+        changed_files = []
+        for match in file_pattern.finditer(implementation):
+            rel_path, content = match.group(1), match.group(2)
+            abs_path = os.path.join(workdir, rel_path)
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+            with open(abs_path, "w") as fh:
+                fh.write(content)
+            changed_files.append(rel_path)
+            print(f"[agent] Wrote {rel_path}")
+
+        if not changed_files:
+            print("[agent] No files changed — nothing to commit.", file=sys.stderr)
+            post_error_comment(task, "No files were changed. The agent could not determine what to implement.")
+            return
+
+        # 9. File discovered out-of-scope issues as new tasks
+        file_discovered_issues(client, task, context)
+
+        # 11. Run tests (Django-only; skip if no django-app directory)
+        django_dir = os.path.join(workdir, "django-app")
+        if os.path.isdir(django_dir):
+            run(["pip", "install", "-q", "-r", "requirements.txt"], cwd=django_dir, check=False)
+            test_result = run(
+                ["python", "manage.py", "test", "task_app", "event_app", "--verbosity=1"],
+                cwd=django_dir,
+                check=False,
+                env={**os.environ, "DJANGO_SETTINGS_MODULE": "task_management.test_settings"},
+            )
+            if test_result.returncode != 0:
+                print("[agent] Tests failed:\n", test_result.stdout, test_result.stderr, file=sys.stderr)
+                error_text = (
+                    f"Tests failed. The agent could not complete the implementation.\n\n"
+                    f"```\n{test_result.stdout[-2000:]}\n{test_result.stderr[-1000:]}\n```"
+                )
+                post_error_comment(task, error_text)
+                sys.exit(1)
+            print("[agent] Tests passed.")
+        else:
+            print("[agent] No django-app/ directory — skipping tests.")
+
+        # 12. Commit (subtasks use their own ID; small tasks use their ID)
+        env_patch = {**os.environ, "DJANGO_SETTINGS_MODULE": "task_management.test_settings"}
+        git(["add", "-A"], workdir)
+        summary = task["title"][:44]
+        commit_msg = make_commit_message(kind, summary, commit_task_id)
+        subprocess.run(
+            ["git", "commit", "-m", commit_msg],
+            cwd=workdir,
+            env={**env_patch, "TASK_URL": f"{TASK_API_URL}/task_app/tasks"},
+            check=True,
+        )
+
+        # Get commit SHA before push for comments
+        commit_sha = git(["rev-parse", "HEAD"], workdir).stdout.strip()
+
+        # 13. Push branch
+        git(["push", "-u", "origin", branch], workdir)
+
+        # 14. Update this task to レビュー and restore assignee to reporter
+        review_patch = {"status": 4}
+        if task.get("reporter"):
+            review_patch["assignee"] = task["reporter"]
+        api_patch(f"task_app/tasks/{TASK_ID}/", review_patch)
+        print(f"[agent] Task #{TASK_ID} marked as review.")
+
+        # 15. Post commit link and completion comment on current task
+        automation_user = task["assignee"]
+        post_commit_comment(TASK_ID, commit_sha, github_repo, automation_user)
+        post_comment(TASK_ID, automation_user, "対応が完了しました。")
+
+        # 16. PR creation — parent task PR after all subtasks done, else direct PR
+        if parent_task:
+            handle_last_subtask(parent_task, sibling_ids, github_repo, branch, kind, project, automation_user)
+        else:
+            create_pr(github_repo, branch, TASK_ID, task["title"], kind, project)
+
+
+if __name__ == "__main__":
+    main()
