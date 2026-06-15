@@ -582,6 +582,11 @@ resource "aws_ecs_cluster" "agent" {
   name = "${local.name}-agent"
 }
 
+resource "aws_ecs_cluster_capacity_providers" "agent" {
+  cluster_name       = aws_ecs_cluster.agent.name
+  capacity_providers = ["FARGATE", "FARGATE_SPOT"]
+}
+
 resource "aws_iam_role" "ecs_task_execution" {
   name = "${local.name}-ecs-exec-role"
 
