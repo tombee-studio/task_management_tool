@@ -333,23 +333,26 @@ def main():
         # 9. File discovered out-of-scope issues as new tasks
         file_discovered_issues(client, task, context)
 
-        # 11. Run tests
+        # 11. Run tests (Django-only; skip if no django-app directory)
         django_dir = os.path.join(workdir, "django-app")
-        run(["pip", "install", "-q", "-r", "requirements.txt"], cwd=django_dir, check=False)
-        test_result = run(
-            ["python", "manage.py", "test", "task_app", "event_app", "--verbosity=1"],
-            cwd=django_dir,
-            check=False,
-        )
-        if test_result.returncode != 0:
-            print("[agent] Tests failed:\n", test_result.stdout, test_result.stderr, file=sys.stderr)
-            error_text = (
-                f"Tests failed. The agent could not complete the implementation.\n\n"
-                f"```\n{test_result.stdout[-2000:]}\n{test_result.stderr[-1000:]}\n```"
+        if os.path.isdir(django_dir):
+            run(["pip", "install", "-q", "-r", "requirements.txt"], cwd=django_dir, check=False)
+            test_result = run(
+                ["python", "manage.py", "test", "task_app", "event_app", "--verbosity=1"],
+                cwd=django_dir,
+                check=False,
             )
-            post_error_comment(task, error_text)
-            sys.exit(1)
-        print("[agent] Tests passed.")
+            if test_result.returncode != 0:
+                print("[agent] Tests failed:\n", test_result.stdout, test_result.stderr, file=sys.stderr)
+                error_text = (
+                    f"Tests failed. The agent could not complete the implementation.\n\n"
+                    f"```\n{test_result.stdout[-2000:]}\n{test_result.stderr[-1000:]}\n```"
+                )
+                post_error_comment(task, error_text)
+                sys.exit(1)
+            print("[agent] Tests passed.")
+        else:
+            print("[agent] No django-app/ directory — skipping tests.")
 
         # 12. Commit (subtasks use their own ID; small tasks use their ID)
         env_patch = {**os.environ, "DJANGO_SETTINGS_MODULE": "task_management.test_settings"}
