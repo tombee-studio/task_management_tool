@@ -51,6 +51,43 @@ def api_post(path, data):
     return resp.json()
 
 
+def file_discovered_issues(client, task, context):
+    """Ask Claude if it found any out-of-scope issues and file them as tasks."""
+    resp = client.messages.create(
+        model=MODEL,
+        max_tokens=1024,
+        messages=[{
+            "role": "user",
+            "content": (
+                f"You just implemented task #{task['id']}: {task['title']}.\n"
+                f"While reviewing this codebase, did you notice any bugs, improvements, "
+                f"or technical debt that are OUT OF SCOPE for this task?\n\n"
+                f"Codebase context:\n{context[:4000]}\n\n"
+                f"For each issue found, respond with:\n"
+                f"ISSUE: <short title under 100 chars>\n"
+                f"DETAIL: <description>\n\n"
+                f"If none found, respond with exactly: NONE"
+            ),
+        }],
+    )
+    text = resp.content[0].text.strip()
+    if text.upper() == "NONE":
+        return
+    pattern = re.compile(r"ISSUE:\s*(.+?)\nDETAIL:\s*(.+?)(?=\nISSUE:|$)", re.DOTALL)
+    for m in pattern.finditer(text):
+        title = m.group(1).strip()[:100]
+        detail = m.group(2).strip()
+        new_task = api_post("task_app/tasks/", {
+            "title": title,
+            "description": detail,
+            "project": task["project"],
+            "assignee": task.get("assignee"),
+            "status": 1,
+            "event": task.get("event"),
+        })
+        print(f"[agent] Filed issue task #{new_task['id']}: {title}")
+
+
 def create_pr(github_repo, branch, task_id, title, kind):
     prefix = KIND_PREFIX.get(kind, "Ftr")
     pr_resp = requests.post(
@@ -222,7 +259,10 @@ def main():
             print("[agent] No files changed — nothing to commit.", file=sys.stderr)
             return
 
-        # 9. Run tests
+        # 9. File discovered out-of-scope issues as new tasks
+        file_discovered_issues(client, task, context)
+
+        # 11. Run tests
         django_dir = os.path.join(workdir, "django-app")
         test_result = run(
             ["python", "manage.py", "test", "task_app", "event_app", "--verbosity=1"],
@@ -235,7 +275,7 @@ def main():
             sys.exit(1)
         print("[agent] Tests passed.")
 
-        # 10. Commit
+        # 12. Commit
         env_patch = {**os.environ, "DJANGO_SETTINGS_MODULE": "task_management.test_settings"}
         git(["add", "-A"], workdir)
         summary = task["title"][:44]
@@ -247,13 +287,13 @@ def main():
             check=True,
         )
 
-        # 11. Push branch
+        # 13. Push branch
         git(["push", "origin", branch], workdir)
 
-        # 12. Create PR -> develop
+        # 14. Create PR -> develop
         create_pr(github_repo, branch, TASK_ID, task["title"], kind)
 
-        # 13. Update task status to レビュー
+        # 15. Update task status to レビュー
         api_patch(f"task_app/tasks/{TASK_ID}/", {"status": 4})
         print(f"[agent] Task #{TASK_ID} marked as review.")
 
