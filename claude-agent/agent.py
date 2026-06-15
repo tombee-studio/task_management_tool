@@ -119,6 +119,7 @@ def file_discovered_issues(client, task, context):
             "description": detail,
             "project": task["project"],
             "status": 1,
+            "parent": task["id"],
         }
         assignee = task.get("reporter") or REPORTER_ID or task.get("assignee")
         if assignee:
@@ -214,8 +215,8 @@ def handle_last_subtask(parent_task, all_sibling_ids, github_repo, branch, kind,
         post_comment(parent_id, author_id, "対応が完了しました。")
 
 
-def run(cmd, cwd=None, check=True):
-    return subprocess.run(cmd, cwd=cwd, check=check, text=True, capture_output=True)
+def run(cmd, cwd=None, check=True, env=None):
+    return subprocess.run(cmd, cwd=cwd, check=check, text=True, capture_output=True, env=env)
 
 
 def git(args, cwd, check=True):
@@ -404,6 +405,7 @@ def main():
                 ["python", "manage.py", "test", "task_app", "event_app", "--verbosity=1"],
                 cwd=django_dir,
                 check=False,
+                env={**os.environ, "DJANGO_SETTINGS_MODULE": "task_management.test_settings"},
             )
             if test_result.returncode != 0:
                 print("[agent] Tests failed:\n", test_result.stdout, test_result.stderr, file=sys.stderr)
