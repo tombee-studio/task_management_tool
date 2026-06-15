@@ -107,6 +107,12 @@ variable "task_status_merge_id" {
   default = 12
 }
 
+variable "public_subnet_ids" {
+  type        = list(string)
+  description = "List of public subnet IDs for ECS Fargate tasks"
+  default     = []
+}
+
 locals {
   name      = "${var.project}-${var.stage}"
   db_port   = 5432
@@ -605,6 +611,7 @@ resource "aws_lambda_function" "dispatcher" {
       ANTHROPIC_API_KEY   = var.anthropic_api_key
       GITHUB_PAT          = var.github_pat
       TASK_API_KEY        = var.task_api_key
+      PUBLIC_SUBNET_IDS   = join(",", var.public_subnet_ids)
     }
   }
 }

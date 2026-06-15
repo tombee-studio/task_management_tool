@@ -14,6 +14,11 @@ def handler(event, context):
     cluster = os.environ["ECS_CLUSTER"]
     task_def = os.environ["ECS_TASK_DEFINITION"]
 
+    # Public subnet IDs are required for Fargate tasks without a VPC NAT gateway.
+    # They are passed as a comma-separated string from the Lambda environment.
+    raw_subnets = os.environ.get("PUBLIC_SUBNET_IDS", "")
+    subnets = [s.strip() for s in raw_subnets.split(",") if s.strip()]
+
     secret_env = [
         {"name": "ANTHROPIC_API_KEY", "value": os.environ["ANTHROPIC_API_KEY"]},
         {"name": "GITHUB_PAT",        "value": os.environ["GITHUB_PAT"]},
@@ -37,7 +42,7 @@ def handler(event, context):
             ],
             networkConfiguration={
                 "awsvpcConfiguration": {
-                    "subnets": [],
+                    "subnets": subnets,
                     "securityGroups": [],
                     "assignPublicIp": "ENABLED",
                 }
