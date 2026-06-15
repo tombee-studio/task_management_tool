@@ -115,10 +115,22 @@ variable "task_status_merge_id" {
   default = 12
 }
 
+variable "create_sqs_vpc_endpoint" {
+  type    = bool
+  default = true
+}
+
+variable "sqs_vpce_sg_id" {
+  type    = string
+  default = ""
+}
+
 locals {
   name      = "${var.project}-${var.stage}"
   db_port   = 5432
   image_uri = "${aws_ecr_repository.app.repository_url}:${var.image_tag}"
+
+  effective_sqs_vpce_sg_id = var.create_sqs_vpc_endpoint ? aws_security_group.vpc_endpoint[0].id : var.sqs_vpce_sg_id
 }
 
 # -----------------------------
@@ -152,7 +164,7 @@ resource "aws_security_group" "rds" {
 # Lambda -> VPC Endpoints (SQS etc.)
 resource "aws_vpc_security_group_egress_rule" "lambda_to_vpce" {
   security_group_id            = aws_security_group.lambda.id
-  referenced_security_group_id = aws_security_group.vpc_endpoint.id
+  referenced_security_group_id = local.effective_sqs_vpce_sg_id
   ip_protocol                  = "tcp"
   from_port                    = 443
   to_port                      = 443
@@ -285,6 +297,20 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
 resource "aws_iam_role_policy_attachment" "lambda_vpc" {
   role       = aws_iam_role.lambda.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+resource "aws_iam_role_policy" "lambda_sqs_send" {
+  name = "${local.name}-lambda-sqs-send"
+  role = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["sqs:SendMessage"]
+      Resource = aws_sqs_queue.task_automation.arn
+    }]
+  })
 }
 
 # -----------------------------
@@ -510,27 +536,30 @@ resource "aws_api_gateway_stage" "api" {
 # -----------------------------
 
 resource "aws_security_group" "vpc_endpoint" {
+  count       = var.create_sqs_vpc_endpoint ? 1 : 0
   name        = "${local.name}-vpce-sg"
   description = "Security group for VPC endpoints"
   vpc_id      = var.vpc_id
 }
 
-resource "aws_vpc_security_group_ingress_rule" "vpce_from_lambda" {
-  security_group_id            = aws_security_group.vpc_endpoint.id
-  referenced_security_group_id = aws_security_group.lambda.id
-  ip_protocol                  = "tcp"
-  from_port                    = 443
-  to_port                      = 443
-  description                  = "Allow Lambda to reach VPC endpoints"
-}
-
 resource "aws_vpc_endpoint" "sqs" {
+  count               = var.create_sqs_vpc_endpoint ? 1 : 0
   vpc_id              = var.vpc_id
   service_name        = "com.amazonaws.${var.aws_region}.sqs"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = var.private_subnet_ids
-  security_group_ids  = [aws_security_group.vpc_endpoint.id]
+  security_group_ids  = [aws_security_group.vpc_endpoint[0].id]
   private_dns_enabled = true
+}
+
+# Each env adds its own Lambda SG as allowed ingress on the shared VPCE SG
+resource "aws_vpc_security_group_ingress_rule" "vpce_from_lambda" {
+  security_group_id            = local.effective_sqs_vpce_sg_id
+  referenced_security_group_id = aws_security_group.lambda.id
+  ip_protocol                  = "tcp"
+  from_port                    = 443
+  to_port                      = 443
+  description                  = "Allow ${local.name} Lambda to reach VPC endpoints"
 }
 
 # -----------------------------
@@ -551,6 +580,11 @@ resource "aws_ecr_repository" "claude_agent" {
 
 resource "aws_ecs_cluster" "agent" {
   name = "${local.name}-agent"
+}
+
+resource "aws_ecs_cluster_capacity_providers" "agent" {
+  cluster_name       = aws_ecs_cluster.agent.name
+  capacity_providers = ["FARGATE", "FARGATE_SPOT"]
 }
 
 resource "aws_iam_role" "ecs_task_execution" {
@@ -688,7 +722,7 @@ resource "aws_iam_role_policy" "dispatcher_ecs_run" {
       {
         Effect   = "Allow"
         Action   = ["ecs:RunTask"]
-        Resource = aws_ecs_task_definition.claude_agent.arn
+        Resource = "${aws_ecs_task_definition.claude_agent.arn_without_revision}:*"
       },
       {
         Effect   = "Allow"
@@ -756,4 +790,12 @@ output "createsuperuser_lambda_name" {
 
 output "db_endpoint" {
   value = aws_db_instance.db.address
+}
+
+output "claude_agent_ecr_url" {
+  value = aws_ecr_repository.claude_agent.repository_url
+}
+
+output "dispatcher_lambda_name" {
+  value = aws_lambda_function.dispatcher.function_name
 }

@@ -9,4 +9,5 @@ db.sqlite3
 terraform.*
 response.json
 *.sh
+!terraform/build_dispatcher.sh
 terraform/dispatcher.zip

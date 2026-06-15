@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - develop
+  pull_request:
+    types:
+      - closed
+    branches:
+      - develop
 
 jobs:
   update-task-status:
@@ -20,19 +25,32 @@ jobs:
           TOOL_API_KEY: ${{ secrets.TOOL_API_KEY }}
           TASK_STAUS_MERGE_ID: ${{ secrets.TASK_STAUS_MERGE_ID }}
         run: |
-          BEFORE="${{ github.event.before }}"
-          AFTER="${{ github.sha }}"
+          TASK_IDS=""
 
-          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-            echo "Initial push to develop, skipping."
-            exit 0
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # PR merge: extract Task IDs from PR body (catches parent task IDs)
+            if [ "${{ github.event.pull_request.merged }}" != "true" ]; then
+              echo "PR closed without merge, skipping."
+              exit 0
+            fi
+            TASK_IDS=$(echo "${{ github.event.pull_request.body }}" \
+              | grep -oE 'Task: \[?[0-9]+' | grep -oE '[0-9]+' | sort -u)
+          else
+            # Direct push: extract Task IDs from commit messages
+            BEFORE="${{ github.event.before }}"
+            AFTER="${{ github.sha }}"
+
+            if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+              echo "Initial push to develop, skipping."
+              exit 0
+            fi
+
+            TASK_IDS=$(git log --pretty=format:"%B" "$BEFORE..$AFTER" \
+              | grep -oE 'Task: \[?[0-9]+' | grep -oE '[0-9]+' | sort -u)
           fi
 
-          TASK_IDS=$(git log --pretty=format:"%B" "$BEFORE..$AFTER" \
-            | grep -oE 'Task: \[?[0-9]+' | grep -oE '[0-9]+' | sort -u)
-
           if [ -z "$TASK_IDS" ]; then
-            echo "No tasks found in pushed commits."
+            echo "No tasks found."
             exit 0
           fi
 

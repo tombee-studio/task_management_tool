@@ -48,6 +48,13 @@ class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        task_id = self.request.query_params.get('task')
+        if task_id:
+            qs = qs.filter(task_id=task_id)
+        return qs
+
 
 @extend_schema_view(
     list=extend_schema(summary='List tags', tags=['Tags']),

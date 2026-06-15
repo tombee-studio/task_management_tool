@@ -17,7 +17,17 @@ class SignUpForm(UserCreationForm):
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['name', 'git_url']
+        fields = ['name', 'git_url', 'dev_branch', 'release_branch', 'main_branch']
+        widgets = {
+            'dev_branch': forms.TextInput(attrs={'placeholder': 'develop'}),
+            'release_branch': forms.TextInput(attrs={'placeholder': 'release'}),
+            'main_branch': forms.TextInput(attrs={'placeholder': 'main'}),
+        }
+        labels = {
+            'dev_branch': '開発ブランチ',
+            'release_branch': 'リリースブランチ',
+            'main_branch': 'メインブランチ',
+        }
 
 
 class TaskForm(forms.ModelForm):
@@ -77,7 +87,8 @@ class TaskForm(forms.ModelForm):
                 Q(status__is_done=False) | Q(status__isnull=True)
             ).order_by('-event_date')
         if project is not None:
-            self.fields['assignee'].queryset = project.participants.all()
+            automation_qs = User.objects.filter(username='Automation')
+            self.fields['assignee'].queryset = (project.participants.all() | automation_qs).distinct()
             self.fields['status'].queryset = Status.objects.filter(project=project)
         else:
             self.fields['assignee'].queryset = User.objects.all()

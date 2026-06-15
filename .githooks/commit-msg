@@ -11,7 +11,7 @@ Required format:
 Rules:
   kind        : Ftr | Fix | Eta
   first line  : ASCII only, <= 50 chars, summary starts with uppercase
-  detail lines: ASCII only, <= 50 chars each (optional)
+  detail lines: ASCII only, <= 80 chars each (optional)
   blank lines : blank line after first line, and before "Task:"
   task_id     : integer
 """
@@ -73,14 +73,14 @@ def main():
     if len(lines) < 3 or lines[-2].strip() != "":
         error("There must be at least one blank line before 'Task:'.")
 
-    # Detail lines: ASCII only, <= 50 chars
+    # Detail lines: ASCII only, <= 80 chars
     for i, line in enumerate(lines[1:-1], start=2):
         if not line:
             continue
         if not line.isascii():
             error(f"Line {i} must be ASCII only.\n  Got: {line!r}")
-        if len(line) > 50:
-            error(f"Line {i} must be 50 characters or less (currently {len(line)}).\n  Got: {line!r}")
+        if len(line) > 80:
+            error(f"Line {i} must be 80 characters or less (currently {len(line)}).\n  Got: {line!r}")
 
     # Rewrite plain Task line as Markdown link if not already done
     if re.match(r"^Task: \d+$", last):

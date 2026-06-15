@@ -2,6 +2,23 @@
 
 This file documents the standard workflow for implementing a task in this project.
 
+## Automation user workflow
+
+The system has a special Django user **Automation** (`username='Automation'`, `is_active=False`).
+
+**Trigger**: When a task's `assignee` is changed **to** Automation (not on task creation), a signal
+sends the task to an SQS queue, which launches the `claude-agent` ECS task automatically.
+
+**On completion**: After the agent commits and pushes, it sets the task status to `レビュー` (4)
+**and** restores `assignee` to the task's `reporter` field (the user who originally created the task).
+
+**reporter field**: The `reporter` FK on `Task` is set to `request.user` when a task is created via
+the web UI. It is exposed in the REST API (`TaskSerializer`) as a nullable field.
+
+**On error**: If the agent encounters an unresolvable error (e.g., tests fail, no files changed),
+it posts a comment on the task describing the error, **does not change the status**, and restores
+`assignee` to the `reporter`. The task is returned to the reporter for manual intervention.
+
 ## Workflow
 
 ### 1. Receive task
@@ -62,6 +79,17 @@ curl -s -X POST "${TOOL_API_URL}task_app/tasks/" \
 
 Work inside `django-app/`. Edit models, views, forms, DSL, templates, etc.
 
+While implementing, if you discover bugs, improvements, or technical debt **outside the scope of the current task**, file them as new tasks via the API:
+
+```bash
+eval "$(direnv export bash)"
+curl -s -X POST "${TOOL_API_URL}task_app/tasks/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "...", "description": "...", "project": <project_id>,
+       "assignee": <user_id>, "status": 1, "event": <event_id>}'
+```
+
 ### 5. Run tests
 
 Always use `task_management.test_settings` when running tests:
@@ -86,8 +114,8 @@ The `commit-msg` hook enforces the following format (all lines ASCII only):
 ```
 <kind>: <Summary starting with uppercase> #<task_id>
 
-- Detail line (50 chars max)
-- Detail line (50 chars max)
+- Detail line (80 chars max)
+- Detail line (80 chars max)
 
 Task: <task_id>
 ```
@@ -96,7 +124,7 @@ Rules:
 - `kind`: `Ftr` (feature) / `Fix` (bug fix) / `Eta` (eta/enhancement)
 - First line: ASCII only, 50 characters or fewer
 - Blank line after the first line
-- Detail lines: ASCII only, 50 characters or fewer each (optional)
+- Detail lines: ASCII only, 80 characters or fewer each (optional)
 - Blank line immediately before `Task:`
 - Last line: `Task: <task_id>` — the hook rewrites this to a Markdown link automatically
 
@@ -138,13 +166,49 @@ curl -s -X PATCH \
 
 マージ済み (status=12) への更新は GitHub Actions が develop へのマージ時に自動で行うため、手動での変更は不要。
 
-### 8. Push
+### 8. Push and create PR
 
 ```bash
 git push -u origin <branch>
 ```
 
 The pre-push hook runs all tests automatically before pushing.
+
+Then create a PR targeting `develop`, including `Task: <task_id>` in the PR body:
+
+```bash
+eval "$(direnv export bash)"
+gh pr create \
+  --base develop \
+  --title "<kind>: <Summary> #<task_id>" \
+  --body "$(cat <<'EOF'
+- Detail line
+
+Task: <task_id>
+EOF
+)"
+```
+
+### 9. Add PR link to task description
+
+After creating the PR, append a Markdown link to the task description:
+
+```bash
+eval "$(direnv export bash)"
+EXISTING=$(curl -s "${TOOL_API_URL}task_app/tasks/<task_id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" | python3 -c \
+  "import sys,json; print(json.load(sys.stdin).get('description',''))")
+
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<task_id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  --data-binary "$(python3 -c "
+import json, sys
+desc = sys.stdin.read()
+desc += '\n\n[PR #<pr_number>](https://github.com/<owner>/<repo>/pull/<pr_number>)'
+print(json.dumps({'description': desc}))
+" <<< "$EXISTING")"
+```
 
 ## API Reference
 
@@ -164,7 +228,7 @@ curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
 # 2. Branch
 git checkout -b feature/#<id>_<desc>
 
-# 3. Implement & test
+# 3. Implement & test (file any discovered issues as new tasks)
 make test
 
 # 4. Commit (use ★ task ID)
@@ -172,8 +236,22 @@ eval "$(direnv export bash)"
 git add <files>
 git commit -m "Ftr: <summary> #<id>\n\n- <detail>\n\nTask: <id>"
 
-# 5. Push
+# 5. Push and create PR (body must include Task: <id>)
 git push -u origin <branch>
+gh pr create --base develop --title "..." --body "...\n\nTask: <id>"
+
+# 6. Add PR link to task description
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"description": "<existing>\n\nPR: https://github.com/<owner>/<repo>/pull/<n>"}'
+
+# 6. Create PR (include Task: <id> in body)
+gh pr create --base develop --title "..." --body "...\n\nTask: <id>"
+
+# 7. Add PR link to task description (Markdown format)
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"description": "<existing>\n\n[PR #<n>](https://github.com/<owner>/<repo>/pull/<n>)"}'
 
 
 # -- Large task (with subtasks) --
@@ -182,7 +260,7 @@ git push -u origin <branch>
 # 3. Branch (one branch for ★, no branch per subtask)
 git checkout -b feature/#<★id>_<desc>
 
-# 4. For each subtask: implement, test, then commit with SUBTASK ID
+# 4. For each subtask: implement, test, commit with SUBTASK ID
 git commit -m "Ftr: <summary> #<subtask_id>\n\n...\n\nTask: <subtask_id>"
 
 # 5. After each subtask commit: set subtask status to レビュー
@@ -190,6 +268,14 @@ curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<subtask_id>/" \
   -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
   -d '{"status": 4}'
 
-# 6. Push when all subtasks are done
+# 6. Push and create PR with PARENT task ID in body
 git push -u origin <branch>
+
+# 7. Create PR with Task: <★id> in body
+gh pr create --base develop --title "..." --body "...\n\nTask: <★id>"
+
+# 8. Add PR link to parent task description (Markdown format)
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<★id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"description": "<existing>\n\n[PR #<n>](https://github.com/<owner>/<repo>/pull/<n>)"}'
 ```
