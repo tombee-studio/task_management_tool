@@ -106,10 +106,16 @@ def file_discovered_issues(client, task, context):
 
 
 def resolve_base_branch(project, github_repo):
-    """Return the branch PRs should target: project dev_branch, else GitHub default."""
+    """Return the branch PRs should target.
+
+    Priority: dev_branch → main_branch → GitHub API default_branch.
+    """
     dev = (project.get("dev_branch") or "").strip()
     if dev:
         return dev
+    main = (project.get("main_branch") or "").strip()
+    if main:
+        return main
     gh_headers = {
         "Authorization": f"token {GITHUB_PAT}",
         "Accept": "application/vnd.github.v3+json",
