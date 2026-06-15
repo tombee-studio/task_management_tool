@@ -62,6 +62,17 @@ curl -s -X POST "${TOOL_API_URL}task_app/tasks/" \
 
 Work inside `django-app/`. Edit models, views, forms, DSL, templates, etc.
 
+While implementing, if you discover bugs, improvements, or technical debt **outside the scope of the current task**, file them as new tasks via the API:
+
+```bash
+eval "$(direnv export bash)"
+curl -s -X POST "${TOOL_API_URL}task_app/tasks/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "...", "description": "...", "project": <project_id>,
+       "assignee": <user_id>, "status": 1, "event": <event_id>}'
+```
+
 ### 5. Run tests
 
 Always use `task_management.test_settings` when running tests:
@@ -200,7 +211,7 @@ curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
 # 2. Branch
 git checkout -b feature/#<id>_<desc>
 
-# 3. Implement & test
+# 3. Implement & test (file any discovered issues as new tasks)
 make test
 
 # 4. Commit (use ★ task ID)
@@ -208,8 +219,14 @@ eval "$(direnv export bash)"
 git add <files>
 git commit -m "Ftr: <summary> #<id>\n\n- <detail>\n\nTask: <id>"
 
-# 5. Push
+# 5. Push and create PR (body must include Task: <id>)
 git push -u origin <branch>
+gh pr create --base develop --title "..." --body "...\n\nTask: <id>"
+
+# 6. Add PR link to task description
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"description": "<existing>\n\nPR: https://github.com/<owner>/<repo>/pull/<n>"}'
 
 # 6. Create PR (include Task: <id> in body)
 gh pr create --base develop --title "..." --body "...\n\nTask: <id>"
@@ -226,7 +243,7 @@ curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
 # 3. Branch (one branch for ★, no branch per subtask)
 git checkout -b feature/#<★id>_<desc>
 
-# 4. For each subtask: implement, test, then commit with SUBTASK ID
+# 4. For each subtask: implement, test, commit with SUBTASK ID
 git commit -m "Ftr: <summary> #<subtask_id>\n\n...\n\nTask: <subtask_id>"
 
 # 5. After each subtask commit: set subtask status to レビュー
@@ -234,7 +251,7 @@ curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<subtask_id>/" \
   -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
   -d '{"status": 4}'
 
-# 6. Push when all subtasks are done
+# 6. Push and create PR with PARENT task ID in body
 git push -u origin <branch>
 
 # 7. Create PR with Task: <★id> in body

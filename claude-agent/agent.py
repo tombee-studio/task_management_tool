@@ -45,6 +45,95 @@ def api_patch(path, data):
     return resp.json()
 
 
+def api_post(path, data):
+    resp = requests.post(f"{TASK_API_URL}/{path}", headers=api_headers, json=data)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def file_discovered_issues(client, task, context):
+    """Ask Claude if it found any out-of-scope issues and file them as tasks."""
+    resp = client.messages.create(
+        model=MODEL,
+        max_tokens=1024,
+        messages=[{
+            "role": "user",
+            "content": (
+                f"You just implemented task #{task['id']}: {task['title']}.\n"
+                f"While reviewing this codebase, did you notice any bugs, improvements, "
+                f"or technical debt that are OUT OF SCOPE for this task?\n\n"
+                f"Codebase context:\n{context[:4000]}\n\n"
+                f"For each issue found, respond with:\n"
+                f"ISSUE: <short title under 100 chars>\n"
+                f"DETAIL: <description>\n\n"
+                f"If none found, respond with exactly: NONE"
+            ),
+        }],
+    )
+    text = resp.content[0].text.strip()
+    if text.upper() == "NONE":
+        return
+    pattern = re.compile(r"ISSUE:\s*(.+?)\nDETAIL:\s*(.+?)(?=\nISSUE:|$)", re.DOTALL)
+    for m in pattern.finditer(text):
+        title = m.group(1).strip()[:100]
+        detail = m.group(2).strip()
+        new_task = api_post("task_app/tasks/", {
+            "title": title,
+            "description": detail,
+            "project": task["project"],
+            "assignee": task.get("assignee"),
+            "status": 1,
+            "event": task.get("event"),
+        })
+        print(f"[agent] Filed issue task #{new_task['id']}: {title}")
+
+
+def create_pr(github_repo, branch, task_id, title, kind):
+    prefix = KIND_PREFIX.get(kind, "Ftr")
+    pr_resp = requests.post(
+        f"https://api.github.com/repos/{github_repo}/pulls",
+        headers={
+            "Authorization": f"token {GITHUB_PAT}",
+            "Accept": "application/vnd.github.v3+json",
+        },
+        json={
+            "title": f"{prefix}: {title[:60]} #{task_id}",
+            "head": branch,
+            "base": "develop",
+            "body": f"Task: {task_id}",
+        },
+    )
+    if pr_resp.status_code == 201:
+        print(f"[agent] PR created: {pr_resp.json()['html_url']}")
+        return pr_resp.json()
+    else:
+        print(f"[agent] PR creation failed: {pr_resp.status_code} {pr_resp.text}", file=sys.stderr)
+        return None
+
+
+def handle_last_subtask(parent_task, all_sibling_ids, github_repo, branch, kind):
+    """When all sibling subtasks are in レビュー, update parent description and create PR."""
+    parent_id = parent_task["id"]
+
+    # Fetch current status of all siblings (excluding current task, already set to レビュー)
+    siblings = [api_get(f"task_app/tasks/{sid}/") for sid in all_sibling_ids]
+    if not all(s["status"] == 4 for s in siblings):
+        print(f"[agent] Siblings not all reviewed yet — no parent PR.")
+        return
+
+    # Build implementation summary from subtask titles
+    subtask_lines = "\n".join(f"- #{s['id']}: {s['title']}" for s in siblings)
+    summary = f"## 対応内容\n\n{subtask_lines}\n- #{TASK_ID}: (current subtask)"
+
+    existing_desc = (parent_task.get("description") or "").strip()
+    new_desc = f"{existing_desc}\n\n---\n\n{summary}" if existing_desc else summary
+
+    api_patch(f"task_app/tasks/{parent_id}/", {"description": new_desc, "status": 4})
+    print(f"[agent] Updated parent task #{parent_id} description and set to review.")
+
+    create_pr(github_repo, branch, parent_id, parent_task["title"], kind)
+
+
 def run(cmd, cwd=None, check=True):
     return subprocess.run(cmd, cwd=cwd, check=check, text=True, capture_output=True)
 
@@ -128,17 +217,35 @@ def main():
     # 3. Update status -> 着手済み
     api_patch(f"task_app/tasks/{TASK_ID}/", {"status": 2})
 
-    # 4. Classify kind
-    kind = classify_kind(task, client)
-    branch = re.sub(r"[^a-z0-9_]", "_", f"{kind}/#{TASK_ID}_{task['title'].lower()}")[:60]
+    # 4. Determine branch — subtasks share the parent's branch
+    parent_task = None
+    sibling_ids = []
+    if task.get("parent"):
+        parent_task = api_get(f"task_app/tasks/{task['parent']}/")
+        kind = classify_kind(parent_task, client)
+        branch = re.sub(r"[^a-z0-9_]", "_",
+                        f"{kind}/#{parent_task['id']}_{parent_task['title'].lower()}")[:60]
+        commit_task_id = TASK_ID
+
+        # Collect sibling subtask IDs (to check completion later)
+        all_tasks = requests.get(f"{TASK_API_URL}/task_app/tasks/", headers=api_headers).json()
+        sibling_ids = [
+            t["id"] for t in all_tasks
+            if t.get("parent") == parent_task["id"] and t["id"] != TASK_ID
+        ]
+    else:
+        kind = classify_kind(task, client)
+        branch = re.sub(r"[^a-z0-9_]", "_", f"{kind}/#{TASK_ID}_{task['title'].lower()}")[:60]
+        commit_task_id = TASK_ID
     print(f"[agent] Branch: {branch}")
 
     with tempfile.TemporaryDirectory() as workdir:
-        # 5. Clone repo
+        # 5. Clone repo; checkout parent branch if it exists, else create it
         run(["git", "clone", github_remote, workdir])
         git(["config", "user.email", "claude-agent@example.com"], workdir)
         git(["config", "user.name", "Claude Agent"], workdir)
-        git(["checkout", "-b", branch], workdir)
+        if git(["checkout", branch], workdir).returncode != 0:
+            git(["checkout", "-b", branch], workdir)
 
         # 6. Read codebase context
         context_files = []
@@ -193,7 +300,10 @@ def main():
             print("[agent] No files changed — nothing to commit.", file=sys.stderr)
             return
 
-        # 9. Run tests
+        # 9. File discovered out-of-scope issues as new tasks
+        file_discovered_issues(client, task, context)
+
+        # 11. Run tests
         django_dir = os.path.join(workdir, "django-app")
         test_result = run(
             ["python", "manage.py", "test", "task_app", "event_app", "--verbosity=1"],
@@ -206,11 +316,11 @@ def main():
             sys.exit(1)
         print("[agent] Tests passed.")
 
-        # 10. Commit
+        # 12. Commit (subtasks use their own ID; small tasks use their ID)
         env_patch = {**os.environ, "DJANGO_SETTINGS_MODULE": "task_management.test_settings"}
         git(["add", "-A"], workdir)
         summary = task["title"][:44]
-        commit_msg = make_commit_message(kind, summary, TASK_ID)
+        commit_msg = make_commit_message(kind, summary, commit_task_id)
         subprocess.run(
             ["git", "commit", "-m", commit_msg],
             cwd=workdir,
@@ -218,26 +328,18 @@ def main():
             check=True,
         )
 
-        # 11. Push branch
-        git(["push", "origin", branch], workdir)
+        # 13. Push branch
+        git(["push", "-u", "origin", branch], workdir)
 
-        # 12. Merge to develop via GitHub API
-        merge_resp = requests.post(
-            f"https://api.github.com/repos/{github_repo}/merges",
-            headers={
-                "Authorization": f"token {GITHUB_PAT}",
-                "Accept": "application/vnd.github.v3+json",
-            },
-            json={"base": "develop", "head": branch, "commit_message": f"Merge {branch} into develop"},
-        )
-        if merge_resp.status_code in (201, 204):
-            print(f"[agent] Merged {branch} -> develop")
+        # 14. Update this task to レビュー
+        api_patch(f"task_app/tasks/{TASK_ID}/", {"status": 4})
+        print(f"[agent] Task #{TASK_ID} marked as review.")
+
+        # 15. PR creation — parent task PR after all subtasks done, else direct PR
+        if parent_task:
+            handle_last_subtask(parent_task, sibling_ids, github_repo, branch, kind)
         else:
-            print(f"[agent] Merge failed: {merge_resp.status_code} {merge_resp.text}", file=sys.stderr)
-
-        # 13. Update task status to merged
-        api_patch(f"task_app/tasks/{TASK_ID}/", {"status": TASK_STATUS_MERGE_ID})
-        print(f"[agent] Task #{TASK_ID} marked as merged.")
+            create_pr(github_repo, branch, TASK_ID, task["title"], kind)
 
 
 if __name__ == "__main__":
