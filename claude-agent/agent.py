@@ -155,8 +155,8 @@ def run(cmd, cwd=None, check=True):
     return subprocess.run(cmd, cwd=cwd, check=check, text=True, capture_output=True)
 
 
-def git(args, cwd):
-    return run(["git"] + args, cwd=cwd)
+def git(args, cwd, check=True):
+    return run(["git"] + args, cwd=cwd, check=check)
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ def main():
     if task.get("parent"):
         parent_task = api_get(f"task_app/tasks/{task['parent']}/")
         kind = classify_kind(parent_task, client)
-        branch = re.sub(r"[^a-z0-9_]", "_",
+        branch = re.sub(r"[^a-z0-9/_#-]", "_",
                         f"{kind}/#{parent_task['id']}_{parent_task['title'].lower()}")[:60]
         commit_task_id = TASK_ID
 
@@ -252,7 +252,7 @@ def main():
         ]
     else:
         kind = classify_kind(task, client)
-        branch = re.sub(r"[^a-z0-9_]", "_", f"{kind}/#{TASK_ID}_{task['title'].lower()}")[:60]
+        branch = re.sub(r"[^a-z0-9/_#-]", "_", f"{kind}/#{TASK_ID}_{task['title'].lower()}")[:60]
         commit_task_id = TASK_ID
     print(f"[agent] Branch: {branch}")
 
@@ -261,7 +261,7 @@ def main():
         run(["git", "clone", github_remote, workdir])
         git(["config", "user.email", "claude-agent@example.com"], workdir)
         git(["config", "user.name", "Claude Agent"], workdir)
-        if git(["checkout", branch], workdir).returncode != 0:
+        if git(["checkout", branch], workdir, check=False).returncode != 0:
             git(["checkout", "-b", branch], workdir)
 
         # 6. Read codebase context
@@ -335,6 +335,7 @@ def main():
 
         # 11. Run tests
         django_dir = os.path.join(workdir, "django-app")
+        run(["pip", "install", "-q", "-r", "requirements.txt"], cwd=django_dir, check=False)
         test_result = run(
             ["python", "manage.py", "test", "task_app", "event_app", "--verbosity=1"],
             cwd=django_dir,
