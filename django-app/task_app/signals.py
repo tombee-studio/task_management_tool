@@ -41,11 +41,15 @@ def create_user_preferences(sender, instance, created, **kwargs):
 def task_pre_save(sender, instance, **kwargs):
     if instance.pk:
         try:
-            instance._prev_assignee_id = Task.objects.get(pk=instance.pk).assignee_id
+            prev = Task.objects.get(pk=instance.pk)
+            instance._prev_assignee_id = prev.assignee_id
+            instance._prev_status_is_done = prev.status.is_done if prev.status_id else False
         except Task.DoesNotExist:
             instance._prev_assignee_id = None
+            instance._prev_status_is_done = False
     else:
         instance._prev_assignee_id = None
+        instance._prev_status_is_done = False
 
 
 @receiver(post_save, sender=Task)
@@ -54,6 +58,17 @@ def task_saved(sender, instance, created, **kwargs):
         process_task_rules(instance)
     except Exception:
         pass
+
+    # When status transitions to done and reporter is set, restore assignee to reporter
+    if not created and instance.reporter_id:
+        try:
+            current_is_done = instance.status.is_done if instance.status_id else False
+            prev_is_done = getattr(instance, '_prev_status_is_done', False)
+            if current_is_done and not prev_is_done:
+                Task.objects.filter(pk=instance.pk).update(assignee_id=instance.reporter_id)
+        except Exception:
+            pass
+
     if not created:
         try:
             automation = User.objects.filter(username='Automation').first()
