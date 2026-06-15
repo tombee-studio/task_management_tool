@@ -94,14 +94,17 @@ def file_discovered_issues(client, task, context):
     for m in pattern.finditer(text):
         title = m.group(1).strip()[:100]
         detail = m.group(2).strip()
-        new_task = api_post("task_app/tasks/", {
+        task_data = {
             "title": title,
             "description": detail,
             "project": task["project"],
-            "assignee": task.get("reporter"),
             "status": 1,
-            "event": task.get("event"),
-        })
+        }
+        if task.get("reporter"):
+            task_data["assignee"] = task["reporter"]
+        if task.get("event"):
+            task_data["event"] = task["event"]
+        new_task = api_post("task_app/tasks/", task_data)
         print(f"[agent] Filed issue task #{new_task['id']}: {title}")
 
 
