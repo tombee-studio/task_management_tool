@@ -51,6 +51,23 @@ def api_post(path, data):
     return resp.json()
 
 
+def post_error_comment(task, error_text):
+    """Post an error comment and restore assignee to reporter."""
+    try:
+        api_post("task_app/comments/", {
+            "author": task["assignee"],
+            "description": f"[Automation Error]\n\n{error_text}",
+            "task": task["id"],
+        })
+    except Exception as e:
+        print(f"[agent] Failed to post error comment: {e}", file=sys.stderr)
+    if task.get("reporter"):
+        try:
+            api_patch(f"task_app/tasks/{task['id']}/", {"assignee": task["reporter"]})
+        except Exception as e:
+            print(f"[agent] Failed to restore assignee: {e}", file=sys.stderr)
+
+
 def file_discovered_issues(client, task, context):
     """Ask Claude if it found any out-of-scope issues and file them as tasks."""
     resp = client.messages.create(
@@ -310,6 +327,7 @@ def main():
 
         if not changed_files:
             print("[agent] No files changed — nothing to commit.", file=sys.stderr)
+            post_error_comment(task, "No files were changed. The agent could not determine what to implement.")
             return
 
         # 9. File discovered out-of-scope issues as new tasks
@@ -324,7 +342,11 @@ def main():
         )
         if test_result.returncode != 0:
             print("[agent] Tests failed:\n", test_result.stdout, test_result.stderr, file=sys.stderr)
-            api_patch(f"task_app/tasks/{TASK_ID}/", {"progress_summary": "Tests failed"})
+            error_text = (
+                f"Tests failed. The agent could not complete the implementation.\n\n"
+                f"```\n{test_result.stdout[-2000:]}\n{test_result.stderr[-1000:]}\n```"
+            )
+            post_error_comment(task, error_text)
             sys.exit(1)
         print("[agent] Tests passed.")
 

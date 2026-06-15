@@ -15,6 +15,10 @@ sends the task to an SQS queue, which launches the `claude-agent` ECS task autom
 **reporter field**: The `reporter` FK on `Task` is set to `request.user` when a task is created via
 the web UI. It is exposed in the REST API (`TaskSerializer`) as a nullable field.
 
+**On error**: If the agent encounters an unresolvable error (e.g., tests fail, no files changed),
+it posts a comment on the task describing the error, **does not change the status**, and restores
+`assignee` to the `reporter`. The task is returned to the reporter for manual intervention.
+
 ## Workflow
 
 ### 1. Receive task
