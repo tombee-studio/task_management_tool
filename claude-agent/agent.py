@@ -98,15 +98,27 @@ def file_discovered_issues(client, task, context):
             "title": title,
             "description": detail,
             "project": task["project"],
-            "assignee": task.get("assignee"),
+            "assignee": task.get("reporter"),
             "status": 1,
             "event": task.get("event"),
         })
         print(f"[agent] Filed issue task #{new_task['id']}: {title}")
 
 
+def get_default_branch(github_repo):
+    gh_headers = {
+        "Authorization": f"token {GITHUB_PAT}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    resp = requests.get(f"https://api.github.com/repos/{github_repo}", headers=gh_headers)
+    if resp.ok:
+        return resp.json().get("default_branch", "main")
+    return "main"
+
+
 def create_pr(github_repo, branch, task_id, title, kind):
     prefix = KIND_PREFIX.get(kind, "Ftr")
+    base = get_default_branch(github_repo)
     pr_resp = requests.post(
         f"https://api.github.com/repos/{github_repo}/pulls",
         headers={
@@ -116,7 +128,7 @@ def create_pr(github_repo, branch, task_id, title, kind):
         json={
             "title": f"{prefix}: {title[:60]} #{task_id}",
             "head": branch,
-            "base": "develop",
+            "base": base,
             "body": f"Task: {task_id}",
         },
     )
