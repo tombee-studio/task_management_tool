@@ -77,7 +77,8 @@ class TaskForm(forms.ModelForm):
                 Q(status__is_done=False) | Q(status__isnull=True)
             ).order_by('-event_date')
         if project is not None:
-            self.fields['assignee'].queryset = project.participants.all()
+            automation_qs = User.objects.filter(username='Automation')
+            self.fields['assignee'].queryset = (project.participants.all() | automation_qs).distinct()
             self.fields['status'].queryset = Status.objects.filter(project=project)
         else:
             self.fields['assignee'].queryset = User.objects.all()
