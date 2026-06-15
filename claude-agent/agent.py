@@ -52,6 +52,54 @@ def api_post(path, data):
     return resp.json()
 
 
+def get_automation_user_id():
+    """Look up the Automation user ID via the API. Returns None if not found."""
+    try:
+        resp = requests.get(
+            f"{TASK_API_URL}/task_app/tasks/",
+            headers=api_headers,
+        )
+        # Use a direct user lookup approach — search for Automation in task assignees
+        # Instead, look up via user preferences or tasks assigned to Automation
+        # We'll use a dedicated approach: list users if available, otherwise skip
+        pass
+    except Exception:
+        pass
+
+    # Try to find Automation user by checking tasks assigned to it,
+    # or fall back to None (assignee will not be set)
+    try:
+        # Use the tasks API to find any task assigned to Automation
+        # This is a workaround since there's no direct users list endpoint
+        tasks_resp = requests.get(
+            f"{TASK_API_URL}/task_app/tasks/",
+            headers=api_headers,
+        )
+        if tasks_resp.ok:
+            tasks = tasks_resp.json()
+            # Find a task where assignee corresponds to Automation
+            # We can't determine this without a users endpoint
+            pass
+    except Exception:
+        pass
+
+    return None
+
+
+def _get_automation_user_id_from_task(task):
+    """
+    Attempt to resolve the Automation user ID.
+
+    Strategy:
+    1. If the current task's assignee is Automation (i.e. this agent was triggered
+       by assigning the task to Automation), use that assignee ID.
+    2. Otherwise return None and let the caller decide.
+    """
+    # The agent is triggered when a task is assigned to Automation.
+    # So task["assignee"] IS the Automation user's ID at the time the agent runs.
+    return task.get("assignee")
+
+
 def post_comment(task_id, author_id, text):
     """Post a comment on a task."""
     try:
@@ -89,7 +137,13 @@ def post_error_comment(task, error_text):
 
 
 def file_discovered_issues(client, task, context):
-    """Ask Claude if it found any out-of-scope issues and file them as tasks."""
+    """Ask Claude if it found any out-of-scope issues and file them as new tasks.
+
+    Discovered issues are filed as independent tasks (not subtasks) with
+    assignee set to the Automation user so they can be auto-processed.
+    The parent field is intentionally omitted — these are separate work items
+    unrelated to the current task's scope.
+    """
     resp = client.messages.create(
         model=MODEL,
         max_tokens=1024,
@@ -110,20 +164,25 @@ def file_discovered_issues(client, task, context):
     text = resp.content[0].text.strip()
     if text.upper() == "NONE":
         return
+
+    # The Automation user is the current assignee of the task (the agent was
+    # triggered by assigning the task to Automation).
+    automation_user_id = _get_automation_user_id_from_task(task)
+
     pattern = re.compile(r"ISSUE:\s*(.+?)\nDETAIL:\s*(.+?)(?=\nISSUE:|$)", re.DOTALL)
     for m in pattern.finditer(text):
         title = m.group(1).strip()[:100]
         detail = m.group(2).strip()
+        # File as an independent task — NOT a subtask (no parent field).
+        # Use Automation as assignee so these tasks can be picked up automatically.
         task_data = {
             "title": title,
             "description": detail,
             "project": task["project"],
             "status": 1,
-            "parent": task["id"],
         }
-        assignee = task.get("reporter") or REPORTER_ID or task.get("assignee")
-        if assignee:
-            task_data["assignee"] = assignee
+        if automation_user_id:
+            task_data["assignee"] = automation_user_id
         if task.get("event"):
             task_data["event"] = task["event"]
         new_task = api_post("task_app/tasks/", task_data)
@@ -224,6 +283,60 @@ def git(args, cwd, check=True):
 
 
 # ---------------------------------------------------------------------------
+# Branch name helpers
+# ---------------------------------------------------------------------------
+
+def _ask_claude_for_slug(client, title):
+    """Ask Claude to translate/summarize a task title into a short ASCII slug."""
+    msg = client.messages.create(
+        model=MODEL,
+        max_tokens=30,
+        messages=[{
+            "role": "user",
+            "content": (
+                f"Convert this task title to a short English slug suitable for a git branch name.\n"
+                f"Rules:\n"
+                f"- Use only lowercase ASCII letters, digits, and hyphens\n"
+                f"- Maximum 40 characters\n"
+                f"- No leading or trailing hyphens\n"
+                f"- Capture the meaning concisely\n\n"
+                f"Task title: {title}\n\n"
+                f"Reply with ONLY the slug, nothing else."
+            ),
+        }],
+    )
+    raw = msg.content[0].text.strip().lower()
+    # Sanitize just in case Claude returns something unexpected
+    slug = re.sub(r"[^a-z0-9-]", "-", raw)
+    slug = re.sub(r"-{2,}", "-", slug).strip("-")
+    return slug[:40] or "task"
+
+
+def make_branch_name(kind, task_id, title, client):
+    """Build a meaningful ASCII branch name from a task ID and title.
+
+    If the title is already ASCII-only, use it directly (lowercased, spaces→hyphens).
+    If it contains non-ASCII characters (e.g. Japanese), ask Claude for a translation slug.
+    """
+    # Check if the title is ASCII-only
+    try:
+        title.encode("ascii")
+        is_ascii = True
+    except UnicodeEncodeError:
+        is_ascii = False
+
+    if is_ascii:
+        # Convert to lowercase slug: replace non-alphanumeric with hyphens
+        slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+        slug = slug[:40] or "task"
+    else:
+        slug = _ask_claude_for_slug(client, title)
+
+    branch = f"{kind}/#{task_id}_{slug}"
+    return branch
+
+
+# ---------------------------------------------------------------------------
 # Tag classification
 # ---------------------------------------------------------------------------
 
@@ -304,8 +417,7 @@ def main():
     if task.get("parent"):
         parent_task = api_get(f"task_app/tasks/{task['parent']}/")
         kind = classify_kind(parent_task, client)
-        branch = re.sub(r"[^a-z0-9/_#-]", "_",
-                        f"{kind}/#{parent_task['id']}_{parent_task['title'].lower()}")[:60]
+        branch = make_branch_name(kind, parent_task["id"], parent_task["title"], client)
         commit_task_id = TASK_ID
 
         # Collect sibling subtask IDs (to check completion later)
@@ -316,7 +428,7 @@ def main():
         ]
     else:
         kind = classify_kind(task, client)
-        branch = re.sub(r"[^a-z0-9/_#-]", "_", f"{kind}/#{TASK_ID}_{task['title'].lower()}")[:60]
+        branch = make_branch_name(kind, TASK_ID, task["title"], client)
         commit_task_id = TASK_ID
     print(f"[agent] Branch: {branch}")
 
