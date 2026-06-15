@@ -52,6 +52,25 @@ def api_post(path, data):
     return resp.json()
 
 
+def post_comment(task_id, author_id, text):
+    """Post a comment on a task."""
+    try:
+        api_post("task_app/comments/", {
+            "author": author_id,
+            "description": text,
+            "task": task_id,
+        })
+        print(f"[agent] Posted comment on task #{task_id}.")
+    except Exception as e:
+        print(f"[agent] Failed to post comment on task #{task_id}: {e}", file=sys.stderr)
+
+
+def post_commit_comment(task_id, commit_sha, github_repo, author_id):
+    """Post commit link as a comment on the task."""
+    commit_url = f"https://github.com/{github_repo}/commit/{commit_sha}"
+    post_comment(task_id, author_id, f"対応コミット: [{commit_sha[:8]}]({commit_url})")
+
+
 def post_error_comment(task, error_text):
     """Post an error comment and restore assignee to reporter."""
     try:
@@ -131,9 +150,13 @@ def resolve_base_branch(project, github_repo):
     return "main"
 
 
-def create_pr(github_repo, branch, task_id, title, kind, project):
+def create_pr(github_repo, branch, task_id, title, kind, project, subtask_lines=None):
     prefix = KIND_PREFIX.get(kind, "Ftr")
     base = resolve_base_branch(project, github_repo)
+    body_parts = []
+    if subtask_lines:
+        body_parts.append(subtask_lines)
+    body_parts.append(f"Task: {task_id}")
     pr_resp = requests.post(
         f"https://api.github.com/repos/{github_repo}/pulls",
         headers={
@@ -144,18 +167,28 @@ def create_pr(github_repo, branch, task_id, title, kind, project):
             "title": f"{prefix}: {title[:60]} #{task_id}",
             "head": branch,
             "base": base,
-            "body": f"Task: {task_id}",
+            "body": "\n\n".join(body_parts),
         },
     )
     if pr_resp.status_code == 201:
-        print(f"[agent] PR created: {pr_resp.json()['html_url']}")
-        return pr_resp.json()
+        pr_data = pr_resp.json()
+        pr_url = pr_data["html_url"]
+        pr_number = pr_data["number"]
+        print(f"[agent] PR created: {pr_url}")
+        # Add PR link (Markdown) to task description
+        task_data = api_get(f"task_app/tasks/{task_id}/")
+        existing_desc = (task_data.get("description") or "").strip()
+        pr_link = f"[PR #{pr_number}]({pr_url})"
+        new_desc = f"{existing_desc}\n\n{pr_link}" if existing_desc else pr_link
+        api_patch(f"task_app/tasks/{task_id}/", {"description": new_desc})
+        print(f"[agent] Added PR link to task #{task_id} description.")
+        return pr_data
     else:
         print(f"[agent] PR creation failed: {pr_resp.status_code} {pr_resp.text}", file=sys.stderr)
         return None
 
 
-def handle_last_subtask(parent_task, all_sibling_ids, github_repo, branch, kind, project):
+def handle_last_subtask(parent_task, all_sibling_ids, github_repo, branch, kind, project, author_id):
     """When all sibling subtasks are in レビュー, update parent description and create PR."""
     parent_id = parent_task["id"]
 
@@ -166,16 +199,19 @@ def handle_last_subtask(parent_task, all_sibling_ids, github_repo, branch, kind,
         return
 
     # Build implementation summary from subtask titles
-    subtask_lines = "\n".join(f"- #{s['id']}: {s['title']}" for s in siblings)
-    summary = f"## 対応内容\n\n{subtask_lines}\n- #{TASK_ID}: (current subtask)"
+    sibling_lines = "\n".join(f"- #{s['id']}: {s['title']}" for s in siblings)
+    subtask_summary = f"## 対応内容\n\n{sibling_lines}\n- #{TASK_ID}: (current subtask)"
 
     existing_desc = (parent_task.get("description") or "").strip()
-    new_desc = f"{existing_desc}\n\n---\n\n{summary}" if existing_desc else summary
+    new_desc = f"{existing_desc}\n\n---\n\n{subtask_summary}" if existing_desc else subtask_summary
 
     api_patch(f"task_app/tasks/{parent_id}/", {"description": new_desc, "status": 4})
     print(f"[agent] Updated parent task #{parent_id} description and set to review.")
 
-    create_pr(github_repo, branch, parent_id, parent_task["title"], kind, project)
+    pr_data = create_pr(github_repo, branch, parent_id, parent_task["title"], kind, project,
+                        subtask_lines=subtask_summary)
+    if pr_data:
+        post_comment(parent_id, author_id, "対応が完了しました。")
 
 
 def run(cmd, cwd=None, check=True):
@@ -393,6 +429,9 @@ def main():
             check=True,
         )
 
+        # Get commit SHA before push for comments
+        commit_sha = git(["rev-parse", "HEAD"], workdir).stdout.strip()
+
         # 13. Push branch
         git(["push", "-u", "origin", branch], workdir)
 
@@ -403,9 +442,14 @@ def main():
         api_patch(f"task_app/tasks/{TASK_ID}/", review_patch)
         print(f"[agent] Task #{TASK_ID} marked as review.")
 
-        # 15. PR creation — parent task PR after all subtasks done, else direct PR
+        # 15. Post commit link and completion comment on current task
+        automation_user = task["assignee"]
+        post_commit_comment(TASK_ID, commit_sha, github_repo, automation_user)
+        post_comment(TASK_ID, automation_user, "対応が完了しました。")
+
+        # 16. PR creation — parent task PR after all subtasks done, else direct PR
         if parent_task:
-            handle_last_subtask(parent_task, sibling_ids, github_repo, branch, kind, project)
+            handle_last_subtask(parent_task, sibling_ids, github_repo, branch, kind, project, automation_user)
         else:
             create_pr(github_repo, branch, TASK_ID, task["title"], kind, project)
 
