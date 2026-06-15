@@ -114,8 +114,8 @@ The `commit-msg` hook enforces the following format (all lines ASCII only):
 ```
 <kind>: <Summary starting with uppercase> #<task_id>
 
-- Detail line (50 chars max)
-- Detail line (50 chars max)
+- Detail line (80 chars max)
+- Detail line (80 chars max)
 
 Task: <task_id>
 ```
@@ -124,7 +124,7 @@ Rules:
 - `kind`: `Ftr` (feature) / `Fix` (bug fix) / `Eta` (eta/enhancement)
 - First line: ASCII only, 50 characters or fewer
 - Blank line after the first line
-- Detail lines: ASCII only, 50 characters or fewer each (optional)
+- Detail lines: ASCII only, 80 characters or fewer each (optional)
 - Blank line immediately before `Task:`
 - Last line: `Task: <task_id>` — the hook rewrites this to a Markdown link automatically
 
