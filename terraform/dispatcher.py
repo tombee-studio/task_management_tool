@@ -13,8 +13,6 @@ ecs = boto3.client("ecs")
 def handler(event, context):
     cluster = os.environ["ECS_CLUSTER"]
     task_def = os.environ["ECS_TASK_DEFINITION"]
-    subnets = os.environ["ECS_SUBNET_IDS"].split(",")
-    sg = os.environ["ECS_SECURITY_GROUP"]
 
     secret_env = [
         {"name": "ANTHROPIC_API_KEY", "value": os.environ["ANTHROPIC_API_KEY"]},
@@ -39,8 +37,8 @@ def handler(event, context):
             ],
             networkConfiguration={
                 "awsvpcConfiguration": {
-                    "subnets": subnets,
-                    "securityGroups": [sg],
+                    "subnets": [],
+                    "securityGroups": [],
                     "assignPublicIp": "ENABLED",
                 }
             },
