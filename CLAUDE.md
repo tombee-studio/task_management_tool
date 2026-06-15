@@ -149,7 +149,7 @@ curl -s -X PATCH \
 
 マージ済み (status=12) への更新は GitHub Actions が develop へのマージ時に自動で行うため、手動での変更は不要。
 
-### 8. Push and create Pull Request
+### 8. Push and create PR
 
 ```bash
 git push -u origin <branch>
@@ -157,13 +157,15 @@ git push -u origin <branch>
 
 The pre-push hook runs all tests automatically before pushing.
 
-After pushing, create a Pull Request targeting `develop`. The PR description must include `Task: <task_id>` (use the parent task ID for large tasks).
+Then create a PR targeting `develop`, including `Task: <task_id>` in the PR body:
 
 ```bash
-gh pr create --base develop --title "<kind>: <summary> #<task_id>" \
+eval "$(direnv export bash)"
+gh pr create \
+  --base develop \
+  --title "<kind>: <Summary> #<task_id>" \
   --body "$(cat <<'EOF'
-## Summary
-- ...
+- Detail line
 
 Task: <task_id>
 EOF
@@ -172,18 +174,24 @@ EOF
 
 ### 9. Add PR link to task description
 
-After the PR is created, paste the PR URL into the task's `description` field so the task management tool links back to the implementation:
+After creating the PR, append a Markdown link to the task description:
 
 ```bash
 eval "$(direnv export bash)"
-curl -s -X PATCH \
-  "${TOOL_API_URL}task_app/tasks/<task_id>/" \
+EXISTING=$(curl -s "${TOOL_API_URL}task_app/tasks/<task_id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" | python3 -c \
+  "import sys,json; print(json.load(sys.stdin).get('description',''))")
+
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<task_id>/" \
   -H "X-API-Key: ${TOOL_API_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"description": "<existing description>\n\nPR: https://github.com/<owner>/<repo>/pull/<pr_number>"}'
+  --data-binary "$(python3 -c "
+import json, sys
+desc = sys.stdin.read()
+desc += '\n\n[PR #<pr_number>](https://github.com/<owner>/<repo>/pull/<pr_number>)'
+print(json.dumps({'description': desc}))
+" <<< "$EXISTING")"
 ```
-
-For large tasks, update the **parent task** description with the PR link.
 
 ## API Reference
 
@@ -220,6 +228,14 @@ curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
   -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
   -d '{"description": "<existing>\n\nPR: https://github.com/<owner>/<repo>/pull/<n>"}'
 
+# 6. Create PR (include Task: <id> in body)
+gh pr create --base develop --title "..." --body "...\n\nTask: <id>"
+
+# 7. Add PR link to task description (Markdown format)
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"description": "<existing>\n\n[PR #<n>](https://github.com/<owner>/<repo>/pull/<n>)"}'
+
 
 # -- Large task (with subtasks) --
 # 1. Set status to 着手済み
@@ -237,10 +253,12 @@ curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<subtask_id>/" \
 
 # 6. Push and create PR with PARENT task ID in body
 git push -u origin <branch>
+
+# 7. Create PR with Task: <★id> in body
 gh pr create --base develop --title "..." --body "...\n\nTask: <★id>"
 
-# 7. Add PR link to PARENT task description
+# 8. Add PR link to parent task description (Markdown format)
 curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<★id>/" \
   -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
-  -d '{"description": "<existing>\n\nPR: https://github.com/<owner>/<repo>/pull/<n>"}'
+  -d '{"description": "<existing>\n\n[PR #<n>](https://github.com/<owner>/<repo>/pull/<n>)"}'
 ```
