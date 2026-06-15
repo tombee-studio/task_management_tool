@@ -263,11 +263,23 @@ def main():
 
         context = "\n\n".join(context_files[:60])  # cap to avoid token overflow
 
-        # 7. Ask Claude to implement
+        # 7a. Fetch task comments
+        comments_resp = requests.get(
+            f"{TASK_API_URL}/task_app/comments/",
+            headers=api_headers,
+            params={"task": TASK_ID},
+        )
+        comments = comments_resp.json() if comments_resp.ok else []
+        comments_text = "\n".join(
+            f"[Comment #{c['id']}] {c['description']}" for c in comments
+        ) if comments else "(no comments)"
+
+        # 7b. Ask Claude to implement
         prompt = (
             f"You are an expert Django developer working on the task-management project.\n\n"
             f"Task #{TASK_ID}: {task['title']}\n"
             f"Description:\n{task['description']}\n\n"
+            f"Comments on this task:\n{comments_text}\n\n"
             f"CLAUDE.md workflow is in the repo. Follow it.\n\n"
             f"Here is the relevant codebase:\n{context}\n\n"
             f"Provide the complete content of each file you need to create or modify. "
@@ -331,8 +343,11 @@ def main():
         # 13. Push branch
         git(["push", "-u", "origin", branch], workdir)
 
-        # 14. Update this task to レビュー
-        api_patch(f"task_app/tasks/{TASK_ID}/", {"status": 4})
+        # 14. Update this task to レビュー and restore assignee to reporter
+        review_patch = {"status": 4}
+        if task.get("reporter"):
+            review_patch["assignee"] = task["reporter"]
+        api_patch(f"task_app/tasks/{TASK_ID}/", review_patch)
         print(f"[agent] Task #{TASK_ID} marked as review.")
 
         # 15. PR creation — parent task PR after all subtasks done, else direct PR
