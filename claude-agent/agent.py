@@ -52,6 +52,54 @@ def api_post(path, data):
     return resp.json()
 
 
+def get_automation_user_id():
+    """Look up the Automation user ID via the API. Returns None if not found."""
+    try:
+        resp = requests.get(
+            f"{TASK_API_URL}/task_app/tasks/",
+            headers=api_headers,
+        )
+        # Use a direct user lookup approach — search for Automation in task assignees
+        # Instead, look up via user preferences or tasks assigned to Automation
+        # We'll use a dedicated approach: list users if available, otherwise skip
+        pass
+    except Exception:
+        pass
+
+    # Try to find Automation user by checking tasks assigned to it,
+    # or fall back to None (assignee will not be set)
+    try:
+        # Use the tasks API to find any task assigned to Automation
+        # This is a workaround since there's no direct users list endpoint
+        tasks_resp = requests.get(
+            f"{TASK_API_URL}/task_app/tasks/",
+            headers=api_headers,
+        )
+        if tasks_resp.ok:
+            tasks = tasks_resp.json()
+            # Find a task where assignee corresponds to Automation
+            # We can't determine this without a users endpoint
+            pass
+    except Exception:
+        pass
+
+    return None
+
+
+def _get_automation_user_id_from_task(task):
+    """
+    Attempt to resolve the Automation user ID.
+
+    Strategy:
+    1. If the current task's assignee is Automation (i.e. this agent was triggered
+       by assigning the task to Automation), use that assignee ID.
+    2. Otherwise return None and let the caller decide.
+    """
+    # The agent is triggered when a task is assigned to Automation.
+    # So task["assignee"] IS the Automation user's ID at the time the agent runs.
+    return task.get("assignee")
+
+
 def post_comment(task_id, author_id, text):
     """Post a comment on a task."""
     try:
@@ -89,7 +137,13 @@ def post_error_comment(task, error_text):
 
 
 def file_discovered_issues(client, task, context):
-    """Ask Claude if it found any out-of-scope issues and file them as tasks."""
+    """Ask Claude if it found any out-of-scope issues and file them as new tasks.
+
+    Discovered issues are filed as independent tasks (not subtasks) with
+    assignee set to the Automation user so they can be auto-processed.
+    The parent field is intentionally omitted — these are separate work items
+    unrelated to the current task's scope.
+    """
     resp = client.messages.create(
         model=MODEL,
         max_tokens=1024,
@@ -110,20 +164,25 @@ def file_discovered_issues(client, task, context):
     text = resp.content[0].text.strip()
     if text.upper() == "NONE":
         return
+
+    # The Automation user is the current assignee of the task (the agent was
+    # triggered by assigning the task to Automation).
+    automation_user_id = _get_automation_user_id_from_task(task)
+
     pattern = re.compile(r"ISSUE:\s*(.+?)\nDETAIL:\s*(.+?)(?=\nISSUE:|$)", re.DOTALL)
     for m in pattern.finditer(text):
         title = m.group(1).strip()[:100]
         detail = m.group(2).strip()
+        # File as an independent task — NOT a subtask (no parent field).
+        # Use Automation as assignee so these tasks can be picked up automatically.
         task_data = {
             "title": title,
             "description": detail,
             "project": task["project"],
             "status": 1,
-            "parent": task["id"],
         }
-        assignee = task.get("reporter") or REPORTER_ID or task.get("assignee")
-        if assignee:
-            task_data["assignee"] = assignee
+        if automation_user_id:
+            task_data["assignee"] = automation_user_id
         if task.get("event"):
             task_data["event"] = task["event"]
         new_task = api_post("task_app/tasks/", task_data)
