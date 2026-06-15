@@ -5,7 +5,7 @@ from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from django.utils import timezone
-from .models import Task, Comment, UserPreferences
+from .models import Task, Comment, UserPreferences, Project
 from .rules import process_task_rules
 
 
@@ -64,6 +64,13 @@ def task_saved(sender, instance, created, **kwargs):
                 _send_task_to_sqs(instance.pk, reporter_id=prev_id)
         except Exception:
             pass
+
+
+@receiver(post_save, sender=Project)
+def add_automation_to_project(sender, instance, created, **kwargs):
+    automation = User.objects.filter(username='Automation').first()
+    if automation:
+        instance.participants.add(automation)
 
 
 @receiver(post_save, sender=Comment)
