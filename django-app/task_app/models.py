@@ -9,7 +9,7 @@ class Project(models.Model):
   updated_at = models.DateTimeField(auto_now=True)
   name = models.CharField(max_length=256, null=False, blank=False)
   git_url = models.URLField(null=True, blank=True)
-  dev_branch = models.CharField(max_length=100, default='develop', blank=True)
+  dev_branch = models.CharField(max_length=100, default='', blank=True)
   release_branch = models.CharField(max_length=100, default='', blank=True)
   main_branch = models.CharField(max_length=100, default='main', blank=True)
   history = AuditlogHistoryField()
