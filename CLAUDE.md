@@ -62,6 +62,17 @@ curl -s -X POST "${TOOL_API_URL}task_app/tasks/" \
 
 Work inside `django-app/`. Edit models, views, forms, DSL, templates, etc.
 
+While implementing, if you discover bugs, improvements, or technical debt **outside the scope of the current task**, file them as new tasks via the API:
+
+```bash
+eval "$(direnv export bash)"
+curl -s -X POST "${TOOL_API_URL}task_app/tasks/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "...", "description": "...", "project": <project_id>,
+       "assignee": <user_id>, "status": 1, "event": <event_id>}'
+```
+
 ### 5. Run tests
 
 Always use `task_management.test_settings` when running tests:
@@ -138,13 +149,45 @@ curl -s -X PATCH \
 
 マージ済み (status=12) への更新は GitHub Actions が develop へのマージ時に自動で行うため、手動での変更は不要。
 
-### 8. Push
+### 8. After all subtasks — update parent task description
+
+After all subtasks are in レビュー status, write an implementation summary to the **parent task's** `description` field:
+
+```bash
+eval "$(direnv export bash)"
+curl -s -X PATCH \
+  "${TOOL_API_URL}task_app/tasks/<parent_task_id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"description": "<existing description>\n\n---\n\n## 対応内容\n\n- #<subtask_id>: ...\n- #<subtask_id>: ...", "status": 4}'
+```
+
+### 9. Push and create Pull Request
 
 ```bash
 git push -u origin <branch>
 ```
 
 The pre-push hook runs all tests automatically before pushing.
+
+After pushing, create a Pull Request targeting `develop`. The PR **description must include `Task: <task_id>`**:
+
+- Small task: `Task: <★ task_id>`
+- Large task: `Task: <parent_task_id>`
+
+```bash
+gh pr create \
+  --base develop \
+  --title "<kind>: <summary> #<task_id>" \
+  --body "$(cat <<'EOF'
+## Summary
+
+- ...
+
+Task: <task_id>
+EOF
+)"
+```
 
 ## API Reference
 
@@ -164,7 +207,7 @@ curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
 # 2. Branch
 git checkout -b feature/#<id>_<desc>
 
-# 3. Implement & test
+# 3. Implement & test (file any discovered issues as new tasks)
 make test
 
 # 4. Commit (use ★ task ID)
@@ -172,8 +215,14 @@ eval "$(direnv export bash)"
 git add <files>
 git commit -m "Ftr: <summary> #<id>\n\n- <detail>\n\nTask: <id>"
 
-# 5. Push
+# 5. Set status to レビュー
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"status": 4}'
+
+# 6. Push and create PR (body must include Task: <id>)
 git push -u origin <branch>
+gh pr create --base develop --title "..." --body "...\n\nTask: <id>"
 
 
 # -- Large task (with subtasks) --
@@ -182,7 +231,7 @@ git push -u origin <branch>
 # 3. Branch (one branch for ★, no branch per subtask)
 git checkout -b feature/#<★id>_<desc>
 
-# 4. For each subtask: implement, test, then commit with SUBTASK ID
+# 4. For each subtask: implement, test, commit with SUBTASK ID
 git commit -m "Ftr: <summary> #<subtask_id>\n\n...\n\nTask: <subtask_id>"
 
 # 5. After each subtask commit: set subtask status to レビュー
@@ -190,6 +239,12 @@ curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<subtask_id>/" \
   -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
   -d '{"status": 4}'
 
-# 6. Push when all subtasks are done
+# 6. After ALL subtasks reviewed: update parent description then set to レビュー
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<★id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"description": "...\n\n## 対応内容\n\n- #<sub>: ...", "status": 4}'
+
+# 7. Push and create PR with parent task ID in body
 git push -u origin <branch>
+gh pr create --base develop --title "..." --body "...\n\nTask: <★id>"
 ```
