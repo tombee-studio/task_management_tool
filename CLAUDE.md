@@ -2,6 +2,19 @@
 
 This file documents the standard workflow for implementing a task in this project.
 
+## Automation user workflow
+
+The system has a special Django user **Automation** (`username='Automation'`, `is_active=False`).
+
+**Trigger**: When a task's `assignee` is changed **to** Automation (not on task creation), a signal
+sends the task to an SQS queue, which launches the `claude-agent` ECS task automatically.
+
+**On completion**: After the agent commits and pushes, it sets the task status to `レビュー` (4)
+**and** restores `assignee` to the task's `reporter` field (the user who originally created the task).
+
+**reporter field**: The `reporter` FK on `Task` is set to `request.user` when a task is created via
+the web UI. It is exposed in the REST API (`TaskSerializer`) as a nullable field.
+
 ## Workflow
 
 ### 1. Receive task
