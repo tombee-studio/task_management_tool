@@ -204,7 +204,7 @@ def make_commit_message(kind, summary, task_id, details=None):
     lines = [first, ""]
     if details:
         for d in details:
-            lines.append(f"- {d[:48]}")
+            lines.append(f"- {d[:78]}")
     lines += ["", f"Task: {task_id}"]
     return "\n".join(lines)
 
