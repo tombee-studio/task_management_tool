@@ -138,13 +138,49 @@ curl -s -X PATCH \
 
 マージ済み (status=12) への更新は GitHub Actions が develop へのマージ時に自動で行うため、手動での変更は不要。
 
-### 8. Push
+### 8. Push and create PR
 
 ```bash
 git push -u origin <branch>
 ```
 
 The pre-push hook runs all tests automatically before pushing.
+
+Then create a PR targeting `develop`, including `Task: <task_id>` in the PR body:
+
+```bash
+eval "$(direnv export bash)"
+gh pr create \
+  --base develop \
+  --title "<kind>: <Summary> #<task_id>" \
+  --body "$(cat <<'EOF'
+- Detail line
+
+Task: <task_id>
+EOF
+)"
+```
+
+### 9. Add PR link to task description
+
+After creating the PR, append a Markdown link to the task description:
+
+```bash
+eval "$(direnv export bash)"
+EXISTING=$(curl -s "${TOOL_API_URL}task_app/tasks/<task_id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" | python3 -c \
+  "import sys,json; print(json.load(sys.stdin).get('description',''))")
+
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<task_id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  --data-binary "$(python3 -c "
+import json, sys
+desc = sys.stdin.read()
+desc += '\n\n[PR #<pr_number>](https://github.com/<owner>/<repo>/pull/<pr_number>)'
+print(json.dumps({'description': desc}))
+" <<< "$EXISTING")"
+```
 
 ## API Reference
 
@@ -175,6 +211,14 @@ git commit -m "Ftr: <summary> #<id>\n\n- <detail>\n\nTask: <id>"
 # 5. Push
 git push -u origin <branch>
 
+# 6. Create PR (include Task: <id> in body)
+gh pr create --base develop --title "..." --body "...\n\nTask: <id>"
+
+# 7. Add PR link to task description (Markdown format)
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"description": "<existing>\n\n[PR #<n>](https://github.com/<owner>/<repo>/pull/<n>)"}'
+
 
 # -- Large task (with subtasks) --
 # 1. Set status to 着手済み
@@ -192,4 +236,12 @@ curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<subtask_id>/" \
 
 # 6. Push when all subtasks are done
 git push -u origin <branch>
+
+# 7. Create PR with Task: <★id> in body
+gh pr create --base develop --title "..." --body "...\n\nTask: <★id>"
+
+# 8. Add PR link to parent task description (Markdown format)
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<★id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"description": "<existing>\n\n[PR #<n>](https://github.com/<owner>/<repo>/pull/<n>)"}'
 ```
