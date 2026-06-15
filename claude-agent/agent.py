@@ -105,7 +105,11 @@ def file_discovered_issues(client, task, context):
         print(f"[agent] Filed issue task #{new_task['id']}: {title}")
 
 
-def get_default_branch(github_repo):
+def resolve_base_branch(project, github_repo):
+    """Return the branch PRs should target: project dev_branch, else GitHub default."""
+    dev = (project.get("dev_branch") or "").strip()
+    if dev:
+        return dev
     gh_headers = {
         "Authorization": f"token {GITHUB_PAT}",
         "Accept": "application/vnd.github.v3+json",
@@ -116,9 +120,9 @@ def get_default_branch(github_repo):
     return "main"
 
 
-def create_pr(github_repo, branch, task_id, title, kind):
+def create_pr(github_repo, branch, task_id, title, kind, project):
     prefix = KIND_PREFIX.get(kind, "Ftr")
-    base = get_default_branch(github_repo)
+    base = resolve_base_branch(project, github_repo)
     pr_resp = requests.post(
         f"https://api.github.com/repos/{github_repo}/pulls",
         headers={
@@ -140,7 +144,7 @@ def create_pr(github_repo, branch, task_id, title, kind):
         return None
 
 
-def handle_last_subtask(parent_task, all_sibling_ids, github_repo, branch, kind):
+def handle_last_subtask(parent_task, all_sibling_ids, github_repo, branch, kind, project):
     """When all sibling subtasks are in レビュー, update parent description and create PR."""
     parent_id = parent_task["id"]
 
@@ -160,7 +164,7 @@ def handle_last_subtask(parent_task, all_sibling_ids, github_repo, branch, kind)
     api_patch(f"task_app/tasks/{parent_id}/", {"description": new_desc, "status": 4})
     print(f"[agent] Updated parent task #{parent_id} description and set to review.")
 
-    create_pr(github_repo, branch, parent_id, parent_task["title"], kind)
+    create_pr(github_repo, branch, parent_id, parent_task["title"], kind, project)
 
 
 def run(cmd, cwd=None, check=True):
@@ -390,9 +394,9 @@ def main():
 
         # 15. PR creation — parent task PR after all subtasks done, else direct PR
         if parent_task:
-            handle_last_subtask(parent_task, sibling_ids, github_repo, branch, kind)
+            handle_last_subtask(parent_task, sibling_ids, github_repo, branch, kind, project)
         else:
-            create_pr(github_repo, branch, TASK_ID, task["title"], kind)
+            create_pr(github_repo, branch, TASK_ID, task["title"], kind, project)
 
 
 if __name__ == "__main__":
