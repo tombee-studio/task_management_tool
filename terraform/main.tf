@@ -299,6 +299,20 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
+resource "aws_iam_role_policy" "lambda_sqs_send" {
+  name = "${local.name}-lambda-sqs-send"
+  role = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["sqs:SendMessage"]
+      Resource = aws_sqs_queue.task_automation.arn
+    }]
+  })
+}
+
 # -----------------------------
 # Lambda Functions
 # -----------------------------
