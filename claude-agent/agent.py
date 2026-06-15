@@ -111,6 +111,29 @@ def create_pr(github_repo, branch, task_id, title, kind):
         return None
 
 
+def handle_last_subtask(parent_task, all_sibling_ids, github_repo, branch, kind):
+    """When all sibling subtasks are in レビュー, update parent description and create PR."""
+    parent_id = parent_task["id"]
+
+    # Fetch current status of all siblings (excluding current task, already set to レビュー)
+    siblings = [api_get(f"task_app/tasks/{sid}/") for sid in all_sibling_ids]
+    if not all(s["status"] == 4 for s in siblings):
+        print(f"[agent] Siblings not all reviewed yet — no parent PR.")
+        return
+
+    # Build implementation summary from subtask titles
+    subtask_lines = "\n".join(f"- #{s['id']}: {s['title']}" for s in siblings)
+    summary = f"## 対応内容\n\n{subtask_lines}\n- #{TASK_ID}: (current subtask)"
+
+    existing_desc = (parent_task.get("description") or "").strip()
+    new_desc = f"{existing_desc}\n\n---\n\n{summary}" if existing_desc else summary
+
+    api_patch(f"task_app/tasks/{parent_id}/", {"description": new_desc, "status": 4})
+    print(f"[agent] Updated parent task #{parent_id} description and set to review.")
+
+    create_pr(github_repo, branch, parent_id, parent_task["title"], kind)
+
+
 def run(cmd, cwd=None, check=True):
     return subprocess.run(cmd, cwd=cwd, check=check, text=True, capture_output=True)
 
@@ -194,17 +217,35 @@ def main():
     # 3. Update status -> 着手済み
     api_patch(f"task_app/tasks/{TASK_ID}/", {"status": 2})
 
-    # 4. Classify kind
-    kind = classify_kind(task, client)
-    branch = re.sub(r"[^a-z0-9_]", "_", f"{kind}/#{TASK_ID}_{task['title'].lower()}")[:60]
+    # 4. Determine branch — subtasks share the parent's branch
+    parent_task = None
+    sibling_ids = []
+    if task.get("parent"):
+        parent_task = api_get(f"task_app/tasks/{task['parent']}/")
+        kind = classify_kind(parent_task, client)
+        branch = re.sub(r"[^a-z0-9_]", "_",
+                        f"{kind}/#{parent_task['id']}_{parent_task['title'].lower()}")[:60]
+        commit_task_id = TASK_ID
+
+        # Collect sibling subtask IDs (to check completion later)
+        all_tasks = requests.get(f"{TASK_API_URL}/task_app/tasks/", headers=api_headers).json()
+        sibling_ids = [
+            t["id"] for t in all_tasks
+            if t.get("parent") == parent_task["id"] and t["id"] != TASK_ID
+        ]
+    else:
+        kind = classify_kind(task, client)
+        branch = re.sub(r"[^a-z0-9_]", "_", f"{kind}/#{TASK_ID}_{task['title'].lower()}")[:60]
+        commit_task_id = TASK_ID
     print(f"[agent] Branch: {branch}")
 
     with tempfile.TemporaryDirectory() as workdir:
-        # 5. Clone repo
+        # 5. Clone repo; checkout parent branch if it exists, else create it
         run(["git", "clone", github_remote, workdir])
         git(["config", "user.email", "claude-agent@example.com"], workdir)
         git(["config", "user.name", "Claude Agent"], workdir)
-        git(["checkout", "-b", branch], workdir)
+        if git(["checkout", branch], workdir).returncode != 0:
+            git(["checkout", "-b", branch], workdir)
 
         # 6. Read codebase context
         context_files = []
@@ -275,11 +316,11 @@ def main():
             sys.exit(1)
         print("[agent] Tests passed.")
 
-        # 12. Commit
+        # 12. Commit (subtasks use their own ID; small tasks use their ID)
         env_patch = {**os.environ, "DJANGO_SETTINGS_MODULE": "task_management.test_settings"}
         git(["add", "-A"], workdir)
         summary = task["title"][:44]
-        commit_msg = make_commit_message(kind, summary, TASK_ID)
+        commit_msg = make_commit_message(kind, summary, commit_task_id)
         subprocess.run(
             ["git", "commit", "-m", commit_msg],
             cwd=workdir,
@@ -288,14 +329,17 @@ def main():
         )
 
         # 13. Push branch
-        git(["push", "origin", branch], workdir)
+        git(["push", "-u", "origin", branch], workdir)
 
-        # 14. Create PR -> develop
-        create_pr(github_repo, branch, TASK_ID, task["title"], kind)
-
-        # 15. Update task status to レビュー
+        # 14. Update this task to レビュー
         api_patch(f"task_app/tasks/{TASK_ID}/", {"status": 4})
         print(f"[agent] Task #{TASK_ID} marked as review.")
+
+        # 15. PR creation — parent task PR after all subtasks done, else direct PR
+        if parent_task:
+            handle_last_subtask(parent_task, sibling_ids, github_repo, branch, kind)
+        else:
+            create_pr(github_repo, branch, TASK_ID, task["title"], kind)
 
 
 if __name__ == "__main__":
