@@ -72,6 +72,13 @@ class Task(models.Model):
       settings.AUTH_USER_MODEL,
       on_delete=models.CASCADE
   )
+  reporter = models.ForeignKey(
+      settings.AUTH_USER_MODEL,
+      on_delete=models.SET_NULL,
+      null=True,
+      blank=True,
+      related_name='reported_tasks',
+  )
   parent = models.ForeignKey(
       "Task",
       on_delete=models.CASCADE,

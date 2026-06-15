@@ -431,6 +431,7 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
                 form.instance.parent = parent_task
                 form.instance.project = parent_task.project
 
+        form.instance.reporter = self.request.user
         form.instance.completed_at = timezone.now() \
             if form.instance.status.is_done else None
         self.object = form.save()
