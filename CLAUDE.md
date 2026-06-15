@@ -149,20 +149,7 @@ curl -s -X PATCH \
 
 マージ済み (status=12) への更新は GitHub Actions が develop へのマージ時に自動で行うため、手動での変更は不要。
 
-### 8. After all subtasks — update parent task description
-
-After all subtasks are in レビュー status, write an implementation summary to the **parent task's** `description` field:
-
-```bash
-eval "$(direnv export bash)"
-curl -s -X PATCH \
-  "${TOOL_API_URL}task_app/tasks/<parent_task_id>/" \
-  -H "X-API-Key: ${TOOL_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"description": "<existing description>\n\n---\n\n## 対応内容\n\n- #<subtask_id>: ...\n- #<subtask_id>: ...", "status": 4}'
-```
-
-### 9. Push and create Pull Request
+### 8. Push and create Pull Request
 
 ```bash
 git push -u origin <branch>
@@ -170,24 +157,33 @@ git push -u origin <branch>
 
 The pre-push hook runs all tests automatically before pushing.
 
-After pushing, create a Pull Request targeting `develop`. The PR **description must include `Task: <task_id>`**:
-
-- Small task: `Task: <★ task_id>`
-- Large task: `Task: <parent_task_id>`
+After pushing, create a Pull Request targeting `develop`. The PR description must include `Task: <task_id>` (use the parent task ID for large tasks).
 
 ```bash
-gh pr create \
-  --base develop \
-  --title "<kind>: <summary> #<task_id>" \
+gh pr create --base develop --title "<kind>: <summary> #<task_id>" \
   --body "$(cat <<'EOF'
 ## Summary
-
 - ...
 
 Task: <task_id>
 EOF
 )"
 ```
+
+### 9. Add PR link to task description
+
+After the PR is created, paste the PR URL into the task's `description` field so the task management tool links back to the implementation:
+
+```bash
+eval "$(direnv export bash)"
+curl -s -X PATCH \
+  "${TOOL_API_URL}task_app/tasks/<task_id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"description": "<existing description>\n\nPR: https://github.com/<owner>/<repo>/pull/<pr_number>"}'
+```
+
+For large tasks, update the **parent task** description with the PR link.
 
 ## API Reference
 
@@ -215,14 +211,14 @@ eval "$(direnv export bash)"
 git add <files>
 git commit -m "Ftr: <summary> #<id>\n\n- <detail>\n\nTask: <id>"
 
-# 5. Set status to レビュー
-curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
-  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
-  -d '{"status": 4}'
-
-# 6. Push and create PR (body must include Task: <id>)
+# 5. Push and create PR (body must include Task: <id>)
 git push -u origin <branch>
 gh pr create --base develop --title "..." --body "...\n\nTask: <id>"
+
+# 6. Add PR link to task description
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"description": "<existing>\n\nPR: https://github.com/<owner>/<repo>/pull/<n>"}'
 
 
 # -- Large task (with subtasks) --
@@ -239,12 +235,12 @@ curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<subtask_id>/" \
   -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
   -d '{"status": 4}'
 
-# 6. After ALL subtasks reviewed: update parent description then set to レビュー
-curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<★id>/" \
-  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
-  -d '{"description": "...\n\n## 対応内容\n\n- #<sub>: ...", "status": 4}'
-
-# 7. Push and create PR with parent task ID in body
+# 6. Push and create PR with PARENT task ID in body
 git push -u origin <branch>
 gh pr create --base develop --title "..." --body "...\n\nTask: <★id>"
+
+# 7. Add PR link to PARENT task description
+curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<★id>/" \
+  -H "X-API-Key: ${TOOL_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"description": "<existing>\n\nPR: https://github.com/<owner>/<repo>/pull/<n>"}'
 ```
