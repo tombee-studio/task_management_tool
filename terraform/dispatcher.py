@@ -25,6 +25,11 @@ def handler(event, context):
     for record in event.get("Records", []):
         body = json.loads(record["body"])
         task_id = body["task_id"]
+        reporter_id = body.get("reporter_id")
+
+        dynamic_env = [{"name": "TASK_ID", "value": str(task_id)}]
+        if reporter_id:
+            dynamic_env.append({"name": "REPORTER_ID", "value": str(reporter_id)})
 
         ecs.run_task(
             cluster=cluster,
@@ -42,9 +47,7 @@ def handler(event, context):
             overrides={
                 "containerOverrides": [{
                     "name": "claude-agent",
-                    "environment": secret_env + [
-                        {"name": "TASK_ID", "value": str(task_id)},
-                    ],
+                    "environment": secret_env + dynamic_env,
                 }]
             },
         )

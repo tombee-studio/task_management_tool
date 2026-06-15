@@ -25,6 +25,7 @@ TASK_API_KEY = os.environ["TASK_API_KEY"]
 TASK_STATUS_MERGE_ID = int(os.environ.get("TASK_STAUS_MERGE_ID", "12"))
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 GITHUB_PAT = os.environ["GITHUB_PAT"]
+REPORTER_ID = int(os.environ["REPORTER_ID"]) if os.environ.get("REPORTER_ID") else None
 MODEL = "claude-sonnet-4-6"
 
 api_headers = {"X-API-Key": TASK_API_KEY, "Content-Type": "application/json"}
@@ -100,8 +101,9 @@ def file_discovered_issues(client, task, context):
             "project": task["project"],
             "status": 1,
         }
-        if task.get("reporter"):
-            task_data["assignee"] = task["reporter"]
+        assignee = task.get("reporter") or REPORTER_ID or task.get("assignee")
+        if assignee:
+            task_data["assignee"] = assignee
         if task.get("event"):
             task_data["event"] = task["event"]
         new_task = api_post("task_app/tasks/", task_data)
