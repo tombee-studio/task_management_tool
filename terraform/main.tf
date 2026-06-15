@@ -722,7 +722,7 @@ resource "aws_iam_role_policy" "dispatcher_ecs_run" {
       {
         Effect   = "Allow"
         Action   = ["ecs:RunTask"]
-        Resource = aws_ecs_task_definition.claude_agent.arn
+        Resource = "${aws_ecs_task_definition.claude_agent.arn_without_revision}:*"
       },
       {
         Effect   = "Allow"
