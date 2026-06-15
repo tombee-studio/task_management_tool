@@ -8,7 +8,7 @@ User = get_user_model()
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
-        fields = ['id', 'name', 'git_url', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'git_url', 'dev_branch', 'release_branch', 'main_branch', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 

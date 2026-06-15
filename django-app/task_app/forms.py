@@ -17,7 +17,17 @@ class SignUpForm(UserCreationForm):
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['name', 'git_url']
+        fields = ['name', 'git_url', 'dev_branch', 'release_branch', 'main_branch']
+        widgets = {
+            'dev_branch': forms.TextInput(attrs={'placeholder': 'develop'}),
+            'release_branch': forms.TextInput(attrs={'placeholder': 'release'}),
+            'main_branch': forms.TextInput(attrs={'placeholder': 'main'}),
+        }
+        labels = {
+            'dev_branch': '開発ブランチ',
+            'release_branch': 'リリースブランチ',
+            'main_branch': 'メインブランチ',
+        }
 
 
 class TaskForm(forms.ModelForm):
