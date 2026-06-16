@@ -79,16 +79,9 @@ curl -s -X POST "${TOOL_API_URL}task_app/tasks/" \
 
 Work inside `django-app/`. Edit models, views, forms, DSL, templates, etc.
 
-While implementing, if you discover bugs, improvements, or technical debt **outside the scope of the current task**, file them as new tasks via the API:
-
-```bash
-eval "$(direnv export bash)"
-curl -s -X POST "${TOOL_API_URL}task_app/tasks/" \
-  -H "X-API-Key: ${TOOL_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"title": "...", "description": "...", "project": <project_id>,
-       "assignee": <user_id>, "status": 1, "event": <event_id>}'
-```
+Stay within the scope of the received task (★) or subtask. Do not file new tasks for
+out-of-scope issues discovered along the way — mention them in a comment on the
+current task instead, and let the reporter decide whether to create a follow-up.
 
 ### 5. Run tests
 
@@ -228,7 +221,7 @@ curl -s -X PATCH "${TOOL_API_URL}task_app/tasks/<id>/" \
 # 2. Branch
 git checkout -b feature/#<id>_<desc>
 
-# 3. Implement & test (file any discovered issues as new tasks)
+# 3. Implement & test (stay in scope; no new tasks for out-of-scope issues)
 make test
 
 # 4. Commit (use ★ task ID)
