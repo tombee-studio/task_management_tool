@@ -10,6 +10,7 @@
 //   PARENT  <child> -> <parent>      set hierarchy   (future)
 //   ASSIGN  <id>   TO <username>     set assignee
 //   EVENT   <task_id> <event_id>     link task to event
+//   DELETE  <task_id>                delete a task
 
 start : statement*
 
@@ -18,6 +19,7 @@ start : statement*
            | parent_stmt
            | assign_stmt
            | event_stmt
+           | delete_stmt
 
 // LINK 1 -> 2
 // Mirrors Cypher's CREATE (a)-[:RELATES]->(b) but concise
@@ -38,6 +40,10 @@ assign_stmt : "ASSIGN"i INTEGER "TO"i name_or_string
 // EVENT 1 2
 // Link task 1 to event 2
 event_stmt  : "EVENT"i  INTEGER INTEGER
+
+// DELETE 1
+// Delete task 1
+delete_stmt : "DELETE"i INTEGER
 
 // Values may be bare identifiers or double-quoted strings
 name_or_string : NAME | ESCAPED_STRING
