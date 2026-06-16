@@ -33,14 +33,6 @@ variable "stage" {
   default = "dev"
 }
 
-variable "vpc_id" {
-  type = string
-}
-
-variable "private_subnet_ids" {
-  type = list(string)
-}
-
 variable "db_name" {
   type    = string
   default = "djangoapp"
@@ -115,22 +107,16 @@ variable "task_status_merge_id" {
   default = 12
 }
 
-variable "create_sqs_vpc_endpoint" {
-  type    = bool
-  default = true
-}
-
-variable "sqs_vpce_sg_id" {
-  type    = string
-  default = ""
+variable "private_subnet_ids" {
+  type        = list(string)
+  description = "List of subnet IDs for ECS Fargate tasks"
+  default     = []
 }
 
 locals {
   name      = "${var.project}-${var.stage}"
   db_port   = 5432
   image_uri = "${aws_ecr_repository.app.repository_url}:${var.image_tag}"
-
-  effective_sqs_vpce_sg_id = var.create_sqs_vpc_endpoint ? aws_security_group.vpc_endpoint[0].id : var.sqs_vpce_sg_id
 }
 
 # -----------------------------
@@ -146,67 +132,12 @@ resource "aws_ecr_repository" "app" {
 }
 
 # -----------------------------
-# Security Groups
-# -----------------------------
-
-resource "aws_security_group" "lambda" {
-  name        = "${local.name}-lambda-sg"
-  description = "Security group for Django Lambda"
-  vpc_id      = var.vpc_id
-}
-
-resource "aws_security_group" "rds" {
-  name        = "${local.name}-rds-sg"
-  description = "Security group for RDS"
-  vpc_id      = var.vpc_id
-}
-
-# Lambda -> VPC Endpoints (SQS etc.)
-resource "aws_vpc_security_group_egress_rule" "lambda_to_vpce" {
-  security_group_id            = aws_security_group.lambda.id
-  referenced_security_group_id = local.effective_sqs_vpce_sg_id
-  ip_protocol                  = "tcp"
-  from_port                    = 443
-  to_port                      = 443
-  description                  = "Allow Lambda to reach VPC endpoints"
-}
-
-# Lambda -> RDS
-resource "aws_vpc_security_group_egress_rule" "lambda_to_rds" {
-  security_group_id = aws_security_group.lambda.id
-
-  referenced_security_group_id = aws_security_group.rds.id
-  ip_protocol                  = "tcp"
-  from_port                    = local.db_port
-  to_port                      = local.db_port
-
-  description = "Allow Lambda to connect to RDS"
-}
-
-# RDS <- Lambda
-resource "aws_vpc_security_group_ingress_rule" "rds_from_lambda" {
-  security_group_id = aws_security_group.rds.id
-
-  referenced_security_group_id = aws_security_group.lambda.id
-  ip_protocol                  = "tcp"
-  from_port                    = local.db_port
-  to_port                      = local.db_port
-
-  description = "Allow RDS to receive traffic from Lambda"
-}
-
-# -----------------------------
 # RDS
 # -----------------------------
 
 resource "random_password" "db" {
   length  = 32
   special = false
-}
-
-resource "aws_db_subnet_group" "db" {
-  name       = "${local.name}-db-subnet-group"
-  subnet_ids = var.private_subnet_ids
 }
 
 resource "aws_db_instance" "db" {
@@ -224,10 +155,7 @@ resource "aws_db_instance" "db" {
   username = var.db_username
   password = random_password.db.result
 
-  db_subnet_group_name   = aws_db_subnet_group.db.name
-  vpc_security_group_ids = [aws_security_group.rds.id]
-
-  publicly_accessible = false
+  publicly_accessible = true
 
   backup_retention_period = 1
 
@@ -235,10 +163,6 @@ resource "aws_db_instance" "db" {
   deletion_protection = false
   skip_final_snapshot = true
 }
-
-# -----------------------------
-# Lambda IAM Role
-# -----------------------------
 
 # -----------------------------
 # SQS — task automation queue
@@ -294,11 +218,6 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_vpc" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-}
-
 resource "aws_iam_role_policy" "lambda_sqs_send" {
   name = "${local.name}-lambda-sqs-send"
   role = aws_iam_role.lambda.id
@@ -329,17 +248,12 @@ resource "aws_lambda_function" "web" {
 
   architectures = ["arm64"]
 
-  vpc_config {
-    subnet_ids         = var.private_subnet_ids
-    security_group_ids = [aws_security_group.lambda.id]
-  }
-
   environment {
     variables = {
       DJANGO_SETTINGS_MODULE = "task_management.settings"
       DJANGO_SECRET_KEY      = var.django_secret_key
       ALLOWED_HOSTS          = trimspace(var.allowed_hosts) != "" ? var.allowed_hosts : "${aws_api_gateway_rest_api.api.id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
-      DEBUG          = var.debug_mode
+      DEBUG                  = var.debug_mode
 
       DB_NAME       = var.db_name
       DB_USER       = var.db_username
@@ -353,7 +267,6 @@ resource "aws_lambda_function" "web" {
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic,
-    aws_iam_role_policy_attachment.lambda_vpc,
   ]
 }
 
@@ -373,17 +286,12 @@ resource "aws_lambda_function" "migrate" {
     command = ["migrate_handler.handler"]
   }
 
-  vpc_config {
-    subnet_ids         = var.private_subnet_ids
-    security_group_ids = [aws_security_group.lambda.id]
-  }
-
   environment {
     variables = {
       DJANGO_SETTINGS_MODULE = "task_management.settings"
       DJANGO_SECRET_KEY      = var.django_secret_key
       ALLOWED_HOSTS          = trimspace(var.allowed_hosts) != "" ? var.allowed_hosts : "${aws_api_gateway_rest_api.api.id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
-      DEBUG          = var.debug_mode
+      DEBUG                  = var.debug_mode
 
       DB_NAME     = var.db_name
       DB_USER     = var.db_username
@@ -396,7 +304,6 @@ resource "aws_lambda_function" "migrate" {
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic,
-    aws_iam_role_policy_attachment.lambda_vpc,
   ]
 }
 
@@ -415,22 +322,17 @@ resource "aws_lambda_function" "createsuperuser" {
     command = ["createsuperuser_handler.handler"]
   }
 
-  vpc_config {
-    subnet_ids         = var.private_subnet_ids
-    security_group_ids = [aws_security_group.lambda.id]
-  }
-
   environment {
     variables = {
       DJANGO_SETTINGS_MODULE = "task_management.settings"
-      DJANGO_SECRET_KEY = var.django_secret_key
-      ALLOWED_HOSTS = trimspace(var.allowed_hosts) != "" ? var.allowed_hosts : "${aws_api_gateway_rest_api.api.id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
+      DJANGO_SECRET_KEY      = var.django_secret_key
+      ALLOWED_HOSTS          = trimspace(var.allowed_hosts) != "" ? var.allowed_hosts : "${aws_api_gateway_rest_api.api.id}.execute-api.${data.aws_region.current.region}.amazonaws.com"
 
-      DB_NAME = var.db_name
-      DB_USER = var.db_username
+      DB_NAME     = var.db_name
+      DB_USER     = var.db_username
       DB_PASSWORD = random_password.db.result
-      DB_HOST = aws_db_instance.db.address
-      DB_PORT = tostring(local.db_port)
+      DB_HOST     = aws_db_instance.db.address
+      DB_PORT     = tostring(local.db_port)
       DB_SSL_USE  = var.db_ssl_use
 
       DJANGO_SUPERUSER_USERNAME = var.superuser_username
@@ -441,7 +343,6 @@ resource "aws_lambda_function" "createsuperuser" {
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic,
-    aws_iam_role_policy_attachment.lambda_vpc,
   ]
 }
 
@@ -532,37 +433,6 @@ resource "aws_api_gateway_stage" "api" {
 }
 
 # -----------------------------
-# VPC Endpoints
-# -----------------------------
-
-resource "aws_security_group" "vpc_endpoint" {
-  count       = var.create_sqs_vpc_endpoint ? 1 : 0
-  name        = "${local.name}-vpce-sg"
-  description = "Security group for VPC endpoints"
-  vpc_id      = var.vpc_id
-}
-
-resource "aws_vpc_endpoint" "sqs" {
-  count               = var.create_sqs_vpc_endpoint ? 1 : 0
-  vpc_id              = var.vpc_id
-  service_name        = "com.amazonaws.${var.aws_region}.sqs"
-  vpc_endpoint_type   = "Interface"
-  subnet_ids          = var.private_subnet_ids
-  security_group_ids  = [aws_security_group.vpc_endpoint[0].id]
-  private_dns_enabled = true
-}
-
-# Each env adds its own Lambda SG as allowed ingress on the shared VPCE SG
-resource "aws_vpc_security_group_ingress_rule" "vpce_from_lambda" {
-  security_group_id            = local.effective_sqs_vpce_sg_id
-  referenced_security_group_id = aws_security_group.lambda.id
-  ip_protocol                  = "tcp"
-  from_port                    = 443
-  to_port                      = 443
-  description                  = "Allow ${local.name} Lambda to reach VPC endpoints"
-}
-
-# -----------------------------
 # ECR — claude-agent image
 # -----------------------------
 
@@ -632,21 +502,6 @@ resource "aws_iam_role_policy" "ecs_task_sqs" {
   })
 }
 
-resource "aws_security_group" "ecs_agent" {
-  name        = "${local.name}-ecs-agent-sg"
-  description = "ECS claude-agent outbound only"
-  vpc_id      = var.vpc_id
-}
-
-resource "aws_vpc_security_group_egress_rule" "ecs_agent_https" {
-  security_group_id = aws_security_group.ecs_agent.id
-  cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol       = "tcp"
-  from_port         = 443
-  to_port           = 443
-  description       = "HTTPS outbound for Claude API and GitHub"
-}
-
 resource "aws_cloudwatch_log_group" "ecs_agent" {
   name              = "/ecs/${local.name}-claude-agent"
   retention_in_days = 7
@@ -672,8 +527,8 @@ resource "aws_ecs_task_definition" "claude_agent" {
     essential = true
 
     environment = [
-      { name = "TASK_API_URL",    value = var.task_api_url },
-      { name = "TASK_API_KEY",    value = var.task_api_key },
+      { name = "TASK_API_URL",        value = var.task_api_url },
+      { name = "TASK_API_KEY",        value = var.task_api_key },
       { name = "TASK_STAUS_MERGE_ID", value = tostring(var.task_status_merge_id) },
     ]
 
@@ -725,8 +580,8 @@ resource "aws_iam_role_policy" "dispatcher_ecs_run" {
         Resource = "${aws_ecs_task_definition.claude_agent.arn_without_revision}:*"
       },
       {
-        Effect   = "Allow"
-        Action   = ["iam:PassRole"]
+        Effect = "Allow"
+        Action = ["iam:PassRole"]
         Resource = [
           aws_iam_role.ecs_task_execution.arn,
           aws_iam_role.ecs_task.arn,
@@ -751,13 +606,12 @@ resource "aws_lambda_function" "dispatcher" {
 
   environment {
     variables = {
-      ECS_CLUSTER          = aws_ecs_cluster.agent.arn
-      ECS_TASK_DEFINITION  = aws_ecs_task_definition.claude_agent.arn
-      ECS_SUBNET_IDS       = join(",", var.private_subnet_ids)
-      ECS_SECURITY_GROUP   = aws_security_group.ecs_agent.id
-      ANTHROPIC_API_KEY    = var.anthropic_api_key
-      GITHUB_PAT           = var.github_pat
-      TASK_API_KEY         = var.task_api_key
+      ECS_CLUSTER         = aws_ecs_cluster.agent.arn
+      ECS_TASK_DEFINITION = aws_ecs_task_definition.claude_agent.arn
+      ANTHROPIC_API_KEY   = var.anthropic_api_key
+      GITHUB_PAT          = var.github_pat
+      TASK_API_KEY        = var.task_api_key
+      PRIVATE_SUBNET_IDS  = join(",", var.private_subnet_ids)
     }
   }
 }
