@@ -13,8 +13,11 @@ ecs = boto3.client("ecs")
 def handler(event, context):
     cluster = os.environ["ECS_CLUSTER"]
     task_def = os.environ["ECS_TASK_DEFINITION"]
-    subnets = os.environ["ECS_SUBNET_IDS"].split(",")
-    sg = os.environ["ECS_SECURITY_GROUP"]
+
+    # Subnet IDs are required for Fargate tasks running in awsvpc network mode.
+    # They are passed as a comma-separated string from the Lambda environment.
+    raw_subnets = os.environ.get("PRIVATE_SUBNET_IDS", "")
+    subnets = [s.strip() for s in raw_subnets.split(",") if s.strip()]
 
     secret_env = [
         {"name": "ANTHROPIC_API_KEY", "value": os.environ["ANTHROPIC_API_KEY"]},
@@ -40,7 +43,7 @@ def handler(event, context):
             networkConfiguration={
                 "awsvpcConfiguration": {
                     "subnets": subnets,
-                    "securityGroups": [sg],
+                    "securityGroups": [],
                     "assignPublicIp": "ENABLED",
                 }
             },
