@@ -109,8 +109,13 @@ variable "task_status_merge_id" {
 
 variable "private_subnet_ids" {
   type        = list(string)
-  description = "List of subnet IDs for ECS Fargate tasks"
+  description = "List of subnet IDs for ECS Fargate tasks and the RDS subnet group"
   default     = []
+}
+
+variable "vpc_id" {
+  type        = string
+  description = "VPC ID that the RDS subnet group's subnets belong to"
 }
 
 locals {
@@ -135,6 +140,28 @@ resource "aws_ecr_repository" "app" {
 # RDS
 # -----------------------------
 
+resource "aws_security_group" "rds" {
+  name        = "${local.name}-rds-sg"
+  description = "Security group for RDS"
+  vpc_id      = var.vpc_id
+}
+
+# Lambda no longer runs inside the VPC (see #252), so RDS must accept
+# connections from outside instead of from a peer security group.
+resource "aws_vpc_security_group_ingress_rule" "rds_from_public" {
+  security_group_id = aws_security_group.rds.id
+  cidr_ipv4          = "0.0.0.0/0"
+  ip_protocol        = "tcp"
+  from_port          = local.db_port
+  to_port            = local.db_port
+  description        = "Allow public access now that Lambda is outside the VPC"
+}
+
+resource "aws_db_subnet_group" "db" {
+  name       = "${local.name}-db-subnet-group"
+  subnet_ids = var.private_subnet_ids
+}
+
 resource "random_password" "db" {
   length  = 32
   special = false
@@ -154,6 +181,9 @@ resource "aws_db_instance" "db" {
   db_name  = var.db_name
   username = var.db_username
   password = random_password.db.result
+
+  db_subnet_group_name   = aws_db_subnet_group.db.name
+  vpc_security_group_ids = [aws_security_group.rds.id]
 
   publicly_accessible = true
 
