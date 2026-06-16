@@ -107,9 +107,9 @@ variable "task_status_merge_id" {
   default = 12
 }
 
-variable "public_subnet_ids" {
+variable "private_subnet_ids" {
   type        = list(string)
-  description = "List of public subnet IDs for ECS Fargate tasks"
+  description = "List of subnet IDs for ECS Fargate tasks"
   default     = []
 }
 
@@ -611,7 +611,7 @@ resource "aws_lambda_function" "dispatcher" {
       ANTHROPIC_API_KEY   = var.anthropic_api_key
       GITHUB_PAT          = var.github_pat
       TASK_API_KEY        = var.task_api_key
-      PUBLIC_SUBNET_IDS   = join(",", var.public_subnet_ids)
+      PRIVATE_SUBNET_IDS  = join(",", var.private_subnet_ids)
     }
   }
 }
