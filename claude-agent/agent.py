@@ -52,40 +52,6 @@ def api_post(path, data):
     return resp.json()
 
 
-def get_automation_user_id():
-    """Look up the Automation user ID via the API. Returns None if not found."""
-    try:
-        resp = requests.get(
-            f"{TASK_API_URL}/task_app/tasks/",
-            headers=api_headers,
-        )
-        # Use a direct user lookup approach — search for Automation in task assignees
-        # Instead, look up via user preferences or tasks assigned to Automation
-        # We'll use a dedicated approach: list users if available, otherwise skip
-        pass
-    except Exception:
-        pass
-
-    # Try to find Automation user by checking tasks assigned to it,
-    # or fall back to None (assignee will not be set)
-    try:
-        # Use the tasks API to find any task assigned to Automation
-        # This is a workaround since there's no direct users list endpoint
-        tasks_resp = requests.get(
-            f"{TASK_API_URL}/task_app/tasks/",
-            headers=api_headers,
-        )
-        if tasks_resp.ok:
-            tasks = tasks_resp.json()
-            # Find a task where assignee corresponds to Automation
-            # We can't determine this without a users endpoint
-            pass
-    except Exception:
-        pass
-
-    return None
-
-
 def _get_automation_user_id_from_task(task):
     """
     Attempt to resolve the Automation user ID.
@@ -136,13 +102,17 @@ def post_error_comment(task, error_text):
             print(f"[agent] Failed to restore assignee: {e}", file=sys.stderr)
 
 
-def file_discovered_issues(client, task, context):
-    """Ask Claude if it found any out-of-scope issues and file them as new tasks.
+def file_related_subtasks(client, task, context, reporter_id):
+    """Ask Claude if there are related subtasks needed for this task implementation.
 
-    Discovered issues are filed as independent tasks (not subtasks) with
-    assignee set to the Automation user so they can be auto-processed.
-    The parent field is intentionally omitted — these are separate work items
-    unrelated to the current task's scope.
+    Only creates subtasks that are directly related to the current task's scope
+    (i.e. work that needs to be done as part of implementing this task).
+    Unrelated issues, bugs, or improvements discovered incidentally are NOT filed.
+
+    Subtasks are created with:
+    - parent set to the current task
+    - assignee set to the reporter (human reviewer), NOT Automation
+    - status set to 1 (未着手)
     """
     resp = client.messages.create(
         model=MODEL,
@@ -151,13 +121,19 @@ def file_discovered_issues(client, task, context):
             "role": "user",
             "content": (
                 f"You just implemented task #{task['id']}: {task['title']}.\n"
-                f"While reviewing this codebase, did you notice any bugs, improvements, "
-                f"or technical debt that are OUT OF SCOPE for this task?\n\n"
-                f"Codebase context:\n{context[:4000]}\n\n"
-                f"For each issue found, respond with:\n"
-                f"ISSUE: <short title under 100 chars>\n"
+                f"Description: {task['description']}\n\n"
+                f"Are there any follow-up subtasks that are DIRECTLY REQUIRED "
+                f"to complete this task (e.g. additional steps in the same scope "
+                f"that you could not implement in this pass)?\n\n"
+                f"Do NOT report:\n"
+                f"- Bugs or improvements unrelated to this task\n"
+                f"- Technical debt outside this task's scope\n"
+                f"- Nice-to-have enhancements\n\n"
+                f"Only report subtasks that are essential to completing task #{task['id']}.\n\n"
+                f"For each required subtask, respond with:\n"
+                f"SUBTASK: <short title under 100 chars>\n"
                 f"DETAIL: <description>\n\n"
-                f"If none found, respond with exactly: NONE"
+                f"If no subtasks are needed, respond with exactly: NONE"
             ),
         }],
     )
@@ -165,28 +141,30 @@ def file_discovered_issues(client, task, context):
     if text.upper() == "NONE":
         return
 
-    # The Automation user is the current assignee of the task (the agent was
-    # triggered by assigning the task to Automation).
-    automation_user_id = _get_automation_user_id_from_task(task)
+    # Assignee for subtasks: use the reporter (human), not Automation.
+    # This prevents subtasks from being auto-executed and causing cascading runs.
+    assignee_id = reporter_id or task.get("reporter")
+    if not assignee_id:
+        # Fall back to current task assignee only if no reporter is available
+        assignee_id = task.get("assignee")
 
-    pattern = re.compile(r"ISSUE:\s*(.+?)\nDETAIL:\s*(.+?)(?=\nISSUE:|$)", re.DOTALL)
+    pattern = re.compile(r"SUBTASK:\s*(.+?)\nDETAIL:\s*(.+?)(?=\nSUBTASK:|$)", re.DOTALL)
     for m in pattern.finditer(text):
         title = m.group(1).strip()[:100]
         detail = m.group(2).strip()
-        # File as an independent task — NOT a subtask (no parent field).
-        # Use Automation as assignee so these tasks can be picked up automatically.
         task_data = {
             "title": title,
             "description": detail,
             "project": task["project"],
             "status": 1,
+            "parent": task["id"],
         }
-        if automation_user_id:
-            task_data["assignee"] = automation_user_id
+        if assignee_id:
+            task_data["assignee"] = assignee_id
         if task.get("event"):
             task_data["event"] = task["event"]
         new_task = api_post("task_app/tasks/", task_data)
-        print(f"[agent] Filed issue task #{new_task['id']}: {title}")
+        print(f"[agent] Filed subtask #{new_task['id']}: {title}")
 
 
 def resolve_base_branch(project, github_repo):
@@ -344,8 +322,6 @@ KIND_MAP = {"bug": "bugfix", "feature": "feature", "enhancement": "enhancement",
 
 def classify_kind(task, client):
     """Ask Claude which branch kind fits the task."""
-    tags = [t.get("name", "") for t in api_get(f"task_app/tasks/{task['id']}/")
-            .get("tags", [])] if False else []
     for tag in (task.get("tags") or []):
         name = tag if isinstance(tag, str) else tag.get("name", "")
         if name in KIND_MAP:
@@ -450,123 +426,4 @@ def main():
                     rel = os.path.relpath(path, workdir)
                     try:
                         content = open(path).read()
-                        context_files.append(f"### {rel}\n```\n{content}\n```")
-                    except Exception:
-                        pass
-
-        context = "\n\n".join(context_files[:60])  # cap to avoid token overflow
-
-        # 7a. Fetch task comments
-        comments_resp = requests.get(
-            f"{TASK_API_URL}/task_app/comments/",
-            headers=api_headers,
-            params={"task": TASK_ID},
-        )
-        comments = comments_resp.json() if comments_resp.ok else []
-        comments_text = "\n".join(
-            f"[Comment #{c['id']}] {c['description']}" for c in comments
-        ) if comments else "(no comments)"
-
-        # 7b. Ask Claude to implement
-        prompt = (
-            f"You are an expert Django developer working on the task-management project.\n\n"
-            f"Task #{TASK_ID}: {task['title']}\n"
-            f"Description:\n{task['description']}\n\n"
-            f"Comments on this task:\n{comments_text}\n\n"
-            f"CLAUDE.md workflow is in the repo. Follow it.\n\n"
-            f"Here is the relevant codebase:\n{context}\n\n"
-            f"Provide the complete content of each file you need to create or modify. "
-            f"Format each file as:\n"
-            f"FILE: <relative/path/to/file>\n```\n<content>\n```\n\n"
-            f"Only output FILE blocks. No explanations."
-        )
-
-        print("[agent] Calling Claude for implementation...")
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=8096,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        implementation = response.content[0].text
-
-        # 8. Apply changes
-        file_pattern = re.compile(r"FILE:\s*(\S+)\n```(?:\w*)\n(.*?)```", re.DOTALL)
-        changed_files = []
-        for match in file_pattern.finditer(implementation):
-            rel_path, content = match.group(1), match.group(2)
-            abs_path = os.path.join(workdir, rel_path)
-            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-            with open(abs_path, "w") as fh:
-                fh.write(content)
-            changed_files.append(rel_path)
-            print(f"[agent] Wrote {rel_path}")
-
-        if not changed_files:
-            print("[agent] No files changed — nothing to commit.", file=sys.stderr)
-            post_error_comment(task, "No files were changed. The agent could not determine what to implement.")
-            return
-
-        # 9. File discovered out-of-scope issues as new tasks
-        file_discovered_issues(client, task, context)
-
-        # 11. Run tests (Django-only; skip if no django-app directory)
-        django_dir = os.path.join(workdir, "django-app")
-        if os.path.isdir(django_dir):
-            run(["pip", "install", "-q", "-r", "requirements.txt"], cwd=django_dir, check=False)
-            test_result = run(
-                ["python", "manage.py", "test", "task_app", "event_app", "--verbosity=1"],
-                cwd=django_dir,
-                check=False,
-                env={**os.environ, "DJANGO_SETTINGS_MODULE": "task_management.test_settings"},
-            )
-            if test_result.returncode != 0:
-                print("[agent] Tests failed:\n", test_result.stdout, test_result.stderr, file=sys.stderr)
-                error_text = (
-                    f"Tests failed. The agent could not complete the implementation.\n\n"
-                    f"```\n{test_result.stdout[-2000:]}\n{test_result.stderr[-1000:]}\n```"
-                )
-                post_error_comment(task, error_text)
-                sys.exit(1)
-            print("[agent] Tests passed.")
-        else:
-            print("[agent] No django-app/ directory — skipping tests.")
-
-        # 12. Commit (subtasks use their own ID; small tasks use their ID)
-        env_patch = {**os.environ, "DJANGO_SETTINGS_MODULE": "task_management.test_settings"}
-        git(["add", "-A"], workdir)
-        summary = task["title"][:44]
-        commit_msg = make_commit_message(kind, summary, commit_task_id)
-        subprocess.run(
-            ["git", "commit", "-m", commit_msg],
-            cwd=workdir,
-            env={**env_patch, "TASK_URL": f"{TASK_API_URL}/task_app/tasks"},
-            check=True,
-        )
-
-        # Get commit SHA before push for comments
-        commit_sha = git(["rev-parse", "HEAD"], workdir).stdout.strip()
-
-        # 13. Push branch
-        git(["push", "-u", "origin", branch], workdir)
-
-        # 14. Update this task to レビュー and restore assignee to reporter
-        review_patch = {"status": 4}
-        if task.get("reporter"):
-            review_patch["assignee"] = task["reporter"]
-        api_patch(f"task_app/tasks/{TASK_ID}/", review_patch)
-        print(f"[agent] Task #{TASK_ID} marked as review.")
-
-        # 15. Post commit link and completion comment on current task
-        automation_user = task["assignee"]
-        post_commit_comment(TASK_ID, commit_sha, github_repo, automation_user)
-        post_comment(TASK_ID, automation_user, "対応が完了しました。")
-
-        # 16. PR creation — parent task PR after all subtasks done, else direct PR
-        if parent_task:
-            handle_last_subtask(parent_task, sibling_ids, github_repo, branch, kind, project, automation_user)
-        else:
-            create_pr(github_repo, branch, TASK_ID, task["title"], kind, project)
-
-
-if __name__ == "__main__":
-    main()
+                        context_files.append(f"### {rel}\n
