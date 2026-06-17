@@ -136,59 +136,6 @@ def post_error_comment(task, error_text):
             print(f"[agent] Failed to restore assignee: {e}", file=sys.stderr)
 
 
-def file_discovered_issues(client, task, context):
-    """Ask Claude if it found any out-of-scope issues and file them as new tasks.
-
-    Discovered issues are filed as independent tasks (not subtasks) with
-    assignee set to the Automation user so they can be auto-processed.
-    The parent field is intentionally omitted — these are separate work items
-    unrelated to the current task's scope.
-    """
-    resp = client.messages.create(
-        model=MODEL,
-        max_tokens=1024,
-        messages=[{
-            "role": "user",
-            "content": (
-                f"You just implemented task #{task['id']}: {task['title']}.\n"
-                f"While reviewing this codebase, did you notice any bugs, improvements, "
-                f"or technical debt that are OUT OF SCOPE for this task?\n\n"
-                f"Codebase context:\n{context[:4000]}\n\n"
-                f"For each issue found, respond with:\n"
-                f"ISSUE: <short title under 100 chars>\n"
-                f"DETAIL: <description>\n\n"
-                f"If none found, respond with exactly: NONE"
-            ),
-        }],
-    )
-    text = resp.content[0].text.strip()
-    if text.upper() == "NONE":
-        return
-
-    # The Automation user is the current assignee of the task (the agent was
-    # triggered by assigning the task to Automation).
-    automation_user_id = _get_automation_user_id_from_task(task)
-
-    pattern = re.compile(r"ISSUE:\s*(.+?)\nDETAIL:\s*(.+?)(?=\nISSUE:|$)", re.DOTALL)
-    for m in pattern.finditer(text):
-        title = m.group(1).strip()[:100]
-        detail = m.group(2).strip()
-        # File as an independent task — NOT a subtask (no parent field).
-        # Use Automation as assignee so these tasks can be picked up automatically.
-        task_data = {
-            "title": title,
-            "description": detail,
-            "project": task["project"],
-            "status": 1,
-        }
-        if automation_user_id:
-            task_data["assignee"] = automation_user_id
-        if task.get("event"):
-            task_data["event"] = task["event"]
-        new_task = api_post("task_app/tasks/", task_data)
-        print(f"[agent] Filed issue task #{new_task['id']}: {title}")
-
-
 def resolve_base_branch(project, github_repo):
     """Return the branch PRs should target.
 
@@ -505,9 +452,6 @@ def main():
             print("[agent] No files changed — nothing to commit.", file=sys.stderr)
             post_error_comment(task, "No files were changed. The agent could not determine what to implement.")
             return
-
-        # 9. File discovered out-of-scope issues as new tasks
-        file_discovered_issues(client, task, context)
 
         # 11. Run tests (Django-only; skip if no django-app directory)
         django_dir = os.path.join(workdir, "django-app")
