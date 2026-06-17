@@ -10,7 +10,7 @@ from .models import Task
 _GRAMMAR = (Path(__file__).parent / "dsl_grammar.lark").read_text()
 
 _STATEMENT_RE = re.compile(
-    r"^\s*(LINK|TAG|PARENT|ASSIGN|EVENT)\b",
+    r"^\s*(LINK|TAG|PARENT|ASSIGN|EVENT|DELETE)\b",
     re.IGNORECASE,
 )
 
@@ -44,6 +44,10 @@ class _DslTransformer(Transformer):
         """EVENT コマンドを ("event", task_id, event_id) に変換する。"""
         return ("event", int(args[0]), int(args[1]))
 
+    def delete_stmt(self, args):
+        """DELETE コマンドを ("delete", task_id) に変換する。"""
+        return ("delete", int(args[0]))
+
     def name_or_string(self, args):
         """識別子またはクォート文字列を Python の str に変換する。
 
@@ -71,6 +75,7 @@ def parse_dsl(text):
       ("tag",    task_id, tag_name)      # future
       ("parent", child_id, parent_id)   # future
       ("assign", task_id, username)     # future
+      ("delete", task_id)
 
     既知キーワードで始まらない行はすべて無視する。
     これにより、ルールテンプレートに自由記述が混在しても後方互換性を保てる。
@@ -141,10 +146,18 @@ def execute_assign(task_id, username):
     Task.objects.filter(pk=task_id).update(assignee=user)
 
 
+def execute_delete(task_id):
+    """タスクを削除する。
+
+    タスクが存在しない場合は何もしない。
+    """
+    Task.objects.filter(pk=task_id).delete()
+
+
 def execute_ast(ast):
     """AST の各コマンドを対応する execute_* 関数にディスパッチする。
 
-    未実装のコマンド (tag / parent) はパース済みだが実行をスキップする。
+    未実装のコマンド (tag) はパース済みだが実行をスキップする。
     """
     for command in ast:
         command_type = command[0]
@@ -160,6 +173,9 @@ def execute_ast(ast):
         elif command_type == "event":
             _, task_id, event_id = command
             execute_event(task_id, event_id)
+        elif command_type == "delete":
+            _, task_id = command
+            execute_delete(task_id)
 
 
 @transaction.atomic
