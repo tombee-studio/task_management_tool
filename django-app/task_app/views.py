@@ -12,7 +12,7 @@ from django.contrib.auth import login
 from django.http import Http404, HttpResponseRedirect
 from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm, UserUpdateForm, UserPreferencesForm
 from .models import UserPreferences
-from .filters import TaskFilterMixin, apply_task_filters
+from .filters import TaskFilterMixin, apply_task_filters, parse_search_query
 from .dsl import execute_dsl
 from .gantt import build_gantt_data
 from .widget_loader import get_page_widgets, resolve_widget_data
@@ -29,18 +29,6 @@ def _parse_gantt_date(value):
 
 
 def preprocess_description(project, _, form):
-    # 時々エラーが発生しているようでリロードに時間がかかっているようなので
-    # 一旦対応を削除
-    # form.instance.description = re.sub(
-    #         r'(commit:\s*([0-9a-zA-Z]+))', 
-    #         f"[\g<1>]({project.git_url})", form.instance.description)
-    # m_iter = re.finditer(r'\#([0-9]+)', form.instance.description)
-    # form.instance.description = re.sub(
-    #     r'\#([0-9]+)', 
-    #     "[\#\g<1>](/task_app/tasks/\g<1>/)", 
-    #     form.instance.description)
-    # return list(filter(lambda item: item != None,
-    #     map(lambda m: Task.objects.get(pk=m.group(1)), m_iter)))
     return []
         
 
@@ -337,6 +325,33 @@ class CommentDeleteView(LoginRequiredMixin, DeleteView):
 
     def get_success_url(self):
         return reverse_lazy("project_list")
+
+
+class TaskListView(LoginRequiredMixin, TaskFilterMixin, ListView):
+    model = Task
+    template_name = "task_app/task_list.html"
+    context_object_name = "tasks"
+    paginate_by = 10
+
+    def get_queryset(self):
+        qs = Task.objects.filter(
+            Q(project__participants=self.request.user) |
+            Q(assignee=self.request.user)
+        ).distinct().select_related('project', 'status', 'assignee').order_by('-updated_at')
+
+        parsed = self.get_parsed_filters()
+        qs = apply_task_filters(qs, parsed)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Preserve query parameters for pagination links
+        query_params = self.request.GET.copy()
+        if 'page' in query_params:
+            del query_params['page']
+        context['query_params'] = query_params.urlencode()
+        return context
+
 
 class TaskDetailView(LoginRequiredMixin, DetailView):
     model = Task
