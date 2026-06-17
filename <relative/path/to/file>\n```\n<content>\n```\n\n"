@@ -1,0 +1,2 @@
+
+The regex `\`\`\`(?:\w*)` matches the opening fence with optional language identifier. But if Claude outputs ` 
