@@ -140,6 +140,13 @@ class Task(models.Model):
     'Tag',
     related_name='tasks',
     blank=True)
+  task_type = models.ForeignKey(
+    'TaskType',
+    on_delete=models.SET_NULL,
+    related_name='tasks',
+    null=True,
+    blank=True,
+  )
   history = AuditlogHistoryField()
   
   def __str__(self):

@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 from django.db.models import Q
 
-from .models import Project, Task, Comment, Status, Tag, UserPreferences
+from .models import Project, Task, Comment, Status, Tag, UserPreferences, TaskType
 from event_app.models import Event
 
 
@@ -51,6 +51,12 @@ class TaskForm(forms.ModelForm):
         help_text='スペース区切りで複数指定できます（例: bug 重要 frontend）。存在しないタグは自動作成されます。',
         widget=forms.TextInput(attrs={'placeholder': 'bug 重要 frontend'}),
     )
+    task_type = forms.ModelChoiceField(
+        queryset=TaskType.objects.none(),
+        required=True,
+        label='種別',
+        empty_label='（種別を選択）',
+    )
     dsl = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={
@@ -90,13 +96,15 @@ class TaskForm(forms.ModelForm):
             automation_qs = User.objects.filter(username='Automation')
             self.fields['assignee'].queryset = (project.participants.all() | automation_qs).distinct()
             self.fields['status'].queryset = Status.objects.filter(project=project)
+            self.fields['task_type'].queryset = TaskType.objects.filter(project=project)
         else:
             self.fields['assignee'].queryset = User.objects.all()
             self.fields['status'].queryset = Status.objects.all()
+            self.fields['task_type'].queryset = TaskType.objects.all()
 
     class Meta:
         model = Task
-        fields = ['title', 'description', 'progress_summary', 'assignee', 'status', 'deadline', 'event']
+        fields = ['title', 'description', 'progress_summary', 'assignee', 'task_type', 'status', 'deadline', 'event']
     
     def clean(self):
         cleaned_data = super().clean()
