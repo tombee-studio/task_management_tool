@@ -85,6 +85,32 @@ class TaskType(models.Model):
     return self.name
 
 
+class TaskTypeField(models.Model):
+  FIELD_TYPES = [
+    ('text', 'テキスト'),
+    ('url', 'URL'),
+    ('number', '数値'),
+    ('textarea', 'テキストエリア'),
+  ]
+  task_type = models.ForeignKey(
+    'TaskType',
+    on_delete=models.CASCADE,
+    related_name='fields',
+  )
+  name = models.SlugField(max_length=64)
+  label = models.CharField(max_length=128)
+  field_type = models.CharField(max_length=16, choices=FIELD_TYPES, default='text')
+  required = models.BooleanField(default=False)
+  order = models.PositiveIntegerField(default=0)
+
+  class Meta:
+    ordering = ['order', 'name']
+    unique_together = [('task_type', 'name')]
+
+  def __str__(self):
+    return f"{self.task_type.name}: {self.label}"
+
+
 class Task(models.Model):
   title = models.CharField(max_length=256, null=False)
   project = models.ForeignKey(

@@ -626,6 +626,75 @@ class TaskTypeDeleteView(LoginRequiredMixin, DeleteView):
         return reverse_lazy("project_detail", kwargs={"pk": self.object.project_id}) + "#tab-task-type"
 
 
+class TaskTypeFieldCreateView(LoginRequiredMixin, CreateView):
+    model = TaskTypeField
+    fields = ["name", "label", "field_type", "required", "order"]
+    template_name = "task_app/task_type_field_form.html"
+
+    def _get_task_type(self):
+        pk = self.kwargs.get('task_type_pk')
+        if pk:
+            return TaskType.objects.filter(pk=pk, project__participants=self.request.user).first()
+        return None
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._get_task_type() is None:
+            raise Http404
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        task_type = self._get_task_type()
+        context['task_type'] = task_type
+        context['project'] = task_type.project
+        return context
+
+    def form_valid(self, form):
+        form.instance.task_type = self._get_task_type()
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return (
+            reverse_lazy("project_detail", kwargs={"pk": self.object.task_type.project_id})
+            + "#tab-task-type"
+        )
+
+
+class TaskTypeFieldUpdateView(LoginRequiredMixin, UpdateView):
+    model = TaskTypeField
+    fields = ["name", "label", "field_type", "required", "order"]
+    template_name = "task_app/task_type_field_form.html"
+
+    def get_queryset(self):
+        return TaskTypeField.objects.filter(task_type__project__participants=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['task_type'] = self.object.task_type
+        context['project'] = self.object.task_type.project
+        return context
+
+    def get_success_url(self):
+        return (
+            reverse_lazy("project_detail", kwargs={"pk": self.object.task_type.project_id})
+            + "#tab-task-type"
+        )
+
+
+class TaskTypeFieldDeleteView(LoginRequiredMixin, DeleteView):
+    model = TaskTypeField
+    template_name = "task_app/task_type_field_confirm_delete.html"
+
+    def get_queryset(self):
+        return TaskTypeField.objects.filter(task_type__project__participants=self.request.user)
+
+    def get_success_url(self):
+        return (
+            reverse_lazy("project_detail", kwargs={"pk": self.object.task_type.project_id})
+            + "#tab-task-type"
+        )
+
+
 class TaskWatchView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         user = request.user
