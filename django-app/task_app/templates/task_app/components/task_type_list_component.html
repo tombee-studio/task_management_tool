@@ -1,0 +1,26 @@
+{% if task_type_list %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>種別名</th>
+        <th>親種別</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task_type in task_type_list %}
+        <tr>
+          <td>{{ task_type.name }}</td>
+          <td>{{ task_type.parent.name|default:"—" }}</td>
+          <td>
+            <a href="{% url 'task_type_update' task_type.pk %}">編集</a>
+            &nbsp;
+            <a href="{% url 'task_type_delete' task_type.pk %}">削除</a>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="panel-body">種別はまだ登録されていません。</p>
+{% endif %}

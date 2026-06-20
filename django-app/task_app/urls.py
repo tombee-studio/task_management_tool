@@ -26,4 +26,7 @@ urlpatterns = [
     re_path(r"^tasks/(?P<pk>\d+)/delete/$", TaskDeleteView.as_view(), name="task_delete"),
     re_path(r"^tasks/(?P<pk>\d+)/watch/$", TaskWatchView.as_view(), name="task_watch"),
     re_path(r"^tasks/(?P<pk>\d+)/unwatch/$", TaskUnwatchView.as_view(), name="task_unwatch"),
+    re_path(r"^projects/(?P<project_pk>\d+)/task-types/create/$", TaskTypeCreateView.as_view(), name="task_type_create"),
+    re_path(r"^task-types/(?P<pk>\d+)/edit/$", TaskTypeUpdateView.as_view(), name="task_type_update"),
+    re_path(r"^task-types/(?P<pk>\d+)/delete/$", TaskTypeDeleteView.as_view(), name="task_type_delete"),
 ]
