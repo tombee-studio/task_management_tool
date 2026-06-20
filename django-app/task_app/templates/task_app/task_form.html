@@ -9,17 +9,7 @@
 {% endif %}
 {% endblock %}
 
-{% block form_button %}
-<div>
-  <button type="submit">保存</button>
-
-  {% if object %}
-    <a href="{% url 'task_detail' object.pk %}">キャンセル</a>
-  {% else %}
-    <a href="{% url 'project_list' %}">キャンセル</a>
-  {% endif %}
-</div>
-
+{% block form_extra %}
 {% if task_type_fields_by_type %}
 <div id="task-type-fields-wrapper">
   <hr>
@@ -69,7 +59,21 @@
 })();
 </script>
 {% endif %}
+{% endblock %}
 
+{% block form_button %}
+<div>
+  <button type="submit" class="btn btn-primary">保存</button>
+
+  {% if object %}
+    <a href="{% url 'task_detail' object.pk %}" class="btn btn-default">キャンセル</a>
+  {% else %}
+    <a href="{% url 'project_list' %}" class="btn btn-default">キャンセル</a>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block form_after %}
 {% include "task_app/components/task_list_component.html" with tasks=tasks task=task status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
 
 <p>
@@ -103,5 +107,4 @@
 {% else %}
   <p>コメントはまだ登録されていません。</p>
 {% endif %}
-
 {% endblock %}

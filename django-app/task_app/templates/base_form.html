@@ -19,10 +19,17 @@
     {{ form.as_p }}
   {% endfor %}
 
+  {% block form_extra %}{% endblock %}
+
+  {% block form_button %}
   {% buttons %}
     <button type="submit" class="btn btn-primary">
       {% bootstrap_icon "send" %} Submit
     </button>
   {% endbuttons %}
+  {% endblock %}
 </form>
+
+{% block form_after %}{% endblock %}
+
 {% endblock %}
