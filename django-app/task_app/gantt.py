@@ -17,6 +17,7 @@ def build_gantt_data(project, from_date=None, to_date=None, assignee_ids=None,
             task_qs = task_qs.filter(status__is_done=False)
         elif status_filter == 'done':
             task_qs = task_qs.filter(status__is_done=True)
+        # 'all' means no status filter
     tasks = list(task_qs)
 
     today = date.today()
