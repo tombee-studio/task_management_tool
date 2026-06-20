@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from task_app.models import Project, Status, Comment, Tag, Task, UserPreferences, Rule
+from task_app.models import Project, Status, Comment, Tag, Task, UserPreferences, Rule, TaskType
 
 User = get_user_model()
 
@@ -59,3 +59,10 @@ class RuleSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class TaskTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaskType
+        fields = ['id', 'project', 'name', 'parent']
+        read_only_fields = ['id']

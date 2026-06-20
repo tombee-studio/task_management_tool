@@ -63,6 +63,28 @@ class Tag(models.Model):
     return self.name
 
 
+class TaskType(models.Model):
+  project = models.ForeignKey(
+    'Project',
+    on_delete=models.CASCADE,
+    related_name='task_types',
+  )
+  name = models.CharField(max_length=128)
+  parent = models.ForeignKey(
+    'self',
+    on_delete=models.CASCADE,
+    related_name='children',
+    null=True,
+    blank=True,
+  )
+
+  class Meta:
+    ordering = ['name']
+
+  def __str__(self):
+    return self.name
+
+
 class Task(models.Model):
   title = models.CharField(max_length=256, null=False)
   project = models.ForeignKey(
