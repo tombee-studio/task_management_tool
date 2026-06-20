@@ -1,4 +1,4 @@
-{% load markdown_extras %}
+{% load markdown_extras extras %}
 <div class="panel-body">
   <p>
     <a href="{% url 'task_create' %}?project={{ task.project.id }}" class="btn btn-primary btn-sm">タスク追加</a>
@@ -29,4 +29,16 @@
     <th>更新日</th>
     <td>{{ task.updated_at|date:"Y/m/d" }}</td>
   </tr>
+  {% if task.task_type %}
+  <tr>
+    <th>種別</th>
+    <td>{{ task.task_type.name }}</td>
+  </tr>
+  {% for field in task.task_type.fields.all %}
+  <tr>
+    <th>{{ field.label }}</th>
+    <td>{{ field_values|get_item:field.pk }}</td>
+  </tr>
+  {% endfor %}
+  {% endif %}
 </table>

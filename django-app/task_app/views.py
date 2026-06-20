@@ -1,3 +1,4 @@
+import json
 import re
 from datetime import timedelta, date
 from django.utils import timezone
@@ -368,7 +369,32 @@ class TaskDetailView(LoginRequiredMixin, DetailView):
             for w in widget_configs
         ]
 
+        context["field_values"] = {
+            fv.field_id: fv.value
+            for fv in self.object.field_values.all()
+        }
+
         return context
+
+
+def _save_field_values(task, post_data):
+    """Save TaskFieldValue records from POST data for the task's current task_type."""
+    if not task.task_type_id:
+        return
+    for field in task.task_type.fields.all():
+        value = post_data.get(f"type_field_{field.pk}", "")
+        TaskFieldValue.objects.update_or_create(
+            task=task, field=field,
+            defaults={"value": value},
+        )
+
+
+def _task_type_fields_context(project):
+    """Return {task_type_id: [fields]} for all types in the project."""
+    result = {}
+    for tt in project.task_types.prefetch_related("fields").all():
+        result[tt.pk] = list(tt.fields.all())
+    return result
 
 
 class TaskCreateView(LoginRequiredMixin, CreateView):
@@ -410,6 +436,17 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
         initial["assignee"] = self.request.user.pk
         return initial
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        project = self._resolve_project()
+        if project:
+            context["task_type_fields_by_type"] = _task_type_fields_context(project)
+        else:
+            context["task_type_fields_by_type"] = {}
+        context["field_values"] = {}
+        context["field_values_json"] = json.dumps({})
+        return context
+
     def form_valid(self, form):
         project_id = self.request.GET.get("project")
         task = self.request.GET.get("task")
@@ -436,6 +473,7 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
         form.instance.completed_at = timezone.now() \
             if form.instance.status.is_done else None
         self.object = form.save()
+        _save_field_values(self.object, self.request.POST)
         dsl_text = form.cleaned_data.get('dsl', '').strip()
         if dsl_text:
             execute_dsl(dsl_text)
@@ -469,12 +507,17 @@ class TaskUpdateView(LoginRequiredMixin, UpdateView):
         context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
         context["tasks"] = self.object.tasks.filter(
             status__in=selected_status_list)
+        context["task_type_fields_by_type"] = _task_type_fields_context(self.object.project)
+        fv_map = {str(fv.field_id): fv.value for fv in self.object.field_values.all()}
+        context["field_values"] = {int(k): v for k, v in fv_map.items()}
+        context["field_values_json"] = json.dumps(fv_map)
         return context
 
     def form_valid(self, form):
         form.instance.completed_at = timezone.now() \
             if form.instance.status.is_done else None
         self.object = form.save()
+        _save_field_values(self.object, self.request.POST)
         dsl_text = form.cleaned_data.get('dsl', '').strip()
         if dsl_text:
             execute_dsl(dsl_text)

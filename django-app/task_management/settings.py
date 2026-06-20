@@ -78,7 +78,8 @@ TEMPLATES = [
                 'task_app.context_processors.git_hash',
             ],
             'libraries': {
-                'markdown_extras': 'task_app.extras'
+                'markdown_extras': 'task_app.extras',
+                'extras': 'task_app.extras',
             }
         },
     },

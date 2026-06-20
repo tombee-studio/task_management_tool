@@ -2,12 +2,12 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResp
 from rest_framework import viewsets, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from task_app.models import Project, Status, Comment, Tag, Task, UserPreferences, Rule, TaskType, TaskTypeField
+from task_app.models import Project, Status, Comment, Tag, Task, UserPreferences, Rule, TaskType, TaskTypeField, TaskFieldValue
 from task_app.signals import generate_api_key
 from .serializers import (
     ProjectSerializer, StatusSerializer, CommentSerializer, TagSerializer,
     TaskSerializer, UserPreferencesSerializer, RuleSerializer, TaskTypeSerializer,
-    TaskTypeFieldSerializer,
+    TaskTypeFieldSerializer, TaskFieldValueSerializer,
 )
 
 
@@ -162,4 +162,24 @@ class TaskTypeFieldViewSet(viewsets.ModelViewSet):
         task_type_id = self.request.query_params.get('task_type')
         if task_type_id:
             qs = qs.filter(task_type_id=task_type_id)
+        return qs
+
+
+@extend_schema_view(
+    list=extend_schema(summary='List task field values', tags=['Task Field Values']),
+    create=extend_schema(summary='Create a task field value', tags=['Task Field Values']),
+    retrieve=extend_schema(summary='Retrieve a task field value', tags=['Task Field Values']),
+    update=extend_schema(summary='Update a task field value', tags=['Task Field Values']),
+    partial_update=extend_schema(summary='Partially update a task field value', tags=['Task Field Values']),
+    destroy=extend_schema(summary='Delete a task field value', tags=['Task Field Values']),
+)
+class TaskFieldValueViewSet(viewsets.ModelViewSet):
+    queryset = TaskFieldValue.objects.all()
+    serializer_class = TaskFieldValueSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        task_id = self.request.query_params.get('task')
+        if task_id:
+            qs = qs.filter(task_id=task_id)
         return qs
