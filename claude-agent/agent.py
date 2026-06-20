@@ -440,7 +440,7 @@ def main():
         file_pattern = re.compile(r"FILE:\s*(\S+)\n```(?:\w*)\n(.*?)```", re.DOTALL)
         changed_files = []
         for match in file_pattern.finditer(implementation):
-            rel_path, content = match.group(1), match.group(2)
+            rel_path, content = match.group(1).strip("`"), match.group(2)
             abs_path = os.path.join(workdir, rel_path)
             os.makedirs(os.path.dirname(abs_path), exist_ok=True)
             with open(abs_path, "w") as fh:
