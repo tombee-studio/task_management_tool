@@ -1,3 +1,4 @@
+import json
 import re
 from datetime import timedelta, date
 from django.utils import timezone
@@ -108,6 +109,7 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
         context["user_preferences"] = user_preferences
 
         context["status_list"] = self.object.statuses.all()
+        context["task_type_list"] = self.object.task_types.all()
 
         gantt_from = _parse_gantt_date(self.request.GET.get('gantt_from'))
         gantt_to = _parse_gantt_date(self.request.GET.get('gantt_to'))
@@ -367,7 +369,32 @@ class TaskDetailView(LoginRequiredMixin, DetailView):
             for w in widget_configs
         ]
 
+        context["field_values"] = {
+            fv.field_id: fv.value
+            for fv in self.object.field_values.all()
+        }
+
         return context
+
+
+def _save_field_values(task, post_data):
+    """Save TaskFieldValue records from POST data for the task's current task_type."""
+    if not task.task_type_id:
+        return
+    for field in task.task_type.fields.all():
+        value = post_data.get(f"type_field_{field.pk}", "")
+        TaskFieldValue.objects.update_or_create(
+            task=task, field=field,
+            defaults={"value": value},
+        )
+
+
+def _task_type_fields_context(project):
+    """Return {task_type_id: [fields]} for all types in the project."""
+    result = {}
+    for tt in project.task_types.prefetch_related("fields").all():
+        result[tt.pk] = list(tt.fields.all())
+    return result
 
 
 class TaskCreateView(LoginRequiredMixin, CreateView):
@@ -409,6 +436,17 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
         initial["assignee"] = self.request.user.pk
         return initial
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        project = self._resolve_project()
+        if project:
+            context["task_type_fields_by_type"] = _task_type_fields_context(project)
+        else:
+            context["task_type_fields_by_type"] = {}
+        context["field_values"] = {}
+        context["field_values_json"] = json.dumps({})
+        return context
+
     def form_valid(self, form):
         project_id = self.request.GET.get("project")
         task = self.request.GET.get("task")
@@ -435,6 +473,7 @@ class TaskCreateView(LoginRequiredMixin, CreateView):
         form.instance.completed_at = timezone.now() \
             if form.instance.status.is_done else None
         self.object = form.save()
+        _save_field_values(self.object, self.request.POST)
         dsl_text = form.cleaned_data.get('dsl', '').strip()
         if dsl_text:
             execute_dsl(dsl_text)
@@ -468,12 +507,17 @@ class TaskUpdateView(LoginRequiredMixin, UpdateView):
         context["selected_status_list"] = list(map(lambda x: int(x), selected_status_list))
         context["tasks"] = self.object.tasks.filter(
             status__in=selected_status_list)
+        context["task_type_fields_by_type"] = _task_type_fields_context(self.object.project)
+        fv_map = {str(fv.field_id): fv.value for fv in self.object.field_values.all()}
+        context["field_values"] = {int(k): v for k, v in fv_map.items()}
+        context["field_values_json"] = json.dumps(fv_map)
         return context
 
     def form_valid(self, form):
         form.instance.completed_at = timezone.now() \
             if form.instance.status.is_done else None
         self.object = form.save()
+        _save_field_values(self.object, self.request.POST)
         dsl_text = form.cleaned_data.get('dsl', '').strip()
         if dsl_text:
             execute_dsl(dsl_text)
@@ -549,6 +593,149 @@ class SignUpView(CreateView):
         login(self.request, user) # 認証
         self.object = user 
         return HttpResponseRedirect(self.get_success_url())
+
+
+class TaskTypeCreateView(LoginRequiredMixin, CreateView):
+    model = TaskType
+    fields = ["name", "parent"]
+    template_name = "task_app/task_type_form.html"
+
+    def _get_project(self):
+        pk = self.kwargs.get('project_pk')
+        if pk:
+            return Project.objects.filter(pk=pk, participants=self.request.user).first()
+        return None
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._get_project() is None:
+            raise Http404
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        project = self._get_project()
+        form.fields['parent'].queryset = TaskType.objects.filter(project=project)
+        form.fields['parent'].required = False
+        form.fields['parent'].empty_label = '（なし）'
+        return form
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['project'] = self._get_project()
+        return context
+
+    def form_valid(self, form):
+        form.instance.project = self._get_project()
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse_lazy("project_detail", kwargs={"pk": self.object.project_id}) + "#tab-task-type"
+
+
+class TaskTypeUpdateView(LoginRequiredMixin, UpdateView):
+    model = TaskType
+    fields = ["name", "parent"]
+    template_name = "task_app/task_type_form.html"
+
+    def get_queryset(self):
+        return TaskType.objects.filter(project__participants=self.request.user)
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        form.fields['parent'].queryset = TaskType.objects.filter(
+            project=self.object.project
+        ).exclude(pk=self.object.pk)
+        form.fields['parent'].required = False
+        form.fields['parent'].empty_label = '（なし）'
+        return form
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['project'] = self.object.project
+        return context
+
+    def get_success_url(self):
+        return reverse_lazy("project_detail", kwargs={"pk": self.object.project_id}) + "#tab-task-type"
+
+
+class TaskTypeDeleteView(LoginRequiredMixin, DeleteView):
+    model = TaskType
+    template_name = "task_app/task_type_confirm_delete.html"
+
+    def get_queryset(self):
+        return TaskType.objects.filter(project__participants=self.request.user)
+
+    def get_success_url(self):
+        return reverse_lazy("project_detail", kwargs={"pk": self.object.project_id}) + "#tab-task-type"
+
+
+class TaskTypeFieldCreateView(LoginRequiredMixin, CreateView):
+    model = TaskTypeField
+    fields = ["name", "label", "field_type", "required", "order"]
+    template_name = "task_app/task_type_field_form.html"
+
+    def _get_task_type(self):
+        pk = self.kwargs.get('task_type_pk')
+        if pk:
+            return TaskType.objects.filter(pk=pk, project__participants=self.request.user).first()
+        return None
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._get_task_type() is None:
+            raise Http404
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        task_type = self._get_task_type()
+        context['task_type'] = task_type
+        context['project'] = task_type.project
+        return context
+
+    def form_valid(self, form):
+        form.instance.task_type = self._get_task_type()
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return (
+            reverse_lazy("project_detail", kwargs={"pk": self.object.task_type.project_id})
+            + "#tab-task-type"
+        )
+
+
+class TaskTypeFieldUpdateView(LoginRequiredMixin, UpdateView):
+    model = TaskTypeField
+    fields = ["name", "label", "field_type", "required", "order"]
+    template_name = "task_app/task_type_field_form.html"
+
+    def get_queryset(self):
+        return TaskTypeField.objects.filter(task_type__project__participants=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['task_type'] = self.object.task_type
+        context['project'] = self.object.task_type.project
+        return context
+
+    def get_success_url(self):
+        return (
+            reverse_lazy("project_detail", kwargs={"pk": self.object.task_type.project_id})
+            + "#tab-task-type"
+        )
+
+
+class TaskTypeFieldDeleteView(LoginRequiredMixin, DeleteView):
+    model = TaskTypeField
+    template_name = "task_app/task_type_field_confirm_delete.html"
+
+    def get_queryset(self):
+        return TaskTypeField.objects.filter(task_type__project__participants=self.request.user)
+
+    def get_success_url(self):
+        return (
+            reverse_lazy("project_detail", kwargs={"pk": self.object.task_type.project_id})
+            + "#tab-task-type"
+        )
 
 
 class TaskWatchView(LoginRequiredMixin, View):

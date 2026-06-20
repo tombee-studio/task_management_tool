@@ -16,6 +16,9 @@
     <a href="#tab-status" aria-controls="tab-status" role="tab" data-toggle="tab">ステータス</a>
   </li>
   <li role="presentation">
+    <a href="#tab-task-type" aria-controls="tab-task-type" role="tab" data-toggle="tab">種別</a>
+  </li>
+  <li role="presentation">
     <a href="#tab-event-status" aria-controls="tab-event-status" role="tab" data-toggle="tab">イベントステータス</a>
   </li>
   <li role="presentation">
@@ -47,6 +50,16 @@
         <a href="{% url 'status_create' project.pk %}" class="btn btn-default btn-sm">新規ステータス作成</a>
       </div>
       {% include "task_app/components/status_list_component.html" with status_list=status_list project=project %}
+    </div>
+  </div>
+
+  <div role="tabpanel" class="tab-pane" id="tab-task-type">
+    <div class="panel panel-default">
+      <div class="panel-heading">{{ project.name }}の種別一覧</div>
+      <div class="panel-body">
+        <a href="{% url 'task_type_create' project.pk %}" class="btn btn-default btn-sm">新規種別作成</a>
+      </div>
+      {% include "task_app/components/task_type_list_component.html" with task_type_list=task_type_list project=project %}
     </div>
   </div>
 
