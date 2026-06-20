@@ -6,7 +6,7 @@ from django.utils import timezone
 from .dsl import execute_assign, execute_dsl, execute_event, execute_link, execute_parent, parse_dsl
 from .filters import apply_task_filters, parse_search_query
 from .forms import CommentForm, TaskForm
-from .models import Comment, Project, Rule, Status, Tag, Task
+from .models import Comment, Project, Rule, Status, Tag, Task, TaskType
 from event_app.models import Event
 from .rules import process_task_rules
 
@@ -755,6 +755,7 @@ class TaskFormTest(TestCase):
         self.status = Status.objects.create(name="Open")
         self.done = Status.objects.create(name="Done", is_done=True)
         self.project = Project.objects.create(name="P")
+        self.task_type = TaskType.objects.create(name="Feature", project=self.project)
         self.task = Task.objects.create(
             title="Task", project=self.project, assignee=self.user, status=self.status
         )
@@ -762,7 +763,8 @@ class TaskFormTest(TestCase):
     def _form(self, status):
         return TaskForm(
             data={"title": "T", "description": "test", "progress_summary": "",
-                  "status": status.pk, "assignee": self.user.pk},
+                  "status": status.pk, "assignee": self.user.pk,
+                  "task_type": self.task_type.pk},
             instance=self.task,
         )
 
@@ -795,7 +797,8 @@ class TaskFormTest(TestCase):
     def test_deadline_field_is_optional(self):
         form = TaskForm(
             data={"title": "T", "description": "test", "progress_summary": "",
-                  "status": self.status.pk, "deadline": "", "assignee": self.user.pk},
+                  "status": self.status.pk, "deadline": "", "assignee": self.user.pk,
+                  "task_type": self.task_type.pk},
             instance=self.task,
         )
         self.assertTrue(form.is_valid(), form.errors)
@@ -812,6 +815,7 @@ class TaskFormEventTest(TestCase):
         self.status = Status.objects.create(name="Open")
         self.project = Project.objects.create(name="P")
         self.project.participants.add(self.user)
+        self.task_type = TaskType.objects.create(name="Feature", project=self.project)
         self.event = Event.objects.create(
             event_date="2026-06-01", project=self.project, name="My Event"
         )
@@ -826,7 +830,8 @@ class TaskFormEventTest(TestCase):
 
     def _form(self, extra_data=None, user=None):
         data = {"title": "T", "description": "test", "progress_summary": "",
-                "status": self.status.pk, "assignee": self.user.pk}
+                "status": self.status.pk, "assignee": self.user.pk,
+                "task_type": self.task_type.pk}
         if extra_data:
             data.update(extra_data)
         return TaskForm(data=data, user=user, instance=self.task)
@@ -866,6 +871,7 @@ class BaseViewTest(TestCase):
         # ステータスはプロジェクトに紐づける（TaskForm がプロジェクト別にフィルタするため）
         self.status = Status.objects.create(name="Open", project=self.project)
         self.done = Status.objects.create(name="Done", is_done=True, project=self.project)
+        self.task_type = TaskType.objects.create(name="Feature", project=self.project)
         self.task = Task.objects.create(
             title="T", project=self.project, assignee=self.user, status=self.status
         )
@@ -1110,7 +1116,8 @@ class TaskViewsTest(BaseViewTest):
         self.client.post(
             reverse("task_create") + f"?project={self.project.pk}",
             {"title": "New", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "assignee": self.user.pk},
+             "status": self.status.pk, "assignee": self.user.pk,
+             "task_type": self.task_type.pk},
         )
         task = Task.objects.get(title="New")
         self.assertEqual(task.project, self.project)
@@ -1120,7 +1127,8 @@ class TaskViewsTest(BaseViewTest):
         self.client.post(
             reverse("task_create") + f"?project={self.project.pk}",
             {"title": "New", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "assignee": self.user.pk},
+             "status": self.status.pk, "assignee": self.user.pk,
+             "task_type": self.task_type.pk},
         )
         self.assertEqual(Task.objects.get(title="New").assignee, self.user)
 
@@ -1129,7 +1137,8 @@ class TaskViewsTest(BaseViewTest):
         self.client.post(
             reverse("task_create") + f"?task={self.task.pk}",
             {"title": "Child", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "assignee": self.user.pk},
+             "status": self.status.pk, "assignee": self.user.pk,
+             "task_type": self.task_type.pk},
         )
         child = Task.objects.get(title="Child")
         self.assertEqual(child.parent, self.task)
@@ -1140,7 +1149,8 @@ class TaskViewsTest(BaseViewTest):
         self.client.post(
             reverse("task_create") + f"?project={self.project.pk}",
             {"title": "Done", "description": "test", "progress_summary": "",
-             "status": self.done.pk, "assignee": self.user.pk},
+             "status": self.done.pk, "assignee": self.user.pk,
+             "task_type": self.task_type.pk},
         )
         self.assertIsNotNone(Task.objects.get(title="Done").completed_at)
 
@@ -1149,7 +1159,8 @@ class TaskViewsTest(BaseViewTest):
         self.client.post(
             reverse("task_create") + f"?project={self.project.pk}",
             {"title": "Open", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "assignee": self.user.pk},
+             "status": self.status.pk, "assignee": self.user.pk,
+             "task_type": self.task_type.pk},
         )
         self.assertIsNone(Task.objects.get(title="Open").completed_at)
 
@@ -1162,7 +1173,8 @@ class TaskViewsTest(BaseViewTest):
         response = self.client.post(
             reverse("task_create") + f"?project={other.pk}",
             {"title": "X", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "assignee": self.user.pk},
+             "status": self.status.pk, "assignee": self.user.pk,
+             "task_type": self.task_type.pk},
         )
         self.assertEqual(response.status_code, 500)
 
@@ -1171,7 +1183,8 @@ class TaskViewsTest(BaseViewTest):
         self.client.post(
             reverse("task_update", kwargs={"pk": self.task.pk}),
             {"title": "T", "description": "test", "progress_summary": "",
-             "status": self.done.pk, "assignee": self.user.pk},
+             "status": self.done.pk, "assignee": self.user.pk,
+             "task_type": self.task_type.pk},
         )
         self.task.refresh_from_db()
         self.assertIsNotNone(self.task.completed_at)
@@ -1182,7 +1195,8 @@ class TaskViewsTest(BaseViewTest):
         self.client.post(
             reverse("task_update", kwargs={"pk": self.task.pk}),
             {"title": "T", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "assignee": self.user.pk},
+             "status": self.status.pk, "assignee": self.user.pk,
+             "task_type": self.task_type.pk},
         )
         self.task.refresh_from_db()
         self.assertIsNone(self.task.completed_at)
@@ -1234,7 +1248,8 @@ class TaskEventViewsTest(BaseViewTest):
         self.client.post(
             reverse("task_create") + f"?project={self.project.pk}",
             {"title": "New", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "event": self.event.pk, "assignee": self.user.pk},
+             "status": self.status.pk, "event": self.event.pk, "assignee": self.user.pk,
+             "task_type": self.task_type.pk},
         )
         self.assertEqual(Task.objects.get(title="New").event, self.event)
 
@@ -1243,7 +1258,8 @@ class TaskEventViewsTest(BaseViewTest):
         self.client.post(
             reverse("task_create") + f"?project={self.project.pk}",
             {"title": "New", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "assignee": self.user.pk},
+             "status": self.status.pk, "assignee": self.user.pk,
+             "task_type": self.task_type.pk},
         )
         self.assertIsNone(Task.objects.get(title="New").event)
 
@@ -1252,7 +1268,8 @@ class TaskEventViewsTest(BaseViewTest):
         self.client.post(
             reverse("task_update", kwargs={"pk": self.task.pk}),
             {"title": "T", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "event": self.event.pk, "assignee": self.user.pk},
+             "status": self.status.pk, "event": self.event.pk, "assignee": self.user.pk,
+             "task_type": self.task_type.pk},
         )
         self.task.refresh_from_db()
         self.assertEqual(self.task.event, self.event)
@@ -1263,7 +1280,8 @@ class TaskEventViewsTest(BaseViewTest):
         self.client.post(
             reverse("task_update", kwargs={"pk": self.task.pk}),
             {"title": "T", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "event": "", "assignee": self.user.pk},
+             "status": self.status.pk, "event": "", "assignee": self.user.pk,
+             "task_type": self.task_type.pk},
         )
         self.task.refresh_from_db()
         self.assertIsNone(self.task.event)
@@ -1645,6 +1663,7 @@ class TaskFormDSLTest(TestCase):
         self.project = Project.objects.create(name="P")
         self.project.participants.add(self.user)
         self.status = Status.objects.create(name="Open", project=self.project)
+        self.task_type = TaskType.objects.create(name="Feature", project=self.project)
         self.task = Task.objects.create(
             title="T", project=self.project, assignee=self.user, status=self.status
         )
@@ -1652,7 +1671,8 @@ class TaskFormDSLTest(TestCase):
     def _form(self, dsl=""):
         return TaskForm(
             data={"title": "T", "description": "test", "progress_summary": "",
-                  "status": self.status.pk, "assignee": self.user.pk, "dsl": dsl},
+                  "status": self.status.pk, "assignee": self.user.pk, "dsl": dsl,
+                  "task_type": self.task_type.pk},
             user=self.user, project=self.project, instance=self.task,
         )
 
@@ -1692,7 +1712,8 @@ class TaskDSLViewTest(BaseViewTest):
 
     def _post_update(self, extra_data=None):
         data = {"title": "T", "description": "test", "progress_summary": "",
-                "status": self.status.pk, "assignee": self.user.pk}
+                "status": self.status.pk, "assignee": self.user.pk,
+                "task_type": self.task_type.pk}
         if extra_data:
             data.update(extra_data)
         self.login()
@@ -1728,7 +1749,8 @@ class TaskDSLViewTest(BaseViewTest):
         self.client.post(
             reverse("task_create") + f"?project={self.project.pk}",
             {"title": "NewTask", "description": "test", "progress_summary": "",
-             "status": self.status.pk, "assignee": self.user.pk, "dsl": dsl},
+             "status": self.status.pk, "assignee": self.user.pk, "dsl": dsl,
+             "task_type": self.task_type.pk},
         )
         self.assertTrue(Task.objects.filter(title="NewTask").exists())
         self.task.refresh_from_db()
@@ -1892,6 +1914,7 @@ class TaskFormTagFieldTest(TestCase):
         self.project = Project.objects.create(name="P")
         self.project.participants.add(self.user)
         self.status = Status.objects.create(name="Open", project=self.project)
+        self.task_type = TaskType.objects.create(name="Feature", project=self.project)
         self.task = Task.objects.create(
             title="T", project=self.project, assignee=self.user, status=self.status
         )
@@ -1899,7 +1922,8 @@ class TaskFormTagFieldTest(TestCase):
     def _form(self, tags="", instance=None):
         return TaskForm(
             data={"title": "T", "description": "test", "progress_summary": "",
-                  "status": self.status.pk, "assignee": self.user.pk, "tags": tags},
+                  "status": self.status.pk, "assignee": self.user.pk, "tags": tags,
+                  "task_type": self.task_type.pk},
             user=self.user, project=self.project,
             instance=instance or self.task,
         )
@@ -2055,7 +2079,8 @@ class TagFilterApplyTest(TestCase):
 class TaskTagViewTest(BaseViewTest):
     def _post_create(self, extra_data=None):
         data = {"title": "NewTask", "description": "test", "progress_summary": "",
-                "status": self.status.pk, "assignee": self.user.pk}
+                "status": self.status.pk, "assignee": self.user.pk,
+                "task_type": self.task_type.pk}
         if extra_data:
             data.update(extra_data)
         self.login()
@@ -2066,7 +2091,8 @@ class TaskTagViewTest(BaseViewTest):
 
     def _post_update(self, extra_data=None):
         data = {"title": "T", "description": "test", "progress_summary": "",
-                "status": self.status.pk, "assignee": self.user.pk}
+                "status": self.status.pk, "assignee": self.user.pk,
+                "task_type": self.task_type.pk}
         if extra_data:
             data.update(extra_data)
         self.login()

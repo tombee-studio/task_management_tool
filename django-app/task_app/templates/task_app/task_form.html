@@ -1,4 +1,5 @@
 {% extends "base_form.html" %}
+{% load extras %}
 
 {% block header_links %}
 {% if object %}
@@ -8,17 +9,71 @@
 {% endif %}
 {% endblock %}
 
-{% block form_button %}
-<div>
-  <button type="submit">保存</button>
-
-  {% if object %}
-    <a href="{% url 'task_detail' object.pk %}">キャンセル</a>
-  {% else %}
-    <a href="{% url 'project_list' %}">キャンセル</a>
+{% block form_extra %}
+{% if task_type_fields_by_type %}
+<div id="task-type-fields-wrapper">
+  <hr>
+  <h3>種別フィールド</h3>
+  {% for task_type_id, fields in task_type_fields_by_type.items %}
+  {% if fields %}
+  <div class="task-type-fields-group" data-task-type="{{ task_type_id }}" style="display:none;">
+    {% for field in fields %}
+    <div class="form-group">
+      <label for="type_field_{{ field.pk }}">
+        {{ field.label }}{% if field.required %} <span class="text-danger">*</span>{% endif %}
+      </label>
+      {% if field.field_type == "textarea" %}
+        <textarea id="type_field_{{ field.pk }}" name="type_field_{{ field.pk }}"
+                  class="form-control" rows="3"
+                  {% if field.required %}required{% endif %}>{{ field_values|get_item:field.pk }}</textarea>
+      {% else %}
+        <input id="type_field_{{ field.pk }}" name="type_field_{{ field.pk }}"
+               type="{{ field.field_type }}" class="form-control"
+               value="{{ field_values|get_item:field.pk }}"
+               {% if field.required %}required{% endif %}>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
   {% endif %}
+  {% endfor %}
 </div>
 
+<script>
+(function() {
+  var select = document.getElementById('id_task_type');
+  function showGroup() {
+    var selected = select ? select.value : '';
+    document.querySelectorAll('.task-type-fields-group').forEach(function(g) {
+      var show = g.dataset.taskType === selected;
+      g.style.display = show ? '' : 'none';
+      g.querySelectorAll('input,textarea').forEach(function(el) {
+        el.disabled = !show;
+      });
+    });
+  }
+  if (select) {
+    select.addEventListener('change', showGroup);
+    showGroup();
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}
+
+{% block form_button %}
+<div>
+  <button type="submit" class="btn btn-primary">保存</button>
+
+  {% if object %}
+    <a href="{% url 'task_detail' object.pk %}" class="btn btn-default">キャンセル</a>
+  {% else %}
+    <a href="{% url 'project_list' %}" class="btn btn-default">キャンセル</a>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block form_after %}
 {% include "task_app/components/task_list_component.html" with tasks=tasks task=task status_list=status_list selected_status_list=selected_status_list nest_count=0 %}
 
 <p>
@@ -52,5 +107,4 @@
 {% else %}
   <p>コメントはまだ登録されていません。</p>
 {% endif %}
-
 {% endblock %}

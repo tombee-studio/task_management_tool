@@ -63,6 +63,74 @@ class Tag(models.Model):
     return self.name
 
 
+class TaskType(models.Model):
+  project = models.ForeignKey(
+    'Project',
+    on_delete=models.CASCADE,
+    related_name='task_types',
+  )
+  name = models.CharField(max_length=128)
+  parent = models.ForeignKey(
+    'self',
+    on_delete=models.CASCADE,
+    related_name='children',
+    null=True,
+    blank=True,
+  )
+
+  class Meta:
+    ordering = ['name']
+
+  def __str__(self):
+    return self.name
+
+
+class TaskTypeField(models.Model):
+  FIELD_TYPES = [
+    ('text', 'テキスト'),
+    ('url', 'URL'),
+    ('number', '数値'),
+    ('textarea', 'テキストエリア'),
+  ]
+  task_type = models.ForeignKey(
+    'TaskType',
+    on_delete=models.CASCADE,
+    related_name='fields',
+  )
+  name = models.SlugField(max_length=64)
+  label = models.CharField(max_length=128)
+  field_type = models.CharField(max_length=16, choices=FIELD_TYPES, default='text')
+  required = models.BooleanField(default=False)
+  order = models.PositiveIntegerField(default=0)
+
+  class Meta:
+    ordering = ['order', 'name']
+    unique_together = [('task_type', 'name')]
+
+  def __str__(self):
+    return f"{self.task_type.name}: {self.label}"
+
+
+class TaskFieldValue(models.Model):
+  task = models.ForeignKey(
+    'Task',
+    on_delete=models.CASCADE,
+    related_name='field_values',
+  )
+  field = models.ForeignKey(
+    'TaskTypeField',
+    on_delete=models.CASCADE,
+    related_name='values',
+  )
+  value = models.TextField(blank=True, default='')
+
+  class Meta:
+    unique_together = [('task', 'field')]
+
+  def __str__(self):
+    return f"{self.task} - {self.field.label}: {self.value}"
+
+
 class Task(models.Model):
   title = models.CharField(max_length=256, null=False)
   project = models.ForeignKey(
@@ -118,6 +186,13 @@ class Task(models.Model):
     'Tag',
     related_name='tasks',
     blank=True)
+  task_type = models.ForeignKey(
+    'TaskType',
+    on_delete=models.SET_NULL,
+    related_name='tasks',
+    null=True,
+    blank=True,
+  )
   history = AuditlogHistoryField()
   
   def __str__(self):

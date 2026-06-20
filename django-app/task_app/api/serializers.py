@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from task_app.models import Project, Status, Comment, Tag, Task, UserPreferences, Rule
+from task_app.models import Project, Status, Comment, Tag, Task, UserPreferences, Rule, TaskType, TaskTypeField, TaskFieldValue
 
 User = get_user_model()
 
@@ -38,7 +38,7 @@ class TaskSerializer(serializers.ModelSerializer):
         model = Task
         fields = [
             'id', 'title', 'project', 'description', 'progress_summary',
-            'assignee', 'reporter', 'parent', 'status', 'deadline',
+            'assignee', 'reporter', 'parent', 'status', 'task_type', 'deadline',
             'completed_at', 'event', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -59,3 +59,24 @@ class RuleSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class TaskTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaskType
+        fields = ['id', 'project', 'name', 'parent']
+        read_only_fields = ['id']
+
+
+class TaskTypeFieldSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaskTypeField
+        fields = ['id', 'task_type', 'name', 'label', 'field_type', 'required', 'order']
+        read_only_fields = ['id']
+
+
+class TaskFieldValueSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaskFieldValue
+        fields = ['id', 'task', 'field', 'value']
+        read_only_fields = ['id']

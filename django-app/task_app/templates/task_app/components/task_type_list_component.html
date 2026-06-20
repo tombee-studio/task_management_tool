@@ -1,0 +1,44 @@
+{% if task_type_list %}
+  {% for task_type in task_type_list %}
+  <div class="panel panel-default" style="margin: 8px 16px;">
+    <div class="panel-heading" style="display:flex; justify-content:space-between; align-items:center;">
+      <strong>{{ task_type.name }}</strong>
+      {% if task_type.parent %}<small>（親: {{ task_type.parent.name }}）</small>{% endif %}
+      <span>
+        <a href="{% url 'task_type_update' task_type.pk %}" class="btn btn-xs btn-default">編集</a>
+        <a href="{% url 'task_type_delete' task_type.pk %}" class="btn btn-xs btn-danger">削除</a>
+      </span>
+    </div>
+    <div class="panel-body">
+      <a href="{% url 'task_type_field_create' task_type.pk %}" class="btn btn-xs btn-default">フィールド追加</a>
+      {% if task_type.fields.all %}
+      <table class="table table-condensed" style="margin-top:8px; margin-bottom:0;">
+        <thead>
+          <tr><th>名前</th><th>ラベル</th><th>種類</th><th>必須</th><th>順序</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for field in task_type.fields.all %}
+          <tr>
+            <td>{{ field.name }}</td>
+            <td>{{ field.label }}</td>
+            <td>{{ field.get_field_type_display }}</td>
+            <td>{% if field.required %}✓{% endif %}</td>
+            <td>{{ field.order }}</td>
+            <td>
+              <a href="{% url 'task_type_field_update' field.pk %}">編集</a>
+              &nbsp;
+              <a href="{% url 'task_type_field_delete' field.pk %}">削除</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="margin-top:8px; color:#888;">フィールドはまだ登録されていません。</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <p class="panel-body">種別はまだ登録されていません。</p>
+{% endif %}
