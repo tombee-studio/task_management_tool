@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>在庫削除確認</h1>
+
+<p>「{{ object }}」を削除しますか？</p>
+
+<form method="POST">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-danger">削除</button>
+  <a href="{% url 'inventory_list' %}" class="btn btn-default">キャンセル</a>
+</form>
+{% endblock %}
