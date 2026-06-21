@@ -1,0 +1,83 @@
+{% load static %}
+{% load bootstrap3 %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}タスク管理ツール{% endblock %}</title>
+    {% bootstrap_css %}
+    {% bootstrap_javascript %}
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .site-content {
+            flex: 1 0 auto;
+        }
+        .site-footer {
+            flex-shrink: 0;
+            border-top: 1px solid #e7e7e7;
+            padding: 12px 0;
+            margin-top: 24px;
+            color: #999;
+            font-size: 12px;
+            text-align: center;
+        }
+        .site-footer .footer-version {
+            display: inline-block;
+            margin-left: 8px;
+            color: #bbb;
+            font-size: 11px;
+        }
+        .navbar-brand .brand-title {
+            font-weight: bold;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar navbar-default">
+        <div class="container">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="{% url 'project_list' %}">
+                    <span class="brand-title">タスク管理ツール</span>
+                </a>
+            </div>
+            <ul class="nav navbar-nav navbar-right">
+                {% if user.is_authenticated %}
+                    <li><a href="{% url 'project_list' %}">プロジェクト</a></li>
+                    <li><a href="{% url 'user_detail' %}">{{ user.username }}</a></li>
+                    <li>
+                        <form action="{% url 'logout' %}" method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-link navbar-btn" style="padding-top:15px;">ログアウト</button>
+                        </form>
+                    </li>
+                {% else %}
+                    <li><a href="{% url 'login' %}">ログイン</a></li>
+                    <li><a href="{% url 'signup' %}">サインアップ</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="site-content">
+        <div class="container">
+            {% bootstrap_messages %}
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <span class="footer-copyright">&copy; タスク管理ツール</span>
+            <span class="footer-version">version: {{ GIT_HASH }}</span>
+        </div>
+    </footer>
+
+    {% block extra_script %}{% endblock %}
+</body>
+</html>
