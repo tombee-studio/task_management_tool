@@ -342,5 +342,46 @@ class TestGetAssignee(unittest.TestCase):
         self.assertEqual(ctx.get_assignee(), 2)
 
 
+class TestRunAgent(unittest.TestCase):
+    def _make_claude_mock(self, response_text):
+        content = MagicMock()
+        content.text = response_text
+        message = MagicMock()
+        message.content = [content]
+        client = MagicMock()
+        client.messages.create.return_value = message
+        return client
+
+    def test_raises_without_workdir(self):
+        ctx = _make_ctx()
+        with self.assertRaises(RuntimeError):
+            ctx.run_agent("do something")
+
+    @patch.object(AgentCtx, "_apply_files", return_value=["app/foo.py"])
+    @patch.object(AgentCtx, "_read_codebase", return_value="### app/foo.py\n```\ncode\n```")
+    def test_calls_claude_and_applies_files(self, mock_read, mock_apply):
+        ctx = _make_ctx()
+        ctx._workdir = "/fake/workdir"
+        ctx._claude = self._make_claude_mock('FILE: app/foo.py\n```\ncode\n```')
+
+        changed = ctx.run_agent("改修を実施してください。")
+
+        self.assertEqual(changed, ["app/foo.py"])
+        mock_read.assert_called_once()
+        mock_apply.assert_called_once()
+
+    @patch.object(AgentCtx, "_apply_files", return_value=[])
+    @patch.object(AgentCtx, "_read_codebase", return_value="")
+    def test_prompt_included_in_claude_call(self, mock_read, mock_apply):
+        ctx = _make_ctx()
+        ctx._workdir = "/fake/workdir"
+        ctx._claude = self._make_claude_mock("")
+
+        ctx.run_agent("特定の改修をしてください")
+
+        messages = ctx._claude.messages.create.call_args[1]["messages"]
+        self.assertIn("特定の改修をしてください", messages[0]["content"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

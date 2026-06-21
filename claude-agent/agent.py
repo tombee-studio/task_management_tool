@@ -85,6 +85,10 @@ def execute_agent_script(script_code, ctx):
         "SMALL": SMALL,
         "MIDDLE": MIDDLE,
         "LARGE": LARGE,
+        # Convenience wrappers so scripts can call top-level functions
+        # in addition to ctx.method() style.
+        "run_agent": ctx.run_agent,
+        "create_pr": ctx.gh_create_pr,
     }
 
     exec(compile(tree, "<agent_script>", "exec"), namespace)
