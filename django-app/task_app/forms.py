@@ -17,16 +17,18 @@ class SignUpForm(UserCreationForm):
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['name', 'git_url', 'dev_branch', 'release_branch', 'main_branch']
+        fields = ['name', 'git_url', 'dev_branch', 'release_branch', 'main_branch', 'agent']
         widgets = {
             'dev_branch': forms.TextInput(attrs={'placeholder': 'develop'}),
             'release_branch': forms.TextInput(attrs={'placeholder': 'release'}),
             'main_branch': forms.TextInput(attrs={'placeholder': 'main'}),
+            'agent': forms.Textarea(attrs={'rows': 6}),
         }
         labels = {
             'dev_branch': '開発ブランチ',
             'release_branch': 'リリースブランチ',
             'main_branch': 'メインブランチ',
+            'agent': 'エージェント設定',
         }
 
 
