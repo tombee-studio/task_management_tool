@@ -1,221 +1,72 @@
 {% load bootstrap3 %}
+{% load static %}
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>{% block title %}Task Management Tool{% endblock %}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  {% bootstrap_css %}
-  {% bootstrap_javascript jquery=True %}
-
-  <style>
-    body { padding-top: 50px; }
-    .tree-item {
-      margin-left: calc(var(--depth) * 16px);
-    }
-
-    .line-clamp-1 {
-      display: -webkit-box;
-      -webkit-line-clamp: 1;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-
-    .task-done {
-      background-color: #f2f2f2;
-      background-image: repeating-linear-gradient(
-        45deg,
-        rgba(0, 0, 0, 0.08) 0,
-        rgba(0, 0, 0, 0.08) 1px,
-        transparent 1px,
-        transparent 6px
-      );
-    }
-
-    .task-deadline-warning {
-      background-color: #fffbe6;
-      background-image: repeating-linear-gradient(
-        45deg,
-        rgba(255, 200, 0, 0.25) 0,
-        rgba(255, 200, 0, 0.25) 1px,
-        transparent 1px,
-        transparent 6px
-      );
-    }
-
-    .task-deadline-urgent {
-      background-color: #fff0f0;
-      background-image: repeating-linear-gradient(
-        45deg,
-        rgba(220, 0, 0, 0.25) 0,
-        rgba(220, 0, 0, 0.25) 1px,
-        transparent 1px,
-        transparent 6px
-      );
-    }
-
-    /* Gantt chart */
-    .gantt-wrapper {
-      overflow-x: auto;
-    }
-    .gantt-container {
-      min-width: 640px;
-    }
-    .gantt-row {
-      display: flex;
-      align-items: center;
-      border-bottom: 1px solid #eee;
-      min-height: 30px;
-    }
-    .gantt-header-row {
-      font-weight: bold;
-      font-size: 11px;
-      background: #f9f9f9;
-      border-bottom: 2px solid #ddd;
-      min-height: 26px;
-    }
-    .gantt-name-col {
-      width: 34%;
-      min-width: 180px;
-      max-width: 280px;
-      padding: 3px 8px 3px 4px;
-      font-size: 13px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      border-right: 1px solid #ddd;
-      flex-shrink: 0;
-      box-sizing: border-box;
-    }
-    .gantt-bar-area {
-      flex: 1;
-      position: relative;
-      height: 30px;
-      overflow: hidden;
-    }
-    .gantt-bar-area::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background-image: repeating-linear-gradient(
-        to right,
-        transparent 0,
-        transparent calc(var(--day-pct) - 1px),
-        rgba(0, 0, 0, 0.13) calc(var(--day-pct) - 1px),
-        rgba(0, 0, 0, 0.13) var(--day-pct)
-      );
-      -webkit-mask-image: repeating-linear-gradient(
-        to bottom, black 0, black 3px, transparent 3px, transparent 6px
-      );
-      mask-image: repeating-linear-gradient(
-        to bottom, black 0, black 3px, transparent 3px, transparent 6px
-      );
-      pointer-events: none;
-    }
-    .gantt-header-row .gantt-bar-area {
-      height: 26px;
-    }
-    .gantt-tick {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 1px;
-      background: #e8e8e8;
-    }
-    .gantt-date-label {
-      position: absolute;
-      top: 5px;
-      font-size: 10px;
-      color: #888;
-      transform: translateX(-50%);
-      white-space: nowrap;
-      pointer-events: none;
-    }
-    .gantt-today-line {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background: rgba(200, 60, 0, 0.45);
-      z-index: 3;
-    }
-    .gantt-event-marker {
-      position: absolute;
-      top: 50%;
-      width: 10px;
-      height: 10px;
-      background: #337ab7;
-      transform: translate(-50%, -50%) rotate(45deg);
-      z-index: 2;
-      border-radius: 1px;
-    }
-    .gantt-bar {
-      position: absolute;
-      top: 6px;
-      height: 18px;
-      border-radius: 3px;
-      z-index: 2;
-      min-width: 3px;
-    }
-    .gantt-bar-active  { background: #5cb85c; opacity: 0.85; }
-    .gantt-dot {
-      position: absolute;
-      top: 50%;
-      width: 8px;
-      height: 8px;
-      background: #999;
-      border-radius: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 2;
-    }
-    .gantt-event-row {
-      background: #f4f8ff;
-    }
-    .gantt-event-name {
-      font-size: 12px;
-      color: #337ab7;
-    }
-  </style>
-
-  {% block extra_head %}{% endblock %}
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}タスク管理ツール{% endblock %}</title>
+    {% bootstrap_css %}
+    {% block extra_head %}{% endblock %}
+    <style>
+        html {
+            position: relative;
+            min-height: 100%;
+        }
+        body {
+            margin-bottom: 48px;
+        }
+        .site-footer {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 48px;
+            line-height: 48px;
+            background-color: #f5f5f5;
+            border-top: 1px solid #e7e7e7;
+            color: #777;
+            font-size: 12px;
+        }
+        .site-footer .version-info {
+            color: #999;
+        }
+    </style>
 </head>
-
 <body>
-  <nav class="navbar navbar-default navbar-fixed-top">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="{% url 'project_list' %}">Task Management Tool</a>
-      <span class="navbar-text" style="font-size: 11px; color: #aaa;">{{ GIT_HASH }}</span>
-      <div class="navbar-text navbar-right">
-        {% if user.is_authenticated %}
-        <a href="{% url 'user_detail' %}" class="navbar-link" style="margin: 0px 25px">{{user.username}}</a>
-        <form method="POST" action="{% url 'logout' %}" style="display: inline-block;">
-          {% csrf_token %}
-          <button type="submit">ログアウト</button>
-        </form>
-        {% else %}
-        <a href="{% url 'login' %}" class="navbar-link" style="margin: 0px 25px">ログイン</a>
-        <a href="{% url 'signup' %}" class="navbar-link" style="margin: 0px 25px">サインアップ</a>
-        {% endif %}
-      </div>
+    <nav class="navbar navbar-default">
+        <div class="container">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="{% url 'project_list' %}">タスク管理ツール</a>
+            </div>
+            <ul class="nav navbar-nav navbar-right">
+                {% if user.is_authenticated %}
+                    <li><a href="{% url 'user_detail' %}">{{ user.username }}</a></li>
+                    <li>
+                        <form action="{% url 'logout' %}" method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-link navbar-btn" style="padding-top:15px;">ログアウト</button>
+                        </form>
+                    </li>
+                {% else %}
+                    <li><a href="{% url 'login' %}">ログイン</a></li>
+                    <li><a href="{% url 'signup' %}">サインアップ</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% bootstrap_messages %}
+        {% block content %}{% endblock %}
     </div>
-  </nav>
 
-  <main class="container-lg" style="padding: 16px;">
-    {% if messages %}
-      <div class="messages">
-        {% for message in messages %}
-          <div class="message">
-            {{ message }}
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
+    <footer class="site-footer">
+        <div class="container text-center">
+            <span class="version-info">Version: {{ GIT_HASH }}</span>
+        </div>
+    </footer>
 
-    {% block content %}
-    {% endblock %}
-  </main>
-
-  {% block extra_js %}{% endblock %}
+    {% bootstrap_javascript %}
+    {% block extra_js %}{% endblock %}
 </body>
 </html>
