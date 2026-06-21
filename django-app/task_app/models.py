@@ -12,6 +12,7 @@ class Project(models.Model):
   dev_branch = models.CharField(max_length=100, default='', blank=True)
   release_branch = models.CharField(max_length=100, default='', blank=True)
   main_branch = models.CharField(max_length=100, default='main', blank=True)
+  agent = models.TextField(blank=True, default='')
   history = AuditlogHistoryField()
   participants = models.ManyToManyField(
     settings.AUTH_USER_MODEL,
