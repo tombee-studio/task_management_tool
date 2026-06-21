@@ -29,7 +29,7 @@ TASK_API_URL = os.environ["TASK_API_URL"].rstrip("/")
 TASK_API_KEY = os.environ["TASK_API_KEY"]
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 GITHUB_PAT = os.environ["GITHUB_PAT"]
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-opus-4-8"
 
 _API_HEADERS = {"X-API-Key": TASK_API_KEY, "Content-Type": "application/json"}
 
