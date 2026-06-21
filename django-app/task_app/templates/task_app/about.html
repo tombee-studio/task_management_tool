@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h1>About</h1>
+  <table class="table" style="max-width: 480px;">
+    <tbody>
+      <tr>
+        <th>サイトバージョン (GIT_HASH)</th>
+        <td><code>{{ GIT_HASH }}</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <h2>リンク</h2>
+  <ul>
+    <li><a href="{% url 'swagger-ui' %}">API ドキュメント (Swagger UI)</a></li>
+    <li><a href="{% url 'redoc' %}">API ドキュメント (ReDoc)</a></li>
+  </ul>
+</div>
+{% endblock %}
