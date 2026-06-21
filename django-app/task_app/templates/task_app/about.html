@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container" style="margin-top: 2rem;">
+  <h1>About</h1>
+
+  <div class="panel panel-default" style="margin-top: 1.5rem;">
+    <div class="panel-heading">
+      <h3 class="panel-title">サイト情報</h3>
+    </div>
+    <div class="panel-body">
+      <dl class="dl-horizontal">
+        <dt>サイトバージョン (GIT_HASH)</dt>
+        <dd><code>{{ GIT_HASH }}</code></dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h3 class="panel-title">リンク</h3>
+    </div>
+    <div class="panel-body">
+      <ul>
+        <li><a href="{% url 'swagger-ui' %}">API ドキュメント (Swagger UI)</a></li>
+        <li><a href="{% url 'redoc' %}">API ドキュメント (ReDoc)</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
