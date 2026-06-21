@@ -313,6 +313,38 @@ class AgentCtx:
         data = self._get(f"task_app/tasks/{self.task_id}/")
         return data.get("reporter") or data.get("assignee")
 
+    def run_agent(self, prompt):
+        """Run Claude with *prompt* in the current working-directory context.
+
+        Reads the codebase, asks Claude to implement the changes described in
+        *prompt*, applies any FILE blocks returned, and returns the list of
+        changed file paths.  Call clone_git_url() before run_agent().
+        """
+        if self._workdir is None:
+            raise RuntimeError("Call clone_git_url() before run_agent().")
+
+        context = self._read_codebase()
+        full_prompt = (
+            f"{prompt.strip()}\n\n"
+            f"Here is the relevant codebase:\n{context}\n\n"
+            "Provide the complete content of each file you need to create or modify. "
+            "Format each file as:\n"
+            "FILE: <relative/path/to/file>\n```\n<content>\n```\n\n"
+            "Only output FILE blocks. No explanations."
+        )
+
+        print("[agent] run_agent: calling Claude...")
+        response = self._client.messages.create(
+            model=self._model,
+            max_tokens=8096,
+            messages=[{"role": "user", "content": full_prompt}],
+        )
+        implementation = response.content[0].text
+
+        changed_files = self._apply_files(implementation)
+        print(f"[agent] run_agent: {len(changed_files)} file(s) changed.")
+        return changed_files
+
     def push(self, task):
         """Ask Claude to implement the task, run tests, commit, and push.
 
