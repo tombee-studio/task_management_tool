@@ -17,6 +17,15 @@ def build_gantt_data(project, from_date=None, to_date=None, assignee_ids=None,
             task_qs = task_qs.filter(status__is_done=False)
         elif status_filter == 'done':
             task_qs = task_qs.filter(status__is_done=True)
+    else:
+        # Apply filters even when task_qs is provided externally
+        if assignee_ids is not None:
+            task_qs = task_qs.filter(assignee_id__in=assignee_ids)
+        if status_filter == 'active':
+            task_qs = task_qs.filter(status__is_done=False)
+        elif status_filter == 'done':
+            task_qs = task_qs.filter(status__is_done=True)
+
     tasks = list(task_qs)
 
     today = date.today()
