@@ -30,18 +30,6 @@ def _parse_gantt_date(value):
 
 
 def preprocess_description(project, _, form):
-    # 時々エラーが発生しているようでリロードに時間がかかっているようなので
-    # 一旦対応を削除
-    # form.instance.description = re.sub(
-    #         r'(commit:\s*([0-9a-zA-Z]+))', 
-    #         f"[\g<1>]({project.git_url})", form.instance.description)
-    # m_iter = re.finditer(r'\#([0-9]+)', form.instance.description)
-    # form.instance.description = re.sub(
-    #     r'\#([0-9]+)', 
-    #     "[\#\g<1>](/task_app/tasks/\g<1>/)", 
-    #     form.instance.description)
-    # return list(filter(lambda item: item != None,
-    #     map(lambda m: Task.objects.get(pk=m.group(1)), m_iter)))
     return []
         
 
@@ -524,7 +512,7 @@ class TaskUpdateView(LoginRequiredMixin, UpdateView):
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
-        return reverse_lazy("project_list")
+        return reverse_lazy("task_detail", kwargs={"pk": self.object.pk})
 
 
 class TaskDeleteView(LoginRequiredMixin, DeleteView):
