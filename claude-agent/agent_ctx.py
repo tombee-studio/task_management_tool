@@ -484,20 +484,36 @@ class AgentCtx:
         return self._project
 
     def _resolve_base_branch(self, project):
+        candidates = []
         dev = (project.get("dev_branch") or "").strip()
         if dev:
-            return dev
+            candidates.append(dev)
         main = (project.get("main_branch") or "").strip()
         if main:
-            return main
-        resp = requests.get(
+            candidates.append(main)
+
+        gh_headers = {
+            "Authorization": f"token {self._github_pat}",
+            "Accept": "application/vnd.github.v3+json",
+        }
+
+        repo_resp = requests.get(
             f"https://api.github.com/repos/{self._github_repo}",
-            headers={
-                "Authorization": f"token {self._github_pat}",
-                "Accept": "application/vnd.github.v3+json",
-            },
+            headers=gh_headers,
         )
-        return resp.json().get("default_branch", "main") if resp.ok else "main"
+        default_branch = repo_resp.json().get("default_branch", "main") if repo_resp.ok else "main"
+
+        for candidate in candidates:
+            check = requests.get(
+                f"https://api.github.com/repos/{self._github_repo}/branches/{candidate}",
+                headers=gh_headers,
+            )
+            if check.status_code == 200:
+                return candidate
+            print(f"[agent] Branch '{candidate}' not found in repo, skipping.")
+
+        print(f"[agent] Falling back to default branch '{default_branch}'.")
+        return default_branch
 
     def _classify_kind(self, task):
         for tag in (getattr(task, "_raw", {}).get("tags") or []):
