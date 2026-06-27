@@ -166,11 +166,6 @@ class ProjectUpdateView(LoginRequiredMixin, UpdateView):
     def get_queryset(self):
         return self.request.user.projects.all()
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["agent_help"] = get_agent_help()
-        return context
-
     def get_success_url(self):
         return reverse_lazy("project_detail", kwargs={"pk": self.object.pk})
 
@@ -630,6 +625,7 @@ class TaskTypeCreateView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['project'] = self._get_project()
+        context['agent_help'] = get_agent_help()
         return context
 
     def form_valid(self, form):
@@ -660,6 +656,7 @@ class TaskTypeUpdateView(LoginRequiredMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['project'] = self.object.project
+        context['agent_help'] = get_agent_help()
         return context
 
     def get_success_url(self):

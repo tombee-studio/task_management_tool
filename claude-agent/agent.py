@@ -97,13 +97,12 @@ def execute_agent_script(script_code, ctx):
 # Agent script resolution
 # ---------------------------------------------------------------------------
 
-def _resolve_agent_script(task, project):
+def _resolve_agent_script(task):
     """Choose the agent script to run, returning (script, source_label).
 
-    Resolution order, so behaviour can be tuned per task type:
+    The agent script is configured per task type:
       1. the task's task type's agent script (if set),
-      2. the project's agent script (if set),
-      3. the built-in default pipeline.
+      2. otherwise the built-in default pipeline.
     """
     task_type_id = task.get("task_type")
     if task_type_id:
@@ -118,10 +117,6 @@ def _resolve_agent_script(task, project):
                     return tt_script, "task-type"
         except Exception as e:
             print(f"[agent] Could not fetch task type {task_type_id}: {e}", file=sys.stderr)
-
-    project_script = (project.get("agent") or "").strip()
-    if project_script:
-        return project_script, "project"
 
     return DEFAULT_AGENT_SCRIPT, "default"
 
@@ -139,12 +134,6 @@ def main():
     task = task_resp.json()
     print(f"[agent] Task #{TASK_ID}: {task['title']}")
 
-    project_resp = requests.get(
-        f"{TASK_API_URL}/task_app/projects/{task['project']}/", headers=_API_HEADERS
-    )
-    project_resp.raise_for_status()
-    project = project_resp.json()
-
     # Update status to 着手済み (2)
     requests.patch(
         f"{TASK_API_URL}/task_app/tasks/{TASK_ID}/",
@@ -161,7 +150,7 @@ def main():
         model=MODEL,
     )
 
-    script, source = _resolve_agent_script(task, project)
+    script, source = _resolve_agent_script(task)
     print(f"[agent] Using {source} agent script.")
 
     try:

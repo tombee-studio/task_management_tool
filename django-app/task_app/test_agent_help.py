@@ -4,7 +4,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from .agent_help import get_agent_help
-from .models import Project
+from .models import Project, TaskType
 
 User = get_user_model()
 
@@ -52,17 +52,27 @@ class AgentHelpPanelTemplateTest(TestCase):
         self.assertNotIn("agent-help-panel", html)
 
 
-class ProjectUpdateAgentHelpContextTest(TestCase):
+class TaskTypeAgentHelpContextTest(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(username="owner", password="pass")
         self.project = Project.objects.create(name="P")
         self.project.participants.add(self.user)
+        self.task_type = TaskType.objects.create(project=self.project, name="不具合")
+
+    def test_create_get_includes_agent_help(self):
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("task_type_create", kwargs={"project_pk": self.project.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("agent_help", response.context)
+        self.assertIn("api_reference", response.context["agent_help"])
 
     def test_update_get_includes_agent_help(self):
         self.client.force_login(self.user)
         response = self.client.get(
-            reverse("project_update", kwargs={"pk": self.project.pk})
+            reverse("task_type_update", kwargs={"pk": self.task_type.pk})
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn("agent_help", response.context)

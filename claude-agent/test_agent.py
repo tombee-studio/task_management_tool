@@ -25,43 +25,28 @@ def _resp(data, ok=True):
 
 class TestResolveAgentScript(unittest.TestCase):
     @patch("agent.requests.get")
-    def test_prefers_task_type_agent(self, mock_get):
+    def test_uses_task_type_agent_when_set(self, mock_get):
         mock_get.return_value = _resp({"agent": "TT SCRIPT"})
-        script, source = agent._resolve_agent_script(
-            {"task_type": 7}, {"agent": "PROJECT SCRIPT"}
-        )
+        script, source = agent._resolve_agent_script({"task_type": 7})
         self.assertEqual(script, "TT SCRIPT")
         self.assertEqual(source, "task-type")
 
     @patch("agent.requests.get")
-    def test_falls_back_to_project_when_task_type_agent_empty(self, mock_get):
+    def test_defaults_when_task_type_agent_empty(self, mock_get):
         mock_get.return_value = _resp({"agent": "  "})
-        script, source = agent._resolve_agent_script(
-            {"task_type": 7}, {"agent": "PROJECT SCRIPT"}
-        )
-        self.assertEqual(script, "PROJECT SCRIPT")
-        self.assertEqual(source, "project")
+        script, source = agent._resolve_agent_script({"task_type": 7})
+        self.assertEqual(script, agent.DEFAULT_AGENT_SCRIPT)
+        self.assertEqual(source, "default")
 
     @patch("agent.requests.get")
-    def test_falls_back_to_project_when_task_type_fetch_fails(self, mock_get):
+    def test_defaults_when_task_type_fetch_fails(self, mock_get):
         mock_get.return_value = _resp({}, ok=False)
-        script, source = agent._resolve_agent_script(
-            {"task_type": 7}, {"agent": "PROJECT SCRIPT"}
-        )
-        self.assertEqual(script, "PROJECT SCRIPT")
-        self.assertEqual(source, "project")
+        script, source = agent._resolve_agent_script({"task_type": 7})
+        self.assertEqual(script, agent.DEFAULT_AGENT_SCRIPT)
+        self.assertEqual(source, "default")
 
-    def test_uses_project_when_no_task_type(self):
-        script, source = agent._resolve_agent_script(
-            {"task_type": None}, {"agent": "PROJECT SCRIPT"}
-        )
-        self.assertEqual(script, "PROJECT SCRIPT")
-        self.assertEqual(source, "project")
-
-    @patch("agent.requests.get")
-    def test_uses_default_when_nothing_set(self, mock_get):
-        mock_get.return_value = _resp({"agent": ""})
-        script, source = agent._resolve_agent_script({"task_type": 7}, {"agent": ""})
+    def test_defaults_when_no_task_type(self):
+        script, source = agent._resolve_agent_script({"task_type": None})
         self.assertEqual(script, agent.DEFAULT_AGENT_SCRIPT)
         self.assertEqual(source, "default")
 
