@@ -1,95 +1,134 @@
 {% comment %}
-Agent Script API ヘルプパネル。
+Agent Script API ヘルプ・サンプル表示用の UI コンポーネント。
 
-プロジェクト編集ページの Agent Script（エージェント設定）入力欄の近くで
-{% include "task_app/_agent_help.html" %} として読み込む。
+プロジェクト編集ページ（project_form.html）の Agent Script 入力欄付近で
+以下のように読み込んで利用する:
 
-必要なコンテキスト変数:
-  agent_globals  -- AGENT_SCRIPT_GLOBALS
-  agent_methods  -- AGENT_CTX_METHODS
-  agent_samples  -- AGENT_SCRIPT_SAMPLES
+    {% include "task_app/_agent_help.html" %}
+
+レンダリングに必要なコンテキスト変数（ProjectUpdateView が提供）:
+    agent_globals  -- スクリプトのスコープに注入されるグローバル一覧
+    agent_methods  -- ctx (AgentCtx) が公開するメソッド一覧
+    agent_samples  -- サンプルスクリプト一覧
+
+構造化データは task_app/agent_help.py で一元管理している。
 {% endcomment %}
-<div class="agent-help-panel panel panel-default" id="agent-help-panel">
-  <div class="panel-heading">
-    <strong>Agent Script API ヘルプ</strong>
-  </div>
-  <div class="panel-body">
-    <p>
-      「エージェント設定」には Python スクリプトを記述できます。
-      実行時に以下のオブジェクト・定数・関数がスコープへ注入されます。
-      空欄の場合はデフォルトパイプラインが実行されます。
-    </p>
 
-    <h5>グローバル変数・関数</h5>
-    <table class="table table-condensed">
-      <thead>
-        <tr><th>名前</th><th>型</th><th>説明</th></tr>
-      </thead>
-      <tbody>
-        {% for g in agent_globals %}
-        <tr>
-          <td><code>{{ g.name }}</code></td>
-          <td>{{ g.type }}</td>
-          <td>{{ g.description }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-
-    <h5>ctx（AgentCtx）のメソッド</h5>
-    {% for m in agent_methods %}
-    <div class="agent-help-method" style="margin-bottom: 12px;">
-      <div><code>{{ m.signature }}</code></div>
-      <div>{{ m.description }}</div>
-      {% if m.params %}
-      <ul>
-        {% for p in m.params %}
-        <li><code>{{ p.name }}</code>（{{ p.type }}） — {{ p.description }}</li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-      <small class="text-muted">戻り値: {{ m.returns }}</small>
+<div class="agent-help panel-group" id="agent-help-accordion">
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h4 class="panel-title">
+        <a data-toggle="collapse" data-parent="#agent-help-accordion" href="#agent-help-globals">
+          スクリプトで使えるグローバル
+        </a>
+      </h4>
     </div>
-    {% endfor %}
-
-    <h5>サンプルスクリプト</h5>
-    {% for s in agent_samples %}
-    <div class="agent-help-sample" style="margin-bottom: 16px;">
-      <div class="agent-help-sample-header" style="display: flex; justify-content: space-between; align-items: center;">
-        <strong>{{ s.title }}</strong>
-        <button type="button" class="btn btn-xs btn-default agent-copy-btn">コピー</button>
+    <div id="agent-help-globals" class="panel-collapse collapse in">
+      <div class="panel-body">
+        <table class="table table-bordered table-condensed">
+          <thead>
+            <tr><th>名前</th><th>型</th><th>説明</th></tr>
+          </thead>
+          <tbody>
+            {% for g in agent_globals %}
+            <tr>
+              <td><code>{{ g.name }}</code></td>
+              <td>{{ g.type }}</td>
+              <td>{{ g.description }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      <p>{{ s.description }}</p>
-      <pre><code class="language-python">{{ s.code }}</code></pre>
     </div>
-    {% endfor %}
+  </div>
+
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h4 class="panel-title">
+        <a data-toggle="collapse" data-parent="#agent-help-accordion" href="#agent-help-methods">
+          ctx のメソッド
+        </a>
+      </h4>
+    </div>
+    <div id="agent-help-methods" class="panel-collapse collapse">
+      <div class="panel-body">
+        {% for m in agent_methods %}
+        <div class="agent-help-method" style="margin-bottom: 1em;">
+          <p style="margin-bottom: 0.25em;">
+            <code>{{ m.signature }}</code>
+            <span class="text-muted">→ {{ m.returns }}</span>
+          </p>
+          <p style="margin-bottom: 0.25em;">{{ m.description }}</p>
+          {% if m.params %}
+          <table class="table table-condensed" style="margin-bottom: 0;">
+            <thead>
+              <tr><th>引数</th><th>型</th><th>説明</th></tr>
+            </thead>
+            <tbody>
+              {% for p in m.params %}
+              <tr>
+                <td><code>{{ p.name }}</code></td>
+                <td>{{ p.type }}</td>
+                <td>{{ p.description }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h4 class="panel-title">
+        <a data-toggle="collapse" data-parent="#agent-help-accordion" href="#agent-help-samples">
+          サンプルスクリプト
+        </a>
+      </h4>
+    </div>
+    <div id="agent-help-samples" class="panel-collapse collapse">
+      <div class="panel-body">
+        {% for s in agent_samples %}
+        <div class="agent-help-sample" style="margin-bottom: 1.5em;">
+          <h5 style="margin-top: 0;">{{ s.title }}</h5>
+          <p>{{ s.description }}</p>
+          <div style="position: relative;">
+            <button type="button"
+                    class="btn btn-xs btn-default agent-help-copy"
+                    data-sample-target="agent-help-sample-{{ forloop.counter }}"
+                    style="position: absolute; top: 4px; right: 4px; z-index: 1;">
+              コピー
+            </button>
+            <pre style="padding-top: 1.5em;"><code id="agent-help-sample-{{ forloop.counter }}" class="language-python">{{ s.code }}</code></pre>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
   </div>
 </div>
 
-<link rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
 (function () {
-  if (window.hljs) {
-    document.querySelectorAll('#agent-help-panel pre code').forEach(function (block) {
-      try { window.hljs.highlightElement(block); } catch (e) {}
-    });
-  }
-  document.querySelectorAll('#agent-help-panel .agent-copy-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var sample = btn.closest('.agent-help-sample');
-      if (!sample) { return; }
-      var code = sample.querySelector('code');
-      if (!code) { return; }
-      var text = code.innerText;
+  var buttons = document.querySelectorAll('.agent-help-copy');
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].addEventListener('click', function () {
+      var targetId = this.getAttribute('data-sample-target');
+      var el = document.getElementById(targetId);
+      if (!el) { return; }
+      var text = el.textContent;
+      var btn = this;
       var done = function () {
         var original = btn.textContent;
         btn.textContent = 'コピーしました';
         setTimeout(function () { btn.textContent = original; }, 1500);
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(done);
+        navigator.clipboard.writeText(text).then(done, function () {});
       } else {
         var ta = document.createElement('textarea');
         ta.value = text;
@@ -99,6 +138,6 @@ Agent Script API ヘルプパネル。
         document.body.removeChild(ta);
       }
     });
-  });
+  }
 })();
 </script>
