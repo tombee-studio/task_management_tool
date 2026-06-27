@@ -35,24 +35,37 @@ AGENT_API_HELP = (
 )
 
 
+class TaskTypeForm(forms.ModelForm):
+    class Meta:
+        model = TaskType
+        fields = ['name', 'parent', 'agent']
+        widgets = {
+            'agent': forms.Textarea(attrs={'rows': 6}),
+        }
+        labels = {
+            'agent': 'エージェント設定（種別）',
+        }
+        help_texts = {
+            'agent': (
+                '空欄の場合はプロジェクトのエージェント設定が使用されます。\n'
+                + AGENT_API_HELP
+            ),
+        }
+
+
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['name', 'git_url', 'dev_branch', 'release_branch', 'main_branch', 'agent']
+        fields = ['name', 'git_url', 'dev_branch', 'release_branch', 'main_branch']
         widgets = {
             'dev_branch': forms.TextInput(attrs={'placeholder': 'develop'}),
             'release_branch': forms.TextInput(attrs={'placeholder': 'release'}),
             'main_branch': forms.TextInput(attrs={'placeholder': 'main'}),
-            'agent': forms.Textarea(attrs={'rows': 6}),
         }
         labels = {
             'dev_branch': '開発ブランチ',
             'release_branch': 'リリースブランチ',
             'main_branch': 'メインブランチ',
-            'agent': 'エージェント設定',
-        }
-        help_texts = {
-            'agent': AGENT_API_HELP,
         }
 
 

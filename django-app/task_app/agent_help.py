@@ -1,6 +1,6 @@
 """Agent Script ヘルプコンテンツ.
 
-プロジェクト編集ページの Agent Script（`Project.agent`）入力欄付近に表示する、
+種別編集ページの Agent Script（`TaskType.agent`）入力欄付近に表示する、
 API リファレンスとサンプルスクリプト（実行フロー含む）を構造化データとして管理する。
 
 メンテナンス性のため、利用可能な API 一覧・各 API の説明・サンプルコード・処理の流れを
@@ -181,7 +181,7 @@ AGENT_SAMPLE_SCRIPTS = [
     {
         "title": "デフォルトパイプライン",
         "description": (
-            "Project.agent が空のときに実行される標準フロー。"
+            "タスク種別に Agent スクリプトが設定されていないときに実行される標準フロー。"
             "clone → タスク取得 → 方針決定 → ブランチ → 実装/push → PR → 担当者復元。"
         ),
         "code": (
