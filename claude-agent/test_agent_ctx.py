@@ -344,12 +344,15 @@ class TestGetAssignee(unittest.TestCase):
 
 class TestRunAgent(unittest.TestCase):
     def _make_claude_mock(self, response_text):
-        content = MagicMock()
-        content.text = response_text
+        block = MagicMock()
+        block.type = "text"
+        block.text = response_text
         message = MagicMock()
-        message.content = [content]
+        message.content = [block]
+        stream_cm = MagicMock()
+        stream_cm.__enter__.return_value.get_final_message.return_value = message
         client = MagicMock()
-        client.messages.create.return_value = message
+        client.messages.stream.return_value = stream_cm
         return client
 
     def test_raises_without_workdir(self):
@@ -379,8 +382,59 @@ class TestRunAgent(unittest.TestCase):
 
         ctx.run_agent("特定の改修をしてください")
 
-        messages = ctx._claude.messages.create.call_args[1]["messages"]
+        messages = ctx._claude.messages.stream.call_args[1]["messages"]
         self.assertIn("特定の改修をしてください", messages[0]["content"])
+
+    def test_skips_thinking_blocks(self):
+        thinking = MagicMock()
+        thinking.type = "thinking"
+        thinking.text = "internal reasoning"
+        text = MagicMock()
+        text.type = "text"
+        text.text = "FILE: app/foo.py\n```\ncode\n```"
+        message = MagicMock()
+        message.content = [thinking, text]
+        stream_cm = MagicMock()
+        stream_cm.__enter__.return_value.get_final_message.return_value = message
+        client = MagicMock()
+        client.messages.stream.return_value = stream_cm
+
+        ctx = _make_ctx()
+        ctx._claude = client
+        result = ctx._complete_code("do it")
+        self.assertEqual(result, "FILE: app/foo.py\n```\ncode\n```")
+
+
+class TestApplyFiles(unittest.TestCase):
+    def test_parses_multiple_files(self):
+        import os
+        import tempfile
+
+        ctx = _make_ctx()
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx._workdir = tmp
+            impl = (
+                "FILE: a.py\n```python\nprint('a')\n```\n\n"
+                "FILE: pkg/b.py\n```\nprint('b')\n```\n"
+            )
+            changed = ctx._apply_files(impl)
+            self.assertEqual(changed, ["a.py", "pkg/b.py"])
+            with open(os.path.join(tmp, "pkg/b.py")) as fh:
+                self.assertEqual(fh.read(), "print('b')\n")
+
+    def test_tolerates_missing_trailing_fence(self):
+        import os
+        import tempfile
+
+        ctx = _make_ctx()
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx._workdir = tmp
+            # Response cut off before the closing fence.
+            impl = "FILE: a.py\n```python\nprint('a')\n"
+            changed = ctx._apply_files(impl)
+            self.assertEqual(changed, ["a.py"])
+            with open(os.path.join(tmp, "a.py")) as fh:
+                self.assertEqual(fh.read(), "print('a')\n")
 
 
 if __name__ == "__main__":

@@ -29,6 +29,20 @@ SMALL = 1
 MIDDLE = 2
 LARGE = 3
 
+# Code-generation tuning.  The previous 8K cap silently truncated full-file
+# rewrites mid-output, which was the main cause of broken/inaccurate edits.
+# Large outputs require streaming to avoid SDK HTTP timeouts.
+_CODE_MAX_TOKENS = 64000
+_CODE_SYSTEM_PROMPT = (
+    "You are an expert software engineer working inside an existing codebase. "
+    "Implement exactly what the task asks and nothing more. Match the style and "
+    "conventions of the surrounding code. Make the smallest change that fully "
+    "solves the task; do not refactor unrelated code or add speculative features, "
+    "and preserve all behavior outside the scope of the task. When you output a "
+    "file you MUST output its complete final contents -- never elide code with "
+    "placeholders like '# ... unchanged'. Output only FILE blocks, no prose."
+)
+
 _KIND_PREFIX = {"feature": "Ftr", "bugfix": "Fix", "hotfix": "Fix", "enhancement": "Eta"}
 _KIND_MAP = {"bug": "bugfix", "feature": "feature", "enhancement": "enhancement", "hotfix": "hotfix"}
 
@@ -104,6 +118,28 @@ class AgentCtx:
         if self._claude is None:
             self._claude = anthropic.Anthropic(api_key=self._anthropic_api_key)
         return self._claude
+
+    def _complete_code(self, prompt):
+        """Run Claude for a code-generation task and return the response text.
+
+        Uses adaptive thinking + high effort (the biggest accuracy lever for
+        Opus on coding) and a generous token budget, streamed so large
+        full-file outputs are not truncated or timed out.  Thinking blocks are
+        skipped; only the visible text is returned.
+        """
+        with self._client.messages.stream(
+            model=self._model,
+            max_tokens=_CODE_MAX_TOKENS,
+            system=_CODE_SYSTEM_PROMPT,
+            thinking={"type": "adaptive"},
+            output_config={"effort": "high"},
+            messages=[{"role": "user", "content": prompt}],
+        ) as stream:
+            message = stream.get_final_message()
+        return "".join(
+            block.text for block in message.content
+            if getattr(block, "type", None) == "text"
+        )
 
     # ------------------------------------------------------------------
     # HTTP helpers
@@ -334,12 +370,7 @@ class AgentCtx:
         )
 
         print("[agent] run_agent: calling Claude...")
-        response = self._client.messages.create(
-            model=self._model,
-            max_tokens=8096,
-            messages=[{"role": "user", "content": full_prompt}],
-        )
-        implementation = response.content[0].text
+        implementation = self._complete_code(full_prompt)
 
         changed_files = self._apply_files(implementation)
         print(f"[agent] run_agent: {len(changed_files)} file(s) changed.")
@@ -386,12 +417,7 @@ class AgentCtx:
         )
 
         print(f"[agent] Calling Claude for task #{task_id}...")
-        response = self._client.messages.create(
-            model=self._model,
-            max_tokens=8096,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        implementation = response.content[0].text
+        implementation = self._complete_code(prompt)
 
         changed_files = self._apply_files(implementation)
         if not changed_files:
@@ -566,24 +592,37 @@ class AgentCtx:
         return f"{kind}/#{task.id}_{slug}"
 
     def _read_codebase(self):
-        context_files = []
+        # Collect matching files in a deterministic (sorted) order so the model
+        # always sees the same context for the same repo, and the relevant files
+        # aren't dropped by arbitrary os.walk ordering.
+        matched = []
         for root, dirs, files in os.walk(self._workdir):
-            dirs[:] = [d for d in dirs
-                       if d not in {".git", "venv", "__pycache__", ".venv", "node_modules"}]
-            for f in files:
+            dirs[:] = sorted(d for d in dirs
+                             if d not in {".git", "venv", "__pycache__", ".venv", "node_modules"})
+            for f in sorted(files):
                 if f.endswith((".py", ".tf", ".md", ".lark")) and "migrations" not in root:
                     path = os.path.join(root, f)
-                    rel = os.path.relpath(path, self._workdir)
-                    try:
-                        with open(path) as fh:
-                            content = fh.read()
-                        context_files.append(f"### {rel}\n```\n{content}\n```")
-                    except Exception:
-                        pass
-        return "\n\n".join(context_files[:60])
+                    matched.append((os.path.relpath(path, self._workdir), path))
+        matched.sort(key=lambda item: item[0])
+
+        # A full file listing helps the model locate code even when a file's
+        # contents fall outside the included window below.
+        tree = "\n".join(rel for rel, _ in matched)
+
+        context_files = []
+        for rel, path in matched[:80]:
+            try:
+                with open(path) as fh:
+                    content = fh.read()
+                context_files.append(f"### {rel}\n```\n{content}\n```")
+            except Exception:
+                pass
+        return f"Project files:\n{tree}\n\n" + "\n\n".join(context_files)
 
     def _apply_files(self, implementation):
-        file_pattern = re.compile(r"FILE:\s*(\S+)\n```(?:\w*)\n(.*?)```", re.DOTALL)
+        # Tolerate a missing trailing fence (e.g. if the response is cut off):
+        # the final FILE block may end at end-of-string instead of ```.
+        file_pattern = re.compile(r"FILE:\s*(\S+)\n```(?:\w*)\n(.*?)(?:```|\Z)", re.DOTALL)
         changed = []
         for match in file_pattern.finditer(implementation):
             rel_path, content = match.group(1).strip("`"), match.group(2)
