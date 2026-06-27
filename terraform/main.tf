@@ -475,7 +475,7 @@ resource "aws_ecr_repository" "claude_agent" {
 }
 
 # -----------------------------
-# ECS — claude-agent (Fargate Spot)
+# ECS — claude-agent (Fargate, on-demand)
 # -----------------------------
 
 resource "aws_ecs_cluster" "agent" {

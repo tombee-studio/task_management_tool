@@ -1,7 +1,11 @@
 """SQS -> ECS dispatcher Lambda.
 
-Reads task_id from SQS message and launches the claude-agent ECS Fargate Spot task,
+Reads task_id from SQS message and launches the claude-agent ECS Fargate task,
 passing secrets as container environment overrides.
+
+The agent is a one-shot, must-complete job (it edits code, commits, and pushes),
+so it runs on on-demand FARGATE rather than FARGATE_SPOT -- Spot capacity can be
+reclaimed mid-run ("Your Spot Task was interrupted"), leaving the work unfinished.
 """
 import json
 import os
@@ -38,7 +42,7 @@ def handler(event, context):
             cluster=cluster,
             taskDefinition=task_def,
             capacityProviderStrategy=[
-                {"capacityProvider": "FARGATE_SPOT", "weight": 1},
+                {"capacityProvider": "FARGATE", "weight": 1},
             ],
             networkConfiguration={
                 "awsvpcConfiguration": {
