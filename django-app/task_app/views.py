@@ -17,6 +17,7 @@ from .filters import TaskFilterMixin, apply_task_filters
 from .dsl import execute_dsl
 from .gantt import build_gantt_data
 from .widget_loader import get_page_widgets, resolve_widget_data
+from .agent_help import AGENT_SCRIPT_GLOBALS, AGENT_CTX_METHODS, AGENT_SCRIPT_SAMPLES
 
 
 def _parse_gantt_date(value):
@@ -158,7 +159,14 @@ class ProjectUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_queryset(self):
         return self.request.user.projects.all()
-    
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["agent_globals"] = AGENT_SCRIPT_GLOBALS
+        context["agent_methods"] = AGENT_CTX_METHODS
+        context["agent_samples"] = AGENT_SCRIPT_SAMPLES
+        return context
+
     def get_success_url(self):
         return reverse_lazy("project_detail", kwargs={"pk": self.object.pk})
 

@@ -1,0 +1,104 @@
+{% comment %}
+Agent Script API ヘルプパネル。
+
+プロジェクト編集ページの Agent Script（エージェント設定）入力欄の近くで
+{% include "task_app/_agent_help.html" %} として読み込む。
+
+必要なコンテキスト変数:
+  agent_globals  -- AGENT_SCRIPT_GLOBALS
+  agent_methods  -- AGENT_CTX_METHODS
+  agent_samples  -- AGENT_SCRIPT_SAMPLES
+{% endcomment %}
+<div class="agent-help-panel panel panel-default" id="agent-help-panel">
+  <div class="panel-heading">
+    <strong>Agent Script API ヘルプ</strong>
+  </div>
+  <div class="panel-body">
+    <p>
+      「エージェント設定」には Python スクリプトを記述できます。
+      実行時に以下のオブジェクト・定数・関数がスコープへ注入されます。
+      空欄の場合はデフォルトパイプラインが実行されます。
+    </p>
+
+    <h5>グローバル変数・関数</h5>
+    <table class="table table-condensed">
+      <thead>
+        <tr><th>名前</th><th>型</th><th>説明</th></tr>
+      </thead>
+      <tbody>
+        {% for g in agent_globals %}
+        <tr>
+          <td><code>{{ g.name }}</code></td>
+          <td>{{ g.type }}</td>
+          <td>{{ g.description }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h5>ctx（AgentCtx）のメソッド</h5>
+    {% for m in agent_methods %}
+    <div class="agent-help-method" style="margin-bottom: 12px;">
+      <div><code>{{ m.signature }}</code></div>
+      <div>{{ m.description }}</div>
+      {% if m.params %}
+      <ul>
+        {% for p in m.params %}
+        <li><code>{{ p.name }}</code>（{{ p.type }}） — {{ p.description }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <small class="text-muted">戻り値: {{ m.returns }}</small>
+    </div>
+    {% endfor %}
+
+    <h5>サンプルスクリプト</h5>
+    {% for s in agent_samples %}
+    <div class="agent-help-sample" style="margin-bottom: 16px;">
+      <div class="agent-help-sample-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <strong>{{ s.title }}</strong>
+        <button type="button" class="btn btn-xs btn-default agent-copy-btn">コピー</button>
+      </div>
+      <p>{{ s.description }}</p>
+      <pre><code class="language-python">{{ s.code }}</code></pre>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+(function () {
+  if (window.hljs) {
+    document.querySelectorAll('#agent-help-panel pre code').forEach(function (block) {
+      try { window.hljs.highlightElement(block); } catch (e) {}
+    });
+  }
+  document.querySelectorAll('#agent-help-panel .agent-copy-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var sample = btn.closest('.agent-help-sample');
+      if (!sample) { return; }
+      var code = sample.querySelector('code');
+      if (!code) { return; }
+      var text = code.innerText;
+      var done = function () {
+        var original = btn.textContent;
+        btn.textContent = 'コピーしました';
+        setTimeout(function () { btn.textContent = original; }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    });
+  });
+})();
+</script>
