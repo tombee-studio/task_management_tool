@@ -362,28 +362,7 @@ class AgentCtx:
         description = task.description if isinstance(task, TaskInfo) else task.get("description", "")
         comments = task.comments if isinstance(task, TaskInfo) else []
 
-        context = self._read_codebase()
-        comments_text = (
-            "\n".join(f"[Comment #{c['id']}] {c['description']}" for c in comments)
-            if comments else "(no comments)"
-        )
-
-        prompt = (
-            "You are an expert Django developer working on the task-management project.\n\n"
-            f"Task #{task_id}: {title}\n"
-            f"Description:\n{description}\n\n"
-        )
-        if self._strategy:
-            prompt += f"Implementation plan:\n{self._strategy.approach}\n\n"
-        prompt += (
-            f"Comments on this task:\n{comments_text}\n\n"
-            "CLAUDE.md workflow is in the repo. Follow it.\n\n"
-            f"Here is the relevant codebase:\n{context}\n\n"
-            "Provide the complete content of each file you need to create or modify. "
-            "Format each file as:\n"
-            "FILE: <relative/path/to/file>\n```\n<content>\n```\n\n"
-            "Only output FILE blocks. No explanations."
-        )
+        prompt = self._build_implementation_prompt(task_id, title, description, comments)
 
         print(f"[agent] Calling Claude for task #{task_id}...")
         response = self._client.messages.create(
@@ -564,6 +543,41 @@ class AgentCtx:
             slug = re.sub(r"[^a-z0-9-]", "-", raw)
             slug = re.sub(r"-{2,}", "-", slug).strip("-")[:40] or "task"
         return f"{kind}/#{task.id}_{slug}"
+
+    def _build_implementation_prompt(self, task_id, title, description, comments):
+        """Build the code-generation prompt grounded in the actual project.
+
+        The framing (project name, repository) is derived from the project
+        currently being edited rather than hardcoded, so context from an
+        unrelated project never leaks into the generated changes.
+        """
+        project = self._fetch_project()
+        project_name = (project.get("name") or "").strip() or self._github_repo or "this"
+        context = self._read_codebase()
+        comments_text = (
+            "\n".join(f"[Comment #{c['id']}] {c['description']}" for c in comments)
+            if comments else "(no comments)"
+        )
+
+        prompt = (
+            f"You are an expert software engineer working on the {project_name} "
+            f"project (repository {self._github_repo}).\n\n"
+            f"Task #{task_id}: {title}\n"
+            f"Description:\n{description}\n\n"
+        )
+        if self._strategy:
+            prompt += f"Implementation plan:\n{self._strategy.approach}\n\n"
+        prompt += (
+            f"Comments on this task:\n{comments_text}\n\n"
+            "If the repository contains a CLAUDE.md or contributing guidelines, "
+            "follow them.\n\n"
+            f"Here is the relevant codebase:\n{context}\n\n"
+            "Provide the complete content of each file you need to create or modify. "
+            "Format each file as:\n"
+            "FILE: <relative/path/to/file>\n```\n<content>\n```\n\n"
+            "Only output FILE blocks. No explanations."
+        )
+        return prompt
 
     def _read_codebase(self):
         context_files = []
