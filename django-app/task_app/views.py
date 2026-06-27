@@ -16,6 +16,7 @@ from .models import UserPreferences
 from .filters import TaskFilterMixin, apply_task_filters
 from .dsl import execute_dsl
 from .gantt import build_gantt_data
+from .agent_help import get_agent_help
 from .widget_loader import get_page_widgets, resolve_widget_data
 
 
@@ -167,8 +168,7 @@ class ProjectUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        user_preferences, _ = UserPreferences.objects.get_or_create(user=self.request.user)
-        context["user_preferences"] = user_preferences
+        context["agent_help"] = get_agent_help()
         return context
 
     def get_success_url(self):

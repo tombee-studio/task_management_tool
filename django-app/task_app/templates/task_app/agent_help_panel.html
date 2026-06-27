@@ -1,0 +1,90 @@
+{% if agent_help %}
+<div class="agent-help-panel card mt-3" id="agent-help-panel">
+  <div class="card-header">
+    <button type="button" class="btn btn-link p-0" data-toggle="collapse" data-target="#agent-help-body" aria-expanded="false" aria-controls="agent-help-body">
+      Agent Script ヘルプ（API リファレンス・サンプル）
+    </button>
+  </div>
+  <div class="collapse" id="agent-help-body">
+    <div class="card-body">
+
+      <h5>スクリプトのスコープ（トップレベル名）</h5>
+      <table class="table table-sm">
+        <thead>
+          <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          {% for g in agent_help.globals %}
+          <tr>
+            <td><code>{{ g.name }}</code></td>
+            <td>{{ g.kind }}</td>
+            <td>{{ g.description }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h6>利用可能な組み込み関数</h6>
+      <p>
+        {% for b in agent_help.safe_builtins %}<code>{{ b }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}
+      </p>
+
+      <h5>API リファレンス（AgentCtx）</h5>
+      <table class="table table-sm">
+        <thead>
+          <tr><th>メソッド</th><th>引数</th><th>戻り値</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          {% for api in agent_help.api_reference %}
+          <tr>
+            <td><code>{{ api.method }}</code></td>
+            <td>{{ api.params }}</td>
+            <td><code>{{ api.returns }}</code></td>
+            <td>{{ api.description }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h5>データクラス</h5>
+      {% for dc in agent_help.data_classes %}
+      <h6><code>{{ dc.name }}</code> — {{ dc.description }}</h6>
+      <table class="table table-sm">
+        <thead>
+          <tr><th>メンバ</th><th>型</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          {% for m in dc.members %}
+          <tr>
+            <td><code>{{ m.name }}</code></td>
+            <td>{{ m.type }}</td>
+            <td>{{ m.description }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endfor %}
+
+      <h5>処理の流れ</h5>
+      <ol>
+        {% for step in agent_help.execution_flow %}
+        <li>
+          <strong>{{ step.title }}</strong> — <code>{{ step.api }}</code><br>
+          {{ step.description }}
+        </li>
+        {% endfor %}
+      </ol>
+
+      <h5>サンプルスクリプト</h5>
+      {% for sample in agent_help.sample_scripts %}
+      <div class="agent-help-sample mb-3">
+        <h6>{{ sample.title }}</h6>
+        <p>{{ sample.description }}</p>
+        <pre class="agent-help-code"><code class="language-python">{{ sample.code }}</code></pre>
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+</div>
+{% endif %}
