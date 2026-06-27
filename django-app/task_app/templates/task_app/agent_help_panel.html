@@ -1,0 +1,99 @@
+{% comment %}
+Agent Script ヘルプパネル（折りたたみ可能）。
+
+プロジェクト編集ページ（project_form.html）の Agent Script 入力欄付近で
+{% include "task_app/agent_help_panel.html" %} として読み込む。
+コンテキストに ProjectUpdateView が渡す `agent_help`（task_app.agent_help.get_agent_help()）が必要。
+
+コードブロックには language-python クラスを付与しているため、
+highlight.js / Prism などのシンタックスハイライタがあれば自動で着色される。
+{% endcomment %}
+{% if agent_help %}
+<div class="panel panel-default" id="agent-help-panel">
+  <div class="panel-heading">
+    <h4 class="panel-title">
+      <a data-toggle="collapse" href="#agent-help-body" aria-expanded="false">
+        Agent Script ヘルプ（API リファレンス・サンプル・実行フロー）
+      </a>
+    </h4>
+  </div>
+  <div id="agent-help-body" class="panel-collapse collapse">
+    <div class="panel-body">
+
+      <h5>1. 実行環境（スクリプトのスコープ）</h5>
+      <table class="table table-condensed table-bordered">
+        <thead>
+          <tr><th>名前</th><th>種別</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          {% for g in agent_help.globals %}
+          <tr>
+            <td><code>{{ g.name }}</code></td>
+            <td>{{ g.kind }}</td>
+            <td>{{ g.description }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="text-muted">
+        利用可能な組み込み関数:
+        {% for b in agent_help.safe_builtins %}<code>{{ b }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}
+      </p>
+
+      <h5>2. 処理の流れ</h5>
+      <ol>
+        {% for f in agent_help.execution_flow %}
+        <li>
+          <strong>{{ f.title }}</strong> — <code>{{ f.api }}</code><br>
+          {{ f.description }}
+        </li>
+        {% endfor %}
+      </ol>
+
+      <h5>3. API リファレンス（AgentCtx）</h5>
+      <table class="table table-condensed table-bordered">
+        <thead>
+          <tr><th>メソッド</th><th>引数</th><th>戻り値</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          {% for api in agent_help.api_reference %}
+          <tr>
+            <td><code>{{ api.method }}</code></td>
+            <td>{{ api.params }}</td>
+            <td><code>{{ api.returns }}</code></td>
+            <td>{{ api.description }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h5>4. データクラス</h5>
+      {% for dc in agent_help.data_classes %}
+      <p><strong>{{ dc.name }}</strong> — {{ dc.description }}</p>
+      <table class="table table-condensed table-bordered">
+        <thead>
+          <tr><th>属性</th><th>型</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          {% for m in dc.members %}
+          <tr>
+            <td><code>{{ m.name }}</code></td>
+            <td>{{ m.type }}</td>
+            <td>{{ m.description }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endfor %}
+
+      <h5>5. サンプルスクリプト</h5>
+      {% for s in agent_help.sample_scripts %}
+      <p><strong>{{ s.title }}</strong></p>
+      <p>{{ s.description }}</p>
+      <pre><code class="language-python">{{ s.code }}</code></pre>
+      {% endfor %}
+
+    </div>
+  </div>
+</div>
+{% endif %}
