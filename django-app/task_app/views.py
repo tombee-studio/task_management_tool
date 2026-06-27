@@ -11,7 +11,7 @@ from .models import *
 
 from django.contrib.auth import login
 from django.http import Http404, HttpResponseRedirect
-from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm, UserUpdateForm, UserPreferencesForm
+from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm, UserUpdateForm, UserPreferencesForm, TaskTypeForm
 from .models import UserPreferences
 from .filters import TaskFilterMixin, apply_task_filters
 from .dsl import execute_dsl
@@ -605,7 +605,7 @@ class SignUpView(CreateView):
 
 class TaskTypeCreateView(LoginRequiredMixin, CreateView):
     model = TaskType
-    fields = ["name", "parent"]
+    form_class = TaskTypeForm
     template_name = "task_app/task_type_form.html"
 
     def _get_project(self):
@@ -642,7 +642,7 @@ class TaskTypeCreateView(LoginRequiredMixin, CreateView):
 
 class TaskTypeUpdateView(LoginRequiredMixin, UpdateView):
     model = TaskType
-    fields = ["name", "parent"]
+    form_class = TaskTypeForm
     template_name = "task_app/task_type_form.html"
 
     def get_queryset(self):

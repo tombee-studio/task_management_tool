@@ -78,6 +78,9 @@ class TaskType(models.Model):
     null=True,
     blank=True,
   )
+  # Agent script for this task type. When set, it overrides Project.agent for
+  # tasks of this type, so the agent's behaviour can be tuned per task type.
+  agent = models.TextField(blank=True, default='')
 
   class Meta:
     ordering = ['name']

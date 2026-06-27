@@ -64,7 +64,7 @@ class RuleSerializer(serializers.ModelSerializer):
 class TaskTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = TaskType
-        fields = ['id', 'project', 'name', 'parent']
+        fields = ['id', 'project', 'name', 'parent', 'agent']
         read_only_fields = ['id']
 
 

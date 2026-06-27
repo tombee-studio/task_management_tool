@@ -647,3 +647,37 @@ class GenerateAPIKeyActionTest(BaseAPITest):
         self.auth()
         r = self.client.get(self.url())
         self.assertEqual(r.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+# ---------------------------------------------------------------------------
+# TaskType agent field (#428) — agent script configurable per task type
+# ---------------------------------------------------------------------------
+
+class TaskTypeAgentAPITest(BaseAPITest):
+    def url(self, pk=None):
+        return f'{BASE}/task-types/{pk}/' if pk else f'{BASE}/task-types/'
+
+    def test_create_persists_agent_script(self):
+        self.auth()
+        r = self.client.post(self.url(), {
+            'project': self.project.id,
+            'name': '不具合',
+            'agent': 'ctx.clone_git_url()\nctx.push(ctx.get_task())',
+        })
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertIn('agent', r.data)
+        self.assertEqual(r.data['agent'], 'ctx.clone_git_url()\nctx.push(ctx.get_task())')
+
+    def test_agent_defaults_to_empty(self):
+        self.auth()
+        r = self.client.post(self.url(), {'project': self.project.id, 'name': '調査'})
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r.data['agent'], '')
+
+    def test_agent_is_updatable(self):
+        self.auth()
+        created = self.client.post(self.url(), {'project': self.project.id, 'name': '改修方針'})
+        pk = created.data['id']
+        r = self.client.patch(self.url(pk), {'agent': 'ctx.run_agent("investigate")'})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['agent'], 'ctx.run_agent("investigate")')

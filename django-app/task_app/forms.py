@@ -35,6 +35,24 @@ AGENT_API_HELP = (
 )
 
 
+class TaskTypeForm(forms.ModelForm):
+    class Meta:
+        model = TaskType
+        fields = ['name', 'parent', 'agent']
+        widgets = {
+            'agent': forms.Textarea(attrs={'rows': 6}),
+        }
+        labels = {
+            'agent': 'エージェント設定（種別）',
+        }
+        help_texts = {
+            'agent': (
+                '空欄の場合はプロジェクトのエージェント設定が使用されます。\n'
+                + AGENT_API_HELP
+            ),
+        }
+
+
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
