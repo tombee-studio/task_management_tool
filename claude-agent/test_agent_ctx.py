@@ -437,5 +437,44 @@ class TestApplyFiles(unittest.TestCase):
                 self.assertEqual(fh.read(), "print('a')\n")
 
 
+class TestBuildImplementationPrompt(unittest.TestCase):
+    @patch.object(AgentCtx, "_read_codebase", return_value="### main.dart\n```\ncode\n```")
+    def test_prompt_uses_actual_project_and_no_leak(self, mock_read):
+        ctx = _make_ctx()
+        ctx._project = {"id": 2, "name": "flutter_viewmodel"}
+        ctx._github_repo = "tombee-studio/flutter_viewmodel"
+
+        prompt = ctx._build_implementation_prompt(
+            42, "Add a ViewModel", "Implement the counter view model", []
+        )
+
+        # The framing must reflect the project being edited...
+        self.assertIn("flutter_viewmodel", prompt)
+        self.assertIn("tombee-studio/flutter_viewmodel", prompt)
+        # ...and must not leak another project's identity or stack.
+        self.assertNotIn("task-management", prompt)
+        self.assertNotIn("Django", prompt)
+
+    @patch.object(AgentCtx, "_read_codebase", return_value="")
+    def test_prompt_falls_back_to_repo_when_no_name(self, mock_read):
+        ctx = _make_ctx()
+        ctx._project = {"id": 3, "name": ""}
+        ctx._github_repo = "owner/some_repo"
+
+        prompt = ctx._build_implementation_prompt(1, "T", "D", [])
+        self.assertIn("owner/some_repo", prompt)
+
+    @patch.object(AgentCtx, "_read_codebase", return_value="")
+    def test_prompt_includes_comments(self, mock_read):
+        ctx = _make_ctx()
+        ctx._project = {"id": 1, "name": "proj"}
+        ctx._github_repo = "o/proj"
+
+        prompt = ctx._build_implementation_prompt(
+            1, "T", "D", [{"id": 7, "description": "please rename the field"}]
+        )
+        self.assertIn("please rename the field", prompt)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
