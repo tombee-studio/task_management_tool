@@ -158,6 +158,7 @@ def execute_ast(ast):
     """AST の各コマンドを対応する execute_* 関数にディスパッチする。
 
     未実装のコマンド (tag) はパース済みだが実行をスキップする。
+    処理したコマンド数を返す。
     """
     for command in ast:
         command_type = command[0]
@@ -176,6 +177,7 @@ def execute_ast(ast):
         elif command_type == "delete":
             _, task_id = command
             execute_delete(task_id)
+    return len(ast)
 
 
 @transaction.atomic
@@ -183,6 +185,7 @@ def execute_dsl(text):
     """DSL テキストを解析して実行する。
 
     いずれかのコマンドが失敗した場合、トランザクション全体をロールバックする。
+    実行したコマンド数を返す。
     """
     ast = parse_dsl(text)
-    execute_ast(ast)
+    return execute_ast(ast)

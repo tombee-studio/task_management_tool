@@ -1,8 +1,9 @@
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 from .views import (
     ProjectViewSet, StatusViewSet, CommentViewSet, TagViewSet,
     TaskViewSet, UserPreferencesViewSet, RuleViewSet, TaskTypeViewSet,
-    TaskTypeFieldViewSet, TaskFieldValueViewSet,
+    TaskTypeFieldViewSet, TaskFieldValueViewSet, DSLExecuteView,
 )
 
 router = DefaultRouter()
@@ -17,4 +18,6 @@ router.register(r'task-types', TaskTypeViewSet)
 router.register(r'task-type-fields', TaskTypeFieldViewSet)
 router.register(r'task-field-values', TaskFieldValueViewSet)
 
-urlpatterns = router.urls
+urlpatterns = router.urls + [
+    path('dsl/execute/', DSLExecuteView.as_view(), name='dsl-execute'),
+]

@@ -1,13 +1,15 @@
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse, inline_serializer
-from rest_framework import viewsets, serializers
+from rest_framework import viewsets, serializers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from task_app.models import Project, Status, Comment, Tag, Task, UserPreferences, Rule, TaskType, TaskTypeField, TaskFieldValue
 from task_app.signals import generate_api_key
+from task_app.dsl import execute_dsl
 from .serializers import (
     ProjectSerializer, StatusSerializer, CommentSerializer, TagSerializer,
     TaskSerializer, UserPreferencesSerializer, RuleSerializer, TaskTypeSerializer,
-    TaskTypeFieldSerializer, TaskFieldValueSerializer,
+    TaskTypeFieldSerializer, TaskFieldValueSerializer, DSLExecuteSerializer,
 )
 
 
@@ -183,3 +185,27 @@ class TaskFieldValueViewSet(viewsets.ModelViewSet):
         if task_id:
             qs = qs.filter(task_id=task_id)
         return qs
+
+
+@extend_schema(
+    summary='Execute a DSL script',
+    tags=['DSL'],
+    request=DSLExecuteSerializer,
+    responses={200: inline_serializer(
+        name='DSLExecuteResponse',
+        fields={'executed_count': serializers.IntegerField()},
+    )},
+)
+class DSLExecuteView(APIView):
+    def post(self, request):
+        serializer = DSLExecuteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        dsl_text = serializer.validated_data['dsl']
+        try:
+            count = execute_dsl(dsl_text)
+        except Exception as e:
+            return Response(
+                {'detail': f'DSL execution error: {e}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({'executed_count': count})
