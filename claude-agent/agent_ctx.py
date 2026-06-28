@@ -141,7 +141,7 @@ class AgentCtx:
             if getattr(block, "type", None) == "text"
         )
 
-    def complete_text(self, prompt, max_tokens=2048):
+    def complete_text(self, prompt, max_tokens=2048, include_codebase=False):
         """Run Claude for a free-form text answer and return the text.
 
         Unlike _complete_code(), this uses no code-generation system prompt
@@ -150,7 +150,30 @@ class AgentCtx:
         Calling _complete_code() for prose makes the model wrap its answer in
         a 'FILE: docs/design/*.md' block, which is almost never what a script
         building a task title or description wants.
+
+        When include_codebase is True the cloned repository (file tree plus
+        contents) is prepended to the prompt and the model is told to only
+        reference paths that actually exist.  Without this grounding, prompts
+        that ask for "the files to change" make the model invent plausible
+        but non-existent paths (e.g. a React 'src/...tsx' layout for a Django
+        project).  Requires clone_git_url() to have been called first.
         """
+        if include_codebase:
+            if self._workdir is None:
+                raise RuntimeError(
+                    "Call clone_git_url() before complete_text(include_codebase=True)."
+                )
+            context = self._read_codebase()
+            prompt = (
+                f"{prompt}\n\n"
+                "Ground your answer in the actual repository below. When you "
+                "name files to change, use real paths that exist in it; only "
+                "introduce a new path if you explicitly say the file is new "
+                "and place it consistent with the project's real structure. "
+                "Do not invent paths for files you claim already exist.\n\n"
+                f"{context}"
+            )
+
         msg = self._client.messages.create(
             model=self._model,
             max_tokens=max_tokens,
