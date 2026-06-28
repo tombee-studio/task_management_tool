@@ -524,6 +524,30 @@ class TestCompleteText(unittest.TestCase):
         ctx._claude = client
         self.assertEqual(ctx.complete_text("q"), "answer")
 
+    def test_include_codebase_requires_workdir(self):
+        ctx = _make_ctx()
+        ctx._claude = self._make_claude_mock("ok")
+        with self.assertRaises(RuntimeError):
+            ctx.complete_text("design this", include_codebase=True)
+
+    @patch.object(AgentCtx, "_read_codebase", return_value="### real/path.py\n```\nx\n```")
+    def test_include_codebase_grounds_prompt(self, mock_read):
+        ctx = _make_ctx()
+        ctx._workdir = "/fake/workdir"
+        ctx._claude = self._make_claude_mock("design")
+        ctx.complete_text("list files to change", include_codebase=True)
+        mock_read.assert_called_once()
+        sent = ctx._claude.messages.create.call_args[1]["messages"][0]["content"]
+        self.assertIn("real/path.py", sent)
+        self.assertIn("list files to change", sent)
+
+    @patch.object(AgentCtx, "_read_codebase")
+    def test_default_does_not_read_codebase(self, mock_read):
+        ctx = _make_ctx()
+        ctx._claude = self._make_claude_mock("ok")
+        ctx.complete_text("just a title")
+        mock_read.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

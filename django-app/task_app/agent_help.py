@@ -105,13 +105,16 @@ AGENT_API_REFERENCE = [
         ),
     },
     {
-        "method": "ctx.complete_text(prompt, max_tokens=2048)",
-        "params": "prompt: str, max_tokens: int",
+        "method": "ctx.complete_text(prompt, max_tokens=2048, include_codebase=False)",
+        "params": "prompt: str, max_tokens: int, include_codebase: bool",
         "returns": "str",
         "description": (
             "Claude に自由記述のテキストを生成させて返す。要約・タイトル・説明など"
             "散文が欲しいときに使う。コード生成用の内部メソッドと違い FILE ブロックを"
             "強制しないため、'FILE: docs/design/*.md' のような出力にならない。"
+            "include_codebase=True にすると、クローン済みリポジトリの内容を前置し、"
+            "実在するファイルパスのみを使うよう指示する（存在しないパスの創作を防ぐ）。"
+            "clone_git_url() 後に呼ぶこと。"
         ),
     },
     {
