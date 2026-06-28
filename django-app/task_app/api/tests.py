@@ -783,3 +783,69 @@ class TaskFieldValuesNestedAPITest(BaseAPITest):
         r = self.client.post(self.URL, payload, format='json')
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('field_values', r.data)
+
+
+# ---------------------------------------------------------------------------
+# DSL execution (#458) — wrapper API around execute_dsl()
+# ---------------------------------------------------------------------------
+
+class DSLExecuteAPITest(BaseAPITest):
+    URL = f'{BASE}/dsl/execute/'
+
+    def setUp(self):
+        super().setUp()
+        self.dst = Task.objects.create(
+            title='Dst', project=self.project, assignee=self.user, status=self.status,
+        )
+        self.prefs = UserPreferences.objects.get(user=self.user)
+        self.prefs.api_key = generate_api_key()
+        self.prefs.save()
+
+    def test_unauthenticated_is_denied(self):
+        r = self.client.post(self.URL, {'dsl': f'LINK {self.task.pk} -> {self.dst.pk}'})
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_valid_link_dsl_returns_200_and_links(self):
+        self.auth()
+        r = self.client.post(self.URL, {'dsl': f'LINK {self.task.pk} -> {self.dst.pk}'})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['executed_count'], 1)
+        self.assertIn(self.dst, self.task.related_tasks.all())
+
+    def test_valid_assign_dsl_changes_assignee(self):
+        self.auth()
+        r = self.client.post(self.URL, {'dsl': f'ASSIGN {self.task.pk} TO other'})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other)
+
+    def test_invalid_dsl_returns_400(self):
+        self.auth()
+        r = self.client.post(self.URL, {'dsl': 'LINK foo'})
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('dsl', r.data)
+
+    def test_nonexistent_task_does_not_raise(self):
+        self.auth()
+        r = self.client.post(self.URL, {'dsl': 'LINK 99999 -> 99998'})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['executed_count'], 1)
+
+    def test_api_key_authentication(self):
+        r = self.client.post(
+            self.URL,
+            {'dsl': f'LINK {self.task.pk} -> {self.dst.pk}'},
+            HTTP_X_API_KEY=self.prefs.api_key,
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertIn(self.dst, self.task.related_tasks.all())
+
+    def test_multiline_dsl_executes_all(self):
+        self.auth()
+        dsl = f'ASSIGN {self.task.pk} TO other\nLINK {self.task.pk} -> {self.dst.pk}'
+        r = self.client.post(self.URL, {'dsl': dsl})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['executed_count'], 2)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assignee, self.other)
+        self.assertIn(self.dst, self.task.related_tasks.all())
