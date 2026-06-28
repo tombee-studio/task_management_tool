@@ -2137,3 +2137,25 @@ class TaskTagViewTest(BaseViewTest):
         tag_names = set(self.task.tags.values_list("name", flat=True))
         self.assertEqual(tag_names, {"バグ", "フロントエンド"})
 
+
+
+# ---------------------------------------------------------------------------
+# Template filter — markdown
+# ---------------------------------------------------------------------------
+
+class MarkdownFilterTest(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="P")
+
+    def test_table_is_rendered(self):
+        from .extras import markdown
+        text = "| a | b |\n|---|---|\n| 1 | 2 |"
+        html = markdown(text, self.project)
+        self.assertIn("<table>", html)
+        self.assertIn("<th>a</th>", html)
+        self.assertIn("<td>1</td>", html)
+
+    def test_fenced_code_still_rendered(self):
+        from .extras import markdown
+        html = markdown("```\ncode\n```", self.project)
+        self.assertIn("<code>", html)
