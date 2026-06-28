@@ -12,7 +12,6 @@ class Project(models.Model):
   dev_branch = models.CharField(max_length=100, default='', blank=True)
   release_branch = models.CharField(max_length=100, default='', blank=True)
   main_branch = models.CharField(max_length=100, default='main', blank=True)
-  agent = models.TextField(blank=True, default='')
   history = AuditlogHistoryField()
   participants = models.ManyToManyField(
     settings.AUTH_USER_MODEL,
@@ -78,6 +77,9 @@ class TaskType(models.Model):
     null=True,
     blank=True,
   )
+  # Agent script for this task type. When set, the automation agent runs it for
+  # tasks of this type; otherwise it falls back to the built-in default pipeline.
+  agent = models.TextField(blank=True, default='')
 
   class Meta:
     ordering = ['name']

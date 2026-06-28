@@ -14,21 +14,58 @@ class SignUpForm(UserCreationForm):
         fields = ('username', 'email', 'password1', 'password2')
 
 
+# エージェント設定（agent フィールド）で利用できる API のヘルプ。
+# プロジェクト編集画面で agent フィールドの help_text として表示する。
+AGENT_API_HELP = (
+    'エージェントスクリプト（Python）で利用できる API:\n'
+    'ctx.clone_git_url() : リポジトリをクローンする（git操作の前に必須）\n'
+    'ctx.get_task() : 現在のタスク情報を取得する\n'
+    'ctx.get_kinds() : プロジェクトのタスク種別を取得する\n'
+    'ctx.decide_strategy(task, kinds) : 実装方針を決定する\n'
+    'ctx.get_modification_level() : 改修規模(SMALL/MIDDLE/LARGE)を判定する\n'
+    'ctx.create_subtasks(strategy) : サブタスクを作成する\n'
+    'ctx.branch(task) : 作業ブランチを作成・切り替えする\n'
+    'ctx.run_agent(prompt) : 任意のプロンプトで改修を実行する\n'
+    'ctx.push(task) : 実装・テスト・コミット・プッシュを行う\n'
+    'ctx.gh_create_pr(task) : GitHub の PR を作成する\n'
+    'ctx.post_comment(task, message) : タスクにコメントを投稿する\n'
+    'ctx.change_assignee(assignee_id) : 担当者を変更する\n'
+    'ctx.get_assignee() : reporter の ID を取得する\n'
+    'SMALL / MIDDLE / LARGE : 改修規模を表す定数'
+)
+
+
+class TaskTypeForm(forms.ModelForm):
+    class Meta:
+        model = TaskType
+        fields = ['name', 'parent', 'agent']
+        widgets = {
+            'agent': forms.Textarea(attrs={'rows': 6}),
+        }
+        labels = {
+            'agent': 'エージェント設定（種別）',
+        }
+        help_texts = {
+            'agent': (
+                '空欄の場合はプロジェクトのエージェント設定が使用されます。\n'
+                + AGENT_API_HELP
+            ),
+        }
+
+
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['name', 'git_url', 'dev_branch', 'release_branch', 'main_branch', 'agent']
+        fields = ['name', 'git_url', 'dev_branch', 'release_branch', 'main_branch']
         widgets = {
             'dev_branch': forms.TextInput(attrs={'placeholder': 'develop'}),
             'release_branch': forms.TextInput(attrs={'placeholder': 'release'}),
             'main_branch': forms.TextInput(attrs={'placeholder': 'main'}),
-            'agent': forms.Textarea(attrs={'rows': 6}),
         }
         labels = {
             'dev_branch': '開発ブランチ',
             'release_branch': 'リリースブランチ',
             'main_branch': 'メインブランチ',
-            'agent': 'エージェント設定',
         }
 
 

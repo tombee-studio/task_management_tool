@@ -94,6 +94,34 @@ def execute_agent_script(script_code, ctx):
     exec(compile(tree, "<agent_script>", "exec"), namespace)
 
 # ---------------------------------------------------------------------------
+# Agent script resolution
+# ---------------------------------------------------------------------------
+
+def _resolve_agent_script(task):
+    """Choose the agent script to run, returning (script, source_label).
+
+    The agent script is configured per task type:
+      1. the task's task type's agent script (if set),
+      2. otherwise the built-in default pipeline.
+    """
+    task_type_id = task.get("task_type")
+    if task_type_id:
+        try:
+            resp = requests.get(
+                f"{TASK_API_URL}/task_app/task-types/{task_type_id}/",
+                headers=_API_HEADERS,
+            )
+            if resp.ok:
+                tt_script = (resp.json().get("agent") or "").strip()
+                if tt_script:
+                    return tt_script, "task-type"
+        except Exception as e:
+            print(f"[agent] Could not fetch task type {task_type_id}: {e}", file=sys.stderr)
+
+    return DEFAULT_AGENT_SCRIPT, "default"
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -105,12 +133,6 @@ def main():
     task_resp.raise_for_status()
     task = task_resp.json()
     print(f"[agent] Task #{TASK_ID}: {task['title']}")
-
-    project_resp = requests.get(
-        f"{TASK_API_URL}/task_app/projects/{task['project']}/", headers=_API_HEADERS
-    )
-    project_resp.raise_for_status()
-    project = project_resp.json()
 
     # Update status to 着手済み (2)
     requests.patch(
@@ -128,13 +150,8 @@ def main():
         model=MODEL,
     )
 
-    agent_script = (project.get("agent") or "").strip()
-    if agent_script:
-        print("[agent] Using project agent script.")
-        script = agent_script
-    else:
-        print("[agent] Using default agent script.")
-        script = DEFAULT_AGENT_SCRIPT
+    script, source = _resolve_agent_script(task)
+    print(f"[agent] Using {source} agent script.")
 
     try:
         execute_agent_script(script, ctx)

@@ -3,7 +3,10 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from task_app.models import Comment, Project, Rule, Status, Tag, Task, UserPreferences
+from task_app.models import (
+    Comment, Project, Rule, Status, Tag, Task, TaskFieldValue, TaskType,
+    TaskTypeField, UserPreferences,
+)
 from task_app.signals import generate_api_key
 
 User = get_user_model()
@@ -647,3 +650,136 @@ class GenerateAPIKeyActionTest(BaseAPITest):
         self.auth()
         r = self.client.get(self.url())
         self.assertEqual(r.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+# ---------------------------------------------------------------------------
+# TaskType agent field (#428) — agent script configurable per task type
+# ---------------------------------------------------------------------------
+
+class TaskTypeAgentAPITest(BaseAPITest):
+    def url(self, pk=None):
+        return f'{BASE}/task-types/{pk}/' if pk else f'{BASE}/task-types/'
+
+    def test_create_persists_agent_script(self):
+        self.auth()
+        r = self.client.post(self.url(), {
+            'project': self.project.id,
+            'name': '不具合',
+            'agent': 'ctx.clone_git_url()\nctx.push(ctx.get_task())',
+        })
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertIn('agent', r.data)
+        self.assertEqual(r.data['agent'], 'ctx.clone_git_url()\nctx.push(ctx.get_task())')
+
+    def test_agent_defaults_to_empty(self):
+        self.auth()
+        r = self.client.post(self.url(), {'project': self.project.id, 'name': '調査'})
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r.data['agent'], '')
+
+    def test_agent_is_updatable(self):
+        self.auth()
+        created = self.client.post(self.url(), {'project': self.project.id, 'name': '改修方針'})
+        pk = created.data['id']
+        r = self.client.patch(self.url(pk), {'agent': 'ctx.run_agent("investigate")'})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['agent'], 'ctx.run_agent("investigate")')
+
+
+# ---------------------------------------------------------------------------
+# Task field_values nested write (#429) — set type-field values on task create
+# ---------------------------------------------------------------------------
+
+class TaskFieldValuesNestedAPITest(BaseAPITest):
+    URL = f'{BASE}/tasks/'
+
+    def setUp(self):
+        super().setUp()
+        self.task_type = TaskType.objects.create(project=self.project, name='調査')
+        self.field = TaskTypeField.objects.create(
+            task_type=self.task_type, name='issue_url', label='Issue URL',
+            field_type='url', required=True,
+        )
+
+    def _payload(self, **kwargs):
+        data = {
+            'title': 'With fields',
+            'project': self.project.pk,
+            'assignee': self.user.pk,
+            'status': self.status.pk,
+            'task_type': self.task_type.pk,
+        }
+        data.update(kwargs)
+        return data
+
+    def detail(self, pk):
+        return f'{self.URL}{pk}/'
+
+    def test_create_with_field_values(self):
+        self.auth()
+        payload = self._payload(
+            field_values=[{'field': self.field.pk, 'value': 'https://x/1'}]
+        )
+        r = self.client.post(self.URL, payload, format='json')
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        task = Task.objects.get(pk=r.data['id'])
+        fv = TaskFieldValue.objects.get(task=task, field=self.field)
+        self.assertEqual(fv.value, 'https://x/1')
+
+    def test_create_without_field_values_still_works(self):
+        self.auth()
+        r = self.client.post(self.URL, self._payload(), format='json')
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            TaskFieldValue.objects.filter(task_id=r.data['id']).count(), 0
+        )
+
+    def test_field_values_in_response(self):
+        self.auth()
+        payload = self._payload(
+            field_values=[{'field': self.field.pk, 'value': 'https://x/2'}]
+        )
+        r = self.client.post(self.URL, payload, format='json')
+        self.assertEqual(len(r.data['field_values']), 1)
+        self.assertEqual(r.data['field_values'][0]['value'], 'https://x/2')
+
+    def test_update_field_values(self):
+        self.auth()
+        created = self.client.post(
+            self.URL,
+            self._payload(field_values=[{'field': self.field.pk, 'value': 'old'}]),
+            format='json',
+        )
+        pk = created.data['id']
+        r = self.client.patch(
+            self.detail(pk),
+            {'field_values': [{'field': self.field.pk, 'value': 'new'}]},
+            format='json',
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        fv = TaskFieldValue.objects.get(task_id=pk, field=self.field)
+        self.assertEqual(fv.value, 'new')
+        self.assertEqual(TaskFieldValue.objects.filter(task_id=pk).count(), 1)
+
+    def test_field_from_other_task_type_rejected(self):
+        self.auth()
+        other_type = TaskType.objects.create(project=self.project, name='不具合')
+        other_field = TaskTypeField.objects.create(
+            task_type=other_type, name='env', label='Env',
+        )
+        payload = self._payload(
+            field_values=[{'field': other_field.pk, 'value': 'prod'}]
+        )
+        r = self.client.post(self.URL, payload, format='json')
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('field_values', r.data)
+
+    def test_field_values_without_task_type_rejected(self):
+        self.auth()
+        payload = self._payload(
+            field_values=[{'field': self.field.pk, 'value': 'x'}]
+        )
+        payload.pop('task_type')
+        r = self.client.post(self.URL, payload, format='json')
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('field_values', r.data)

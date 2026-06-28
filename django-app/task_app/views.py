@@ -11,11 +11,12 @@ from .models import *
 
 from django.contrib.auth import login
 from django.http import Http404, HttpResponseRedirect
-from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm, UserUpdateForm, UserPreferencesForm
+from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm, UserUpdateForm, UserPreferencesForm, TaskTypeForm
 from .models import UserPreferences
 from .filters import TaskFilterMixin, apply_task_filters
 from .dsl import execute_dsl
 from .gantt import build_gantt_data
+from .agent_help import get_agent_help
 from .widget_loader import get_page_widgets, resolve_widget_data
 
 
@@ -141,6 +142,12 @@ class ProjectCreateView(LoginRequiredMixin, CreateView):
     fields = ["name", "git_url"]
     template_name = "task_app/project_form.html"
     
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user_preferences, _ = UserPreferences.objects.get_or_create(user=self.request.user)
+        context["user_preferences"] = user_preferences
+        return context
+
     def get_success_url(self):
         return reverse_lazy("project_detail", kwargs={"pk": self.object.pk})
 
@@ -158,7 +165,7 @@ class ProjectUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_queryset(self):
         return self.request.user.projects.all()
-    
+
     def get_success_url(self):
         return reverse_lazy("project_detail", kwargs={"pk": self.object.pk})
 
@@ -593,7 +600,7 @@ class SignUpView(CreateView):
 
 class TaskTypeCreateView(LoginRequiredMixin, CreateView):
     model = TaskType
-    fields = ["name", "parent"]
+    form_class = TaskTypeForm
     template_name = "task_app/task_type_form.html"
 
     def _get_project(self):
@@ -618,6 +625,7 @@ class TaskTypeCreateView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['project'] = self._get_project()
+        context['agent_help'] = get_agent_help()
         return context
 
     def form_valid(self, form):
@@ -630,7 +638,7 @@ class TaskTypeCreateView(LoginRequiredMixin, CreateView):
 
 class TaskTypeUpdateView(LoginRequiredMixin, UpdateView):
     model = TaskType
-    fields = ["name", "parent"]
+    form_class = TaskTypeForm
     template_name = "task_app/task_type_form.html"
 
     def get_queryset(self):
@@ -648,6 +656,7 @@ class TaskTypeUpdateView(LoginRequiredMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['project'] = self.object.project
+        context['agent_help'] = get_agent_help()
         return context
 
     def get_success_url(self):
