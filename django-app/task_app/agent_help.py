@@ -105,6 +105,16 @@ AGENT_API_REFERENCE = [
         ),
     },
     {
+        "method": "ctx.complete_text(prompt, max_tokens=2048)",
+        "params": "prompt: str, max_tokens: int",
+        "returns": "str",
+        "description": (
+            "Claude に自由記述のテキストを生成させて返す。要約・タイトル・説明など"
+            "散文が欲しいときに使う。コード生成用の内部メソッドと違い FILE ブロックを"
+            "強制しないため、'FILE: docs/design/*.md' のような出力にならない。"
+        ),
+    },
+    {
         "method": "ctx.run_agent(prompt)",
         "params": "prompt: str",
         "returns": "list[str]",

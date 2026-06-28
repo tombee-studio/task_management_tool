@@ -141,6 +141,26 @@ class AgentCtx:
             if getattr(block, "type", None) == "text"
         )
 
+    def complete_text(self, prompt, max_tokens=2048):
+        """Run Claude for a free-form text answer and return the text.
+
+        Unlike _complete_code(), this uses no code-generation system prompt
+        and does not ask for FILE blocks, so it is the right helper when an
+        agent script needs plain text -- a summary, a title, a description.
+        Calling _complete_code() for prose makes the model wrap its answer in
+        a 'FILE: docs/design/*.md' block, which is almost never what a script
+        building a task title or description wants.
+        """
+        msg = self._client.messages.create(
+            model=self._model,
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return "".join(
+            block.text for block in msg.content
+            if getattr(block, "type", None) == "text"
+        ).strip()
+
     # ------------------------------------------------------------------
     # HTTP helpers
     # ------------------------------------------------------------------

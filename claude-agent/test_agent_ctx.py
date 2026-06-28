@@ -476,5 +476,54 @@ class TestBuildImplementationPrompt(unittest.TestCase):
         self.assertIn("please rename the field", prompt)
 
 
+class TestCompleteText(unittest.TestCase):
+    def _make_claude_mock(self, response_text):
+        content = MagicMock()
+        content.type = "text"
+        content.text = response_text
+        message = MagicMock()
+        message.content = [content]
+        client = MagicMock()
+        client.messages.create.return_value = message
+        return client
+
+    def test_returns_plain_text_stripped(self):
+        ctx = _make_ctx()
+        ctx._claude = self._make_claude_mock("  a one line summary  ")
+        result = ctx.complete_text("summarize this")
+        self.assertEqual(result, "a one line summary")
+
+    def test_uses_messages_create_not_stream(self):
+        ctx = _make_ctx()
+        ctx._claude = self._make_claude_mock("ok")
+        ctx.complete_text("do it")
+        ctx._claude.messages.create.assert_called_once()
+        ctx._claude.messages.stream.assert_not_called()
+
+    def test_no_file_block_system_prompt(self):
+        # complete_text must not impose the FILE-block code-gen system prompt;
+        # otherwise prose answers come back as "FILE: docs/design/*.md".
+        ctx = _make_ctx()
+        ctx._claude = self._make_claude_mock("title")
+        ctx.complete_text("make a title")
+        kwargs = ctx._claude.messages.create.call_args[1]
+        self.assertNotIn("system", kwargs)
+
+    def test_skips_non_text_blocks(self):
+        thinking = MagicMock()
+        thinking.type = "thinking"
+        thinking.text = "reasoning"
+        text = MagicMock()
+        text.type = "text"
+        text.text = "answer"
+        message = MagicMock()
+        message.content = [thinking, text]
+        client = MagicMock()
+        client.messages.create.return_value = message
+        ctx = _make_ctx()
+        ctx._claude = client
+        self.assertEqual(ctx.complete_text("q"), "answer")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
