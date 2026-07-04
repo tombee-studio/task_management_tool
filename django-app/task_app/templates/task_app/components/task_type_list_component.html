@@ -36,6 +36,31 @@
       {% else %}
       <p style="margin-top:8px; color:#888;">フィールドはまだ登録されていません。</p>
       {% endif %}
+
+      <hr style="margin:12px 0;">
+      <a href="{% url 'task_type_status_agent_create' task_type.pk %}" class="btn btn-xs btn-default">ステータス別エージェント追加</a>
+      {% if task_type.status_agents.all %}
+      <table class="table table-condensed" style="margin-top:8px; margin-bottom:0;">
+        <thead>
+          <tr><th>ステータス</th><th>エージェント設定</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for sa in task_type.status_agents.all %}
+          <tr>
+            <td>{{ sa.status.name }}</td>
+            <td>{% if sa.agent %}✓{% else %}<span style="color:#888;">（空）</span>{% endif %}</td>
+            <td>
+              <a href="{% url 'task_type_status_agent_update' sa.pk %}">編集</a>
+              &nbsp;
+              <a href="{% url 'task_type_status_agent_delete' sa.pk %}">削除</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="margin-top:8px; color:#888;">ステータス別エージェント設定はまだ登録されていません。</p>
+      {% endif %}
     </div>
   </div>
   {% endfor %}

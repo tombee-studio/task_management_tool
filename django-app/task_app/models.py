@@ -114,6 +114,30 @@ class TaskTypeField(models.Model):
     return f"{self.task_type.name}: {self.label}"
 
 
+class TaskTypeStatusAgent(models.Model):
+  # Agent script for a specific (task type, status) combination. When the
+  # automation agent picks up a task, it prefers the script matching the task's
+  # task type AND current status over the task-type-wide fallback (TaskType.agent).
+  task_type = models.ForeignKey(
+    'TaskType',
+    on_delete=models.CASCADE,
+    related_name='status_agents',
+  )
+  status = models.ForeignKey(
+    'Status',
+    on_delete=models.CASCADE,
+    related_name='task_type_agents',
+  )
+  agent = models.TextField(blank=True, default='')
+
+  class Meta:
+    unique_together = [('task_type', 'status')]
+    ordering = ['task_type', 'status']
+
+  def __str__(self):
+    return f"{self.task_type.name} / {self.status.name}"
+
+
 class TaskFieldValue(models.Model):
   task = models.ForeignKey(
     'Task',

@@ -32,4 +32,7 @@ urlpatterns = [
     re_path(r"^task-types/(?P<task_type_pk>\d+)/fields/create/$", TaskTypeFieldCreateView.as_view(), name="task_type_field_create"),
     re_path(r"^task-type-fields/(?P<pk>\d+)/edit/$", TaskTypeFieldUpdateView.as_view(), name="task_type_field_update"),
     re_path(r"^task-type-fields/(?P<pk>\d+)/delete/$", TaskTypeFieldDeleteView.as_view(), name="task_type_field_delete"),
+    re_path(r"^task-types/(?P<task_type_pk>\d+)/status-agents/create/$", TaskTypeStatusAgentCreateView.as_view(), name="task_type_status_agent_create"),
+    re_path(r"^task-type-status-agents/(?P<pk>\d+)/edit/$", TaskTypeStatusAgentUpdateView.as_view(), name="task_type_status_agent_update"),
+    re_path(r"^task-type-status-agents/(?P<pk>\d+)/delete/$", TaskTypeStatusAgentDeleteView.as_view(), name="task_type_status_agent_delete"),
 ]
