@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}タスク管理ツール{% endblock %}</title>
     {% bootstrap_css %}
-    {% block extra_head %}{% endblock %}
+    {% block extra_css %}{% endblock %}
   </head>
   <body>
     <nav class="navbar navbar-default">
@@ -19,7 +19,7 @@
             <li><a href="{% url 'project_list' %}">プロジェクト</a></li>
             <li><a href="{% url 'user_detail' %}">{{ user.username }}</a></li>
             <li>
-              <form method="post" action="{% url 'logout' %}" class="navbar-form">
+              <form action="{% url 'logout' %}" method="post" class="navbar-form">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-link">ログアウト</button>
               </form>
@@ -39,6 +39,7 @@
 
     {% bootstrap_javascript %}
     {% block extra_js %}{% endblock %}
+
     <footer class="app-footer text-muted text-center py-2">
       {{ GIT_HASH }}
     </footer>
