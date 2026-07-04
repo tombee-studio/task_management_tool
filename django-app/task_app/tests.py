@@ -805,6 +805,38 @@ class TaskFormTest(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Form — TaskTypeStatusAgent (#483) unique_together validation
+# ---------------------------------------------------------------------------
+
+class TaskTypeStatusAgentFormTest(TestCase):
+    def setUp(self):
+        from .forms import TaskTypeStatusAgentForm
+        from .models import TaskTypeStatusAgent
+        self.Form = TaskTypeStatusAgentForm
+        self.Model = TaskTypeStatusAgent
+        self.project = Project.objects.create(name="P")
+        self.task_type = TaskType.objects.create(name="Feature", project=self.project)
+        self.status = Status.objects.create(name="Review", project=self.project)
+
+    def test_new_combination_is_valid(self):
+        form = self.Form(
+            data={"status": self.status.pk, "agent": "ctx.merge()"},
+            project=self.project, task_type=self.task_type,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_duplicate_combination_is_invalid(self):
+        self.Model.objects.create(
+            task_type=self.task_type, status=self.status, agent="existing")
+        form = self.Form(
+            data={"status": self.status.pk, "agent": "ctx.merge()"},
+            project=self.project, task_type=self.task_type,
+        )
+        # Must be caught at validation, not raise IntegrityError on save().
+        self.assertFalse(form.is_valid())
+
+
+# ---------------------------------------------------------------------------
 # Form — Task-Event
 # ---------------------------------------------------------------------------
 

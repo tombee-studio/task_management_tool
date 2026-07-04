@@ -11,7 +11,7 @@ from .models import *
 
 from django.contrib.auth import login
 from django.http import Http404, HttpResponseRedirect
-from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm, UserUpdateForm, UserPreferencesForm, TaskTypeForm
+from .forms import SignUpForm, ProjectForm, TaskForm, CommentForm, UserUpdateForm, UserPreferencesForm, TaskTypeForm, TaskTypeStatusAgentForm
 from .models import UserPreferences
 from .filters import TaskFilterMixin, apply_task_filters
 from .dsl import execute_dsl
@@ -98,7 +98,9 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
         context["user_preferences"] = user_preferences
 
         context["status_list"] = self.object.statuses.all()
-        context["task_type_list"] = self.object.task_types.all()
+        context["task_type_list"] = self.object.task_types.prefetch_related(
+            'fields', 'status_agents', 'status_agents__status'
+        ).all()
 
         gantt_from = _parse_gantt_date(self.request.GET.get('gantt_from'))
         gantt_to = _parse_gantt_date(self.request.GET.get('gantt_to'))
@@ -735,6 +737,89 @@ class TaskTypeFieldDeleteView(LoginRequiredMixin, DeleteView):
 
     def get_queryset(self):
         return TaskTypeField.objects.filter(task_type__project__participants=self.request.user)
+
+    def get_success_url(self):
+        return (
+            reverse_lazy("project_detail", kwargs={"pk": self.object.task_type.project_id})
+            + "#tab-task-type"
+        )
+
+
+class TaskTypeStatusAgentCreateView(LoginRequiredMixin, CreateView):
+    model = TaskTypeStatusAgent
+    form_class = TaskTypeStatusAgentForm
+    template_name = "task_app/task_type_status_agent_form.html"
+
+    def _get_task_type(self):
+        pk = self.kwargs.get('task_type_pk')
+        if pk:
+            return TaskType.objects.filter(pk=pk, project__participants=self.request.user).first()
+        return None
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._get_task_type() is None:
+            raise Http404
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        task_type = self._get_task_type()
+        kwargs['project'] = task_type.project
+        kwargs['task_type'] = task_type
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        task_type = self._get_task_type()
+        context['task_type'] = task_type
+        context['project'] = task_type.project
+        context['agent_help'] = get_agent_help()
+        return context
+
+    def get_success_url(self):
+        return (
+            reverse_lazy("project_detail", kwargs={"pk": self.object.task_type.project_id})
+            + "#tab-task-type"
+        )
+
+
+class TaskTypeStatusAgentUpdateView(LoginRequiredMixin, UpdateView):
+    model = TaskTypeStatusAgent
+    form_class = TaskTypeStatusAgentForm
+    template_name = "task_app/task_type_status_agent_form.html"
+
+    def get_queryset(self):
+        return TaskTypeStatusAgent.objects.filter(
+            task_type__project__participants=self.request.user
+        )
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['project'] = self.object.task_type.project
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['task_type'] = self.object.task_type
+        context['project'] = self.object.task_type.project
+        context['agent_help'] = get_agent_help()
+        return context
+
+    def get_success_url(self):
+        return (
+            reverse_lazy("project_detail", kwargs={"pk": self.object.task_type.project_id})
+            + "#tab-task-type"
+        )
+
+
+class TaskTypeStatusAgentDeleteView(LoginRequiredMixin, DeleteView):
+    model = TaskTypeStatusAgent
+    template_name = "task_app/task_type_status_agent_confirm_delete.html"
+
+    def get_queryset(self):
+        return TaskTypeStatusAgent.objects.filter(
+            task_type__project__participants=self.request.user
+        )
 
     def get_success_url(self):
         return (

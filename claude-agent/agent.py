@@ -1,16 +1,19 @@
 """Claude automation agent.
 
 Reads TASK_ID from the environment, fetches the task from the API,
-and drives the agent using the project's `agent` script field.
+and drives the agent using the configured agent script.
 
-If Project.agent is set, its content is executed as a Python script
-(validated via ast.parse).  The script receives:
+The script is resolved by (task type, status) combination, in order:
+  1. the script for the task's task type AND current status (if set),
+  2. otherwise the task's task type's agent script (task-type-wide),
+  3. otherwise the built-in default pipeline.
+
+The chosen script's content is executed as a Python script (validated via
+ast.parse). The script receives:
 
   ctx       -- AgentCtx instance with all agent operations
   task_id   -- int, the current task ID
   SMALL / MIDDLE / LARGE -- modification level constants
-
-If Project.agent is empty the default pipeline runs.
 """
 import ast
 import os
@@ -100,11 +103,36 @@ def execute_agent_script(script_code, ctx):
 def _resolve_agent_script(task):
     """Choose the agent script to run, returning (script, source_label).
 
-    The agent script is configured per task type:
-      1. the task's task type's agent script (if set),
-      2. otherwise the built-in default pipeline.
+    The agent script is configured by (task type, status) combination:
+      1. the script for the task's task type AND current status (if set),
+      2. otherwise the task's task type's agent script (task-type-wide),
+      3. otherwise the built-in default pipeline.
+
+    The status matched is the task's status at pickup (before the agent sets
+    it to 着手済み), so behaviour can differ per status transition.
     """
     task_type_id = task.get("task_type")
+    status_id = task.get("status")
+
+    if task_type_id and status_id:
+        try:
+            resp = requests.get(
+                f"{TASK_API_URL}/task_app/task-type-status-agents/",
+                headers=_API_HEADERS,
+                params={"task_type": task_type_id, "status": status_id},
+            )
+            if resp.ok:
+                for row in resp.json():
+                    ts_script = (row.get("agent") or "").strip()
+                    if ts_script:
+                        return ts_script, "task-type+status"
+        except Exception as e:
+            print(
+                f"[agent] Could not fetch status agent for task type "
+                f"{task_type_id} / status {status_id}: {e}",
+                file=sys.stderr,
+            )
+
     if task_type_id:
         try:
             resp = requests.get(

@@ -1,13 +1,16 @@
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse, inline_serializer
-from rest_framework import viewsets, serializers
+from rest_framework import viewsets, serializers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from task_app.models import Project, Status, Comment, Tag, Task, UserPreferences, Rule, TaskType, TaskTypeField, TaskFieldValue
+from rest_framework.views import APIView
+from task_app.models import Project, Status, Comment, Tag, Task, UserPreferences, Rule, TaskType, TaskTypeField, TaskTypeStatusAgent, TaskFieldValue
 from task_app.signals import generate_api_key
+from task_app.dsl import execute_dsl
 from .serializers import (
     ProjectSerializer, StatusSerializer, CommentSerializer, TagSerializer,
     TaskSerializer, UserPreferencesSerializer, RuleSerializer, TaskTypeSerializer,
-    TaskTypeFieldSerializer, TaskFieldValueSerializer,
+    TaskTypeFieldSerializer, TaskTypeStatusAgentSerializer, TaskFieldValueSerializer,
+    DSLExecuteSerializer,
 )
 
 
@@ -166,6 +169,29 @@ class TaskTypeFieldViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema_view(
+    list=extend_schema(summary='List task type status agents', tags=['Task Type Status Agents']),
+    create=extend_schema(summary='Create a task type status agent', tags=['Task Type Status Agents']),
+    retrieve=extend_schema(summary='Retrieve a task type status agent', tags=['Task Type Status Agents']),
+    update=extend_schema(summary='Update a task type status agent', tags=['Task Type Status Agents']),
+    partial_update=extend_schema(summary='Partially update a task type status agent', tags=['Task Type Status Agents']),
+    destroy=extend_schema(summary='Delete a task type status agent', tags=['Task Type Status Agents']),
+)
+class TaskTypeStatusAgentViewSet(viewsets.ModelViewSet):
+    queryset = TaskTypeStatusAgent.objects.all()
+    serializer_class = TaskTypeStatusAgentSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        task_type_id = self.request.query_params.get('task_type')
+        if task_type_id:
+            qs = qs.filter(task_type_id=task_type_id)
+        status_id = self.request.query_params.get('status')
+        if status_id:
+            qs = qs.filter(status_id=status_id)
+        return qs
+
+
+@extend_schema_view(
     list=extend_schema(summary='List task field values', tags=['Task Field Values']),
     create=extend_schema(summary='Create a task field value', tags=['Task Field Values']),
     retrieve=extend_schema(summary='Retrieve a task field value', tags=['Task Field Values']),
@@ -183,3 +209,27 @@ class TaskFieldValueViewSet(viewsets.ModelViewSet):
         if task_id:
             qs = qs.filter(task_id=task_id)
         return qs
+
+
+@extend_schema(
+    summary='Execute a DSL script',
+    tags=['DSL'],
+    request=DSLExecuteSerializer,
+    responses={200: inline_serializer(
+        name='DSLExecuteResponse',
+        fields={'executed_count': serializers.IntegerField()},
+    )},
+)
+class DSLExecuteView(APIView):
+    def post(self, request):
+        serializer = DSLExecuteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        dsl_text = serializer.validated_data['dsl']
+        try:
+            count = execute_dsl(dsl_text)
+        except Exception as e:
+            return Response(
+                {'detail': f'DSL execution error: {e}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({'executed_count': count})

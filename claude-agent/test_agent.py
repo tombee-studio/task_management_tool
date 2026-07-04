@@ -51,5 +51,53 @@ class TestResolveAgentScript(unittest.TestCase):
         self.assertEqual(source, "default")
 
 
+def _dispatch(status_agents, task_type):
+    """Return a requests.get side_effect dispatching on the URL."""
+    def _get(url, *args, **kwargs):
+        if "task-type-status-agents" in url:
+            return _resp(status_agents)
+        return _resp(task_type)
+    return _get
+
+
+class TestResolveAgentScriptWithStatus(unittest.TestCase):
+    @patch("agent.requests.get")
+    def test_uses_status_agent_when_set(self, mock_get):
+        mock_get.side_effect = _dispatch(
+            status_agents=[{"agent": "STATUS SCRIPT"}],
+            task_type={"agent": "TT SCRIPT"},
+        )
+        script, source = agent._resolve_agent_script({"task_type": 7, "status": 4})
+        self.assertEqual(script, "STATUS SCRIPT")
+        self.assertEqual(source, "task-type+status")
+
+    @patch("agent.requests.get")
+    def test_falls_back_to_task_type_when_no_status_agent(self, mock_get):
+        mock_get.side_effect = _dispatch(
+            status_agents=[],
+            task_type={"agent": "TT SCRIPT"},
+        )
+        script, source = agent._resolve_agent_script({"task_type": 7, "status": 4})
+        self.assertEqual(script, "TT SCRIPT")
+        self.assertEqual(source, "task-type")
+
+    @patch("agent.requests.get")
+    def test_falls_back_when_status_agent_blank(self, mock_get):
+        mock_get.side_effect = _dispatch(
+            status_agents=[{"agent": "   "}],
+            task_type={"agent": "TT SCRIPT"},
+        )
+        script, source = agent._resolve_agent_script({"task_type": 7, "status": 4})
+        self.assertEqual(script, "TT SCRIPT")
+        self.assertEqual(source, "task-type")
+
+    @patch("agent.requests.get")
+    def test_defaults_when_neither_set(self, mock_get):
+        mock_get.side_effect = _dispatch(status_agents=[], task_type={"agent": ""})
+        script, source = agent._resolve_agent_script({"task_type": 7, "status": 4})
+        self.assertEqual(script, agent.DEFAULT_AGENT_SCRIPT)
+        self.assertEqual(source, "default")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

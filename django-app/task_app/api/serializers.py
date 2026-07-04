@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from task_app.models import Project, Status, Comment, Tag, Task, UserPreferences, Rule, TaskType, TaskTypeField, TaskFieldValue
+from lark import LarkError
+from task_app.dsl import parse_dsl
+from task_app.models import Project, Status, Comment, Tag, Task, UserPreferences, Rule, TaskType, TaskTypeField, TaskTypeStatusAgent, TaskFieldValue
 
 User = get_user_model()
 
@@ -117,6 +119,13 @@ class TaskTypeSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
 
+class TaskTypeStatusAgentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaskTypeStatusAgent
+        fields = ['id', 'task_type', 'status', 'agent']
+        read_only_fields = ['id']
+
+
 class TaskTypeFieldSerializer(serializers.ModelSerializer):
     class Meta:
         model = TaskTypeField
@@ -129,3 +138,14 @@ class TaskFieldValueSerializer(serializers.ModelSerializer):
         model = TaskFieldValue
         fields = ['id', 'task', 'field', 'value']
         read_only_fields = ['id']
+
+
+class DSLExecuteSerializer(serializers.Serializer):
+    dsl = serializers.CharField(allow_blank=False, trim_whitespace=False)
+
+    def validate_dsl(self, value):
+        try:
+            parse_dsl(value)
+        except LarkError as e:
+            raise serializers.ValidationError(f'DSL parse error: {e}')
+        return value
