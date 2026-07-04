@@ -152,6 +152,27 @@ class TestGetTask(unittest.TestCase):
         task = ctx.get_task()
         self.assertIsNone(task.kind)
 
+    @patch("agent_ctx.requests.get")
+    def test_fetches_explicit_task_id(self, mock_get):
+        # ctx is for task 123 but we ask for task 456.
+        task_data = {
+            "id": 456, "title": "Other", "description": "", "status": 1,
+            "assignee": 2, "reporter": None, "parent": None,
+            "project": 1, "event": None, "task_type": None,
+        }
+        mock_get.side_effect = [
+            _mock_response(task_data),
+            _mock_response([]),
+        ]
+
+        ctx = _make_ctx()
+        task = ctx.get_task(456)
+
+        self.assertEqual(task.id, 456)
+        # The task and comments requests must target task 456, not 123.
+        self.assertIn("task_app/tasks/456/", mock_get.call_args_list[0][0][0])
+        self.assertEqual(mock_get.call_args_list[1][1]["params"], {"task": 456})
+
 
 class TestDecideStrategy(unittest.TestCase):
     def _make_claude_mock(self, response_text):

@@ -53,10 +53,10 @@ AGENT_API_REFERENCE = [
         ),
     },
     {
-        "method": "ctx.get_task()",
-        "params": "なし",
+        "method": "ctx.get_task(task_id=None)",
+        "params": "task_id: int（省略時は現在のタスク）",
         "returns": "TaskInfo",
-        "description": "現在のタスクをコメント付きで取得する。",
+        "description": "タスクをコメント付きで取得する。task_id を渡すと任意のタスクを取得できる。",
     },
     {
         "method": "ctx.decide_strategy(task, kinds)",
