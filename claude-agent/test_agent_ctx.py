@@ -292,6 +292,84 @@ class TestCreateSubtasks(unittest.TestCase):
         self.assertEqual(ids, [])
 
 
+class TestCreateTask(unittest.TestCase):
+    @patch("agent_ctx.requests.post")
+    @patch("agent_ctx.requests.get")
+    def test_minimal_inherits_from_current_task(self, mock_get, mock_post):
+        mock_get.return_value = _mock_response(
+            {"id": 123, "project": 1, "assignee": 2, "event": 5}
+        )
+        mock_post.return_value = _mock_response({"id": 300, "title": "New"})
+        ctx = _make_ctx()
+        new_id = ctx.create_task("New")
+        self.assertEqual(new_id, 300)
+        data = mock_post.call_args[1]["json"]
+        self.assertEqual(data["title"], "New")
+        self.assertEqual(data["project"], 1)
+        self.assertEqual(data["assignee"], 2)
+        self.assertEqual(data["status"], 1)
+        self.assertEqual(data["event"], 5)
+        self.assertNotIn("parent", data)
+        self.assertNotIn("task_type", data)
+
+    @patch("agent_ctx.requests.post")
+    @patch("agent_ctx.requests.get")
+    def test_no_current_fetch_when_defaults_provided(self, mock_get, mock_post):
+        mock_post.return_value = _mock_response({"id": 301})
+        ctx = _make_ctx()
+        ctx.create_task(
+            "T", project=9, assignee=7, event=8, status=2,
+            parent=50, description="d", progress_summary="p", deadline="2026-01-01",
+        )
+        mock_get.assert_not_called()
+        data = mock_post.call_args[1]["json"]
+        self.assertEqual(data["project"], 9)
+        self.assertEqual(data["status"], 2)
+        self.assertEqual(data["parent"], 50)
+        self.assertEqual(data["event"], 8)
+        self.assertEqual(data["description"], "d")
+        self.assertEqual(data["progress_summary"], "p")
+        self.assertEqual(data["deadline"], "2026-01-01")
+
+    @patch("agent_ctx.requests.post")
+    @patch("agent_ctx.requests.get")
+    def test_resolves_task_type_name(self, mock_get, mock_post):
+        mock_get.return_value = _mock_response(
+            [{"id": 4, "name": "調査"}, {"id": 5, "name": "不具合"}]
+        )
+        mock_post.return_value = _mock_response({"id": 302})
+        ctx = _make_ctx()
+        ctx.create_task("T", project=1, assignee=2, event=9, task_type="不具合")
+        self.assertEqual(mock_post.call_args[1]["json"]["task_type"], 5)
+
+    @patch("agent_ctx.requests.post")
+    @patch("agent_ctx.requests.get")
+    def test_task_type_id_passthrough(self, mock_get, mock_post):
+        mock_post.return_value = _mock_response({"id": 303})
+        ctx = _make_ctx()
+        ctx.create_task("T", project=1, assignee=2, event=9, task_type=7)
+        mock_get.assert_not_called()
+        self.assertEqual(mock_post.call_args[1]["json"]["task_type"], 7)
+
+    @patch("agent_ctx.requests.post")
+    @patch("agent_ctx.requests.get")
+    def test_unknown_task_type_name_raises(self, mock_get, mock_post):
+        mock_get.return_value = _mock_response([{"id": 4, "name": "調査"}])
+        ctx = _make_ctx()
+        with self.assertRaises(ValueError):
+            ctx.create_task("T", project=1, assignee=2, event=9, task_type="なし")
+        mock_post.assert_not_called()
+
+    @patch("agent_ctx.requests.post")
+    @patch("agent_ctx.requests.get")
+    def test_field_values_passthrough(self, mock_get, mock_post):
+        mock_post.return_value = _mock_response({"id": 304})
+        ctx = _make_ctx()
+        fv = [{"field": 12, "value": "x"}]
+        ctx.create_task("T", project=1, assignee=2, event=9, task_type=7, field_values=fv)
+        self.assertEqual(mock_post.call_args[1]["json"]["field_values"], fv)
+
+
 class TestPostComment(unittest.TestCase):
     @patch("agent_ctx.requests.post")
     def test_posts_comment(self, mock_post):
