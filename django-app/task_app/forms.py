@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 from django.db.models import Q
 
-from .models import Project, Task, Comment, Status, Tag, UserPreferences, TaskType
+from .models import Project, Task, Comment, Status, Tag, UserPreferences, TaskType, TaskTypeStatusAgent
 from event_app.models import Event
 
 
@@ -27,6 +27,47 @@ class TaskTypeForm(forms.ModelForm):
         help_texts = {
             'agent': '空欄の場合はプロジェクトのエージェント設定が使用されます。',
         }
+
+
+class TaskTypeStatusAgentForm(forms.ModelForm):
+    class Meta:
+        model = TaskTypeStatusAgent
+        fields = ['status', 'agent']
+        widgets = {
+            'agent': forms.Textarea(attrs={'rows': 6}),
+        }
+        labels = {
+            'status': 'ステータス',
+            'agent': 'エージェント設定（種別×ステータス）',
+        }
+        help_texts = {
+            'agent': (
+                '空欄の場合は種別のエージェント設定（種別全体）が使用されます。'
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        project = kwargs.pop('project', None)
+        task_type = kwargs.pop('task_type', None)
+        super().__init__(*args, **kwargs)
+        if project is not None:
+            self.fields['status'].queryset = Status.objects.filter(project=project)
+        # Set task_type on the instance before validation so the
+        # (task_type, status) unique_together check runs during form
+        # validation and surfaces a clean error instead of a DB IntegrityError.
+        if task_type is not None:
+            self.instance.task_type = task_type
+
+    def validate_unique(self):
+        # task_type is set on the instance (not a form field), so Django would
+        # otherwise exclude it from the unique check and let a duplicate
+        # (task_type, status) pass validation and raise IntegrityError on save.
+        exclude = self._get_validation_exclusions()
+        exclude.discard('task_type')
+        try:
+            self.instance.validate_unique(exclude=exclude)
+        except forms.ValidationError as e:
+            self._update_errors(e)
 
 
 class ProjectForm(forms.ModelForm):

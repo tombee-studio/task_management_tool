@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from lark import LarkError
 from task_app.dsl import parse_dsl
-from task_app.models import Project, Status, Comment, Tag, Task, UserPreferences, Rule, TaskType, TaskTypeField, TaskFieldValue
+from task_app.models import Project, Status, Comment, Tag, Task, UserPreferences, Rule, TaskType, TaskTypeField, TaskTypeStatusAgent, TaskFieldValue
 
 User = get_user_model()
 
@@ -116,6 +116,13 @@ class TaskTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = TaskType
         fields = ['id', 'project', 'name', 'parent', 'agent']
+        read_only_fields = ['id']
+
+
+class TaskTypeStatusAgentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaskTypeStatusAgent
+        fields = ['id', 'task_type', 'status', 'agent']
         read_only_fields = ['id']
 
 
