@@ -2191,3 +2191,28 @@ class MarkdownFilterTest(TestCase):
         from .extras import markdown
         html = markdown("```\ncode\n```", self.project)
         self.assertIn("<code>", html)
+
+
+# ---------------------------------------------------------------------------
+# Views — Agent Script editor (#484) syntax highlighting assets
+# ---------------------------------------------------------------------------
+
+class AgentScriptEditorViewTest(BaseViewTest):
+    """The CodeMirror editor assets load only on forms with an 'agent' field."""
+
+    def test_task_type_form_includes_codemirror(self):
+        self.login()
+        r = self.client.get(reverse("task_type_update", kwargs={"pk": self.task_type.pk}))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "codemirror")
+        self.assertContains(r, "mode/python/python")
+
+    def test_non_agent_form_excludes_codemirror(self):
+        # The task-type field form also extends base_form.html but has no
+        # 'agent' field, so the editor assets must not be loaded there.
+        self.login()
+        r = self.client.get(
+            reverse("task_type_field_create", kwargs={"task_type_pk": self.task_type.pk})
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, "codemirror")

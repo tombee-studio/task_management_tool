@@ -1,0 +1,37 @@
+{% comment %}
+Live Python syntax highlighting for the Agent Script input (textarea[name="agent"]).
+Uses CodeMirror 5 from CDN (no build step). CodeMirror.fromTextArea keeps the
+underlying textarea in sync on form submit, so no extra wiring is needed.
+Include this inside {% block extra_js %} of any form that edits an agent script.
+{% endcomment %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<style>
+  .CodeMirror {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    height: auto;
+    font-family: Menlo, Monaco, "Courier New", monospace;
+    font-size: 13px;
+  }
+  .CodeMirror-scroll {
+    min-height: 120px;
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.CodeMirror) { return; }
+    document.querySelectorAll('textarea[name="agent"]').forEach(function (ta) {
+      CodeMirror.fromTextArea(ta, {
+        mode: 'python',
+        lineNumbers: true,
+        indentUnit: 4,
+        tabSize: 4,
+        indentWithTabs: false,
+        lineWrapping: true,
+        viewportMargin: Infinity,
+      });
+    });
+  });
+</script>

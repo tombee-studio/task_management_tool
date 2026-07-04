@@ -33,3 +33,7 @@
 {% block form_after %}{% endblock %}
 
 {% endblock %}
+
+{% block extra_js %}{{ block.super }}
+{% if form.agent %}{% include "task_app/agent_script_editor.html" %}{% endif %}
+{% endblock %}
