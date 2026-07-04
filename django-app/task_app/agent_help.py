@@ -71,6 +71,20 @@ AGENT_API_REFERENCE = [
         "description": "Claude に改修規模を判定させる。不明時は MIDDLE。",
     },
     {
+        "method": "ctx.create_task(title, ...)",
+        "params": (
+            "title: str, project=None, status=1, assignee=None, task_type=None, "
+            "parent=None, event=None, description=None, progress_summary=None, "
+            "reporter=None, deadline=None, field_values=None"
+        ),
+        "returns": "int",
+        "description": (
+            "タスクを API 作成し ID を返す。各フィールドをキーワード引数で指定。"
+            "project/assignee/event 未指定時は現タスクから継承、status は 1(未着手)。"
+            "task_type は id(int) でも種別名(str) でも可。"
+        ),
+    },
+    {
         "method": "ctx.create_subtasks(strategy)",
         "params": "strategy: Strategy",
         "returns": "list[int]",

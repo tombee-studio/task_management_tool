@@ -333,6 +333,65 @@ class AgentCtx:
         word = msg.content[0].text.strip().upper()
         return {"SMALL": SMALL, "MIDDLE": MIDDLE, "LARGE": LARGE}.get(word, MIDDLE)
 
+    def _resolve_task_type_id(self, project_id, name):
+        """Resolve a task type name to its id within a project."""
+        types = self._get("task_app/task-types/", params={"project": project_id})
+        for t in types:
+            if t["name"] == name:
+                return t["id"]
+        raise ValueError(f"Task type '{name}' not found in project {project_id}.")
+
+    def create_task(self, title, project=None, status=1, assignee=None,
+                    task_type=None, parent=None, event=None, description=None,
+                    progress_summary=None, reporter=None, deadline=None,
+                    field_values=None):
+        """Create a task via the API. Each task field is a keyword argument.
+
+        Fields left as None inherit sensible defaults from the current task:
+          - project:  the current task's project
+          - assignee: the current task's assignee
+          - event:    the current task's event
+        `status` defaults to 1 (未着手). `parent` defaults to None (top-level task).
+        `task_type` accepts an id (int) or a task type name (str), the latter
+        resolved within the project. `field_values` is a list of
+        {"field": <id>, "value": <str>} for the task type's custom fields.
+
+        Returns the created task's id.
+        """
+        if project is None or assignee is None or event is None:
+            current = self._get(f"task_app/tasks/{self.task_id}/")
+            if project is None:
+                project = current["project"]
+            if assignee is None:
+                assignee = current["assignee"]
+            if event is None:
+                event = current.get("event")
+
+        if isinstance(task_type, str):
+            task_type = self._resolve_task_type_id(project, task_type)
+
+        payload = {
+            "title": title,
+            "project": project,
+            "status": status,
+            "assignee": assignee,
+        }
+        optional = {
+            "task_type": task_type,
+            "parent": parent,
+            "event": event,
+            "description": description,
+            "progress_summary": progress_summary,
+            "reporter": reporter,
+            "deadline": deadline,
+            "field_values": field_values,
+        }
+        payload.update({k: v for k, v in optional.items() if v is not None})
+
+        result = self._post("task_app/tasks/", payload)
+        print(f"[agent] Created task #{result['id']}: {title}")
+        return result["id"]
+
     def create_subtasks(self, strategy):
         """Create subtasks listed in strategy.subtask_titles.
 
@@ -341,16 +400,13 @@ class AgentCtx:
         data = self._get(f"task_app/tasks/{self.task_id}/")
         created = []
         for title in (strategy.subtask_titles or []):
-            result = self._post("task_app/tasks/", {
-                "title": title,
-                "project": data["project"],
-                "parent": self.task_id,
-                "event": data.get("event"),
-                "assignee": data["assignee"],
-                "status": 1,
-            })
-            created.append(result["id"])
-            print(f"[agent] Created subtask #{result['id']}: {title}")
+            created.append(self.create_task(
+                title=title,
+                parent=self.task_id,
+                project=data["project"],
+                assignee=data["assignee"],
+                event=data.get("event"),
+            ))
         return created
 
     def branch(self, task):

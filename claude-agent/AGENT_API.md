@@ -86,7 +86,8 @@
 | `get_task()` | なし | `TaskInfo` | 現在のタスクをコメント付きで取得。 |
 | `decide_strategy(task, kinds)` | `task: TaskInfo`, `kinds: list[TaskKind]` | `Strategy` | Claude に実装方針を計画させ、内部に保存して返す。 |
 | `get_modification_level()` | なし | `int` (`SMALL`/`MIDDLE`/`LARGE`) | Claude に改修規模を判定させる。不明時は `MIDDLE`。 |
-| `create_subtasks(strategy)` | `strategy: Strategy` | `list[int]` | `strategy.subtask_titles` のサブタスクを API 作成し、ID を返す。 |
+| `create_task(title, ...)` | `title: str`, `project=None`, `status=1`, `assignee=None`, `task_type=None`, `parent=None`, `event=None`, `description=None`, `progress_summary=None`, `reporter=None`, `deadline=None`, `field_values=None` | `int` | タスクを API 作成し ID を返す。各フィールドをキーワード引数で指定。`project`/`assignee`/`event` 未指定時は現タスクから継承。`task_type` は id(int) でも種別名(str) でも可。 |
+| `create_subtasks(strategy)` | `strategy: Strategy` | `list[int]` | `strategy.subtask_titles` のサブタスクを（現タスクの子として）API 作成し、ID を返す。内部で `create_task` に委譲。 |
 | `branch(task)` | `task` | `None` | タスクに応じた git ブランチを作成/切替。`clone_git_url()` 後に呼ぶ。 |
 | `post_comment(task, message)` | `task`, `message: str` | `None` | タスクにコメントを投稿（失敗しても例外を出さない）。 |
 | `change_assignee(assignee_id)` | `assignee_id: int` | `None` | 現在タスクの担当者を変更。 |
