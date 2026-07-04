@@ -1,0 +1,46 @@
+{% load bootstrap3 %}
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}タスク管理ツール{% endblock %}</title>
+    {% bootstrap_css %}
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body>
+    <nav class="navbar navbar-default">
+      <div class="container">
+        <div class="navbar-header">
+          <a class="navbar-brand" href="{% url 'project_list' %}">タスク管理ツール</a>
+        </div>
+        <ul class="nav navbar-nav navbar-right">
+          {% if user.is_authenticated %}
+            <li><a href="{% url 'project_list' %}">プロジェクト</a></li>
+            <li><a href="{% url 'user_detail' %}">{{ user.username }}</a></li>
+            <li>
+              <form method="post" action="{% url 'logout' %}" class="navbar-form">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-link">ログアウト</button>
+              </form>
+            </li>
+          {% else %}
+            <li><a href="{% url 'login' %}">ログイン</a></li>
+            <li><a href="{% url 'signup' %}">サインアップ</a></li>
+          {% endif %}
+        </ul>
+      </div>
+    </nav>
+
+    <div class="container">
+      {% bootstrap_messages %}
+      {% block content %}{% endblock %}
+    </div>
+
+    {% bootstrap_javascript %}
+    {% block extra_js %}{% endblock %}
+    <footer class="app-footer text-muted text-center py-2">
+      {{ GIT_HASH }}
+    </footer>
+  </body>
+</html>
