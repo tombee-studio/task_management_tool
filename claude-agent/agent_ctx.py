@@ -247,9 +247,14 @@ class AgentCtx:
         self._git(["config", "user.name", "Claude Agent"])
         print(f"[agent] Cloned {self._github_repo}")
 
-    def get_task(self):
-        """Fetch the current task with comments. Returns TaskInfo."""
-        data = self._get(f"task_app/tasks/{self.task_id}/")
+    def get_task(self, task_id=None):
+        """Fetch a task with comments. Returns TaskInfo.
+
+        task_id defaults to the current task; pass an id to fetch any other task.
+        """
+        if task_id is None:
+            task_id = self.task_id
+        data = self._get(f"task_app/tasks/{task_id}/")
 
         kind_name = None
         if data.get("task_type"):
@@ -262,7 +267,7 @@ class AgentCtx:
         comments_resp = requests.get(
             f"{self._api_url}/task_app/comments/",
             headers=self._headers,
-            params={"task": self.task_id},
+            params={"task": task_id},
         )
         comments = comments_resp.json() if comments_resp.ok else []
 

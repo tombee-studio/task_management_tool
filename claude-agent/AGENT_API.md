@@ -83,7 +83,7 @@
 |----------|------|--------|------|
 | `get_kinds()` | なし | `list[TaskKind]` | プロジェクトのタスク種別一覧を取得。 |
 | `clone_git_url()` | なし | `None` | プロジェクトの `git_url` を一時ディレクトリに clone。git 操作前に必須。`git_url` 未設定時は `RuntimeError`。 |
-| `get_task()` | なし | `TaskInfo` | 現在のタスクをコメント付きで取得。 |
+| `get_task(task_id=None)` | `task_id: int` (省略時は現在のタスク) | `TaskInfo` | タスクをコメント付きで取得。`task_id` を渡すと任意のタスクを取得できる。 |
 | `decide_strategy(task, kinds)` | `task: TaskInfo`, `kinds: list[TaskKind]` | `Strategy` | Claude に実装方針を計画させ、内部に保存して返す。 |
 | `get_modification_level()` | なし | `int` (`SMALL`/`MIDDLE`/`LARGE`) | Claude に改修規模を判定させる。不明時は `MIDDLE`。 |
 | `create_task(title, ...)` | `title: str`, `project=None`, `status=1`, `assignee=None`, `task_type=None`, `parent=None`, `event=None`, `description=None`, `progress_summary=None`, `reporter=None`, `deadline=None`, `field_values=None` | `int` | タスクを API 作成し ID を返す。各フィールドをキーワード引数で指定。`project`/`assignee`/`event` 未指定時は現タスクから継承。`task_type` は id(int) でも種別名(str) でも可。 |
