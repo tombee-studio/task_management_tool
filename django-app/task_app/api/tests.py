@@ -687,6 +687,66 @@ class TaskTypeAgentAPITest(BaseAPITest):
 
 
 # ---------------------------------------------------------------------------
+# TaskTypeStatusAgent (#483) — agent script per (task type, status) combination
+# ---------------------------------------------------------------------------
+
+class TaskTypeStatusAgentAPITest(BaseAPITest):
+    def url(self, pk=None):
+        base = f'{BASE}/task-type-status-agents/'
+        return f'{base}{pk}/' if pk else base
+
+    def setUp(self):
+        super().setUp()
+        self.task_type = TaskType.objects.create(project=self.project, name='不具合')
+        self.review = Status.objects.create(name='Review', project=self.project)
+
+    def test_unauthenticated_is_denied(self):
+        self.assertEqual(self.client.get(self.url()).status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_persists_script(self):
+        self.auth()
+        r = self.client.post(self.url(), {
+            'task_type': self.task_type.id,
+            'status': self.review.id,
+            'agent': 'ctx.merge()',
+        })
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r.data['agent'], 'ctx.merge()')
+        self.assertEqual(r.data['task_type'], self.task_type.id)
+        self.assertEqual(r.data['status'], self.review.id)
+
+    def test_unique_per_type_and_status(self):
+        self.auth()
+        payload = {'task_type': self.task_type.id, 'status': self.review.id, 'agent': 'a'}
+        self.assertEqual(self.client.post(self.url(), payload).status_code,
+                         status.HTTP_201_CREATED)
+        dup = self.client.post(self.url(), payload)
+        self.assertEqual(dup.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_filter_by_task_type_and_status(self):
+        self.auth()
+        from task_app.models import TaskTypeStatusAgent
+        TaskTypeStatusAgent.objects.create(
+            task_type=self.task_type, status=self.review, agent='review-script')
+        TaskTypeStatusAgent.objects.create(
+            task_type=self.task_type, status=self.status, agent='open-script')
+        r = self.client.get(
+            self.url(), {'task_type': self.task_type.id, 'status': self.review.id})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(r.data), 1)
+        self.assertEqual(r.data[0]['agent'], 'review-script')
+
+    def test_is_updatable(self):
+        self.auth()
+        created = self.client.post(self.url(), {
+            'task_type': self.task_type.id, 'status': self.review.id, 'agent': 'x'})
+        pk = created.data['id']
+        r = self.client.patch(self.url(pk), {'agent': 'ctx.deploy()'})
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data['agent'], 'ctx.deploy()')
+
+
+# ---------------------------------------------------------------------------
 # Task field_values nested write (#429) — set type-field values on task create
 # ---------------------------------------------------------------------------
 

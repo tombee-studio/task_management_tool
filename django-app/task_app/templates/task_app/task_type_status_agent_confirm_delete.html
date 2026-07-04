@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>ステータス別エージェント設定 削除確認</h1>
+
+<p>「{{ object.task_type.name }} / {{ object.status.name }}」のエージェント設定を削除しますか？</p>
+
+<form method="POST">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-danger">削除</button>
+  {% if object.task_type.project %}
+    <a href="{% url 'project_detail' object.task_type.project.pk %}#tab-task-type" class="btn btn-default">キャンセル</a>
+  {% else %}
+    <a href="{% url 'project_list' %}" class="btn btn-default">キャンセル</a>
+  {% endif %}
+</form>
+{% endblock %}

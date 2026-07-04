@@ -805,6 +805,38 @@ class TaskFormTest(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Form — TaskTypeStatusAgent (#483) unique_together validation
+# ---------------------------------------------------------------------------
+
+class TaskTypeStatusAgentFormTest(TestCase):
+    def setUp(self):
+        from .forms import TaskTypeStatusAgentForm
+        from .models import TaskTypeStatusAgent
+        self.Form = TaskTypeStatusAgentForm
+        self.Model = TaskTypeStatusAgent
+        self.project = Project.objects.create(name="P")
+        self.task_type = TaskType.objects.create(name="Feature", project=self.project)
+        self.status = Status.objects.create(name="Review", project=self.project)
+
+    def test_new_combination_is_valid(self):
+        form = self.Form(
+            data={"status": self.status.pk, "agent": "ctx.merge()"},
+            project=self.project, task_type=self.task_type,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_duplicate_combination_is_invalid(self):
+        self.Model.objects.create(
+            task_type=self.task_type, status=self.status, agent="existing")
+        form = self.Form(
+            data={"status": self.status.pk, "agent": "ctx.merge()"},
+            project=self.project, task_type=self.task_type,
+        )
+        # Must be caught at validation, not raise IntegrityError on save().
+        self.assertFalse(form.is_valid())
+
+
+# ---------------------------------------------------------------------------
 # Form — Task-Event
 # ---------------------------------------------------------------------------
 
@@ -2159,3 +2191,28 @@ class MarkdownFilterTest(TestCase):
         from .extras import markdown
         html = markdown("```\ncode\n```", self.project)
         self.assertIn("<code>", html)
+
+
+# ---------------------------------------------------------------------------
+# Views — Agent Script editor (#484) syntax highlighting assets
+# ---------------------------------------------------------------------------
+
+class AgentScriptEditorViewTest(BaseViewTest):
+    """The CodeMirror editor assets load only on forms with an 'agent' field."""
+
+    def test_task_type_form_includes_codemirror(self):
+        self.login()
+        r = self.client.get(reverse("task_type_update", kwargs={"pk": self.task_type.pk}))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "codemirror")
+        self.assertContains(r, "mode/python/python")
+
+    def test_non_agent_form_excludes_codemirror(self):
+        # The task-type field form also extends base_form.html but has no
+        # 'agent' field, so the editor assets must not be loaded there.
+        self.login()
+        r = self.client.get(
+            reverse("task_type_field_create", kwargs={"task_type_pk": self.task_type.pk})
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, "codemirror")
