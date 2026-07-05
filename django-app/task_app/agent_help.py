@@ -27,6 +27,8 @@ AGENT_SCRIPT_GLOBALS = [
      "description": "ctx.run_agent へのトップレベル別名。"},
     {"name": "create_pr", "kind": "callable",
      "description": "ctx.gh_create_pr へのトップレベル別名。"},
+    {"name": "execute_dsl", "kind": "callable",
+     "description": "ctx.execute_dsl へのトップレベル別名。"},
 ]
 
 # 利用可能な組み込み関数（_SAFE_BUILTINS）
@@ -85,10 +87,131 @@ AGENT_API_REFERENCE = [
         ),
     },
     {
+        "method": "ctx.update_task(task_id, **fields)",
+        "params": "task_id: int, **fields",
+        "returns": "dict",
+        "description": "タスクを PATCH 更新し、更新後の dict を返す。",
+    },
+    {
+        "method": "ctx.delete_task(task_id)",
+        "params": "task_id: int",
+        "returns": "None",
+        "description": "タスクを削除する。",
+    },
+    {
         "method": "ctx.create_subtasks(strategy)",
         "params": "strategy: Strategy",
         "returns": "list[int]",
         "description": "strategy.subtask_titles のサブタスクを API 作成し、ID を返す。",
+    },
+    {
+        "method": "ctx.get_statuses(project=None)",
+        "params": "project: int（省略時は現タスクのプロジェクト）",
+        "returns": "list[dict]",
+        "description": "ステータス一覧を取得する（task_app/statuses/）。",
+    },
+    {
+        "method": "ctx.get_status(status_id)",
+        "params": "status_id: int",
+        "returns": "dict",
+        "description": "ステータスを 1 件取得する。",
+    },
+    {
+        "method": "ctx.create_status(name, is_done=False, project=None)",
+        "params": "name: str, is_done: bool, project=None",
+        "returns": "int",
+        "description": (
+            "ステータスを作成し ID を返す。project 未指定時は現タスクから継承。"
+        ),
+    },
+    {
+        "method": "ctx.update_status(status_id, **fields)",
+        "params": "status_id: int, **fields",
+        "returns": "dict",
+        "description": "ステータスを PATCH 更新する。",
+    },
+    {
+        "method": "ctx.delete_status(status_id)",
+        "params": "status_id: int",
+        "returns": "None",
+        "description": "ステータスを削除する。",
+    },
+    {
+        "method": "ctx.get_comments(task_id=None)",
+        "params": "task_id: int（省略時は現在のタスク）",
+        "returns": "list[dict]",
+        "description": "コメント一覧を取得する（task_app/comments/）。",
+    },
+    {
+        "method": "ctx.get_comment(comment_id)",
+        "params": "comment_id: int",
+        "returns": "dict",
+        "description": "コメントを 1 件取得する。",
+    },
+    {
+        "method": "ctx.create_comment(message, task=None, author=None)",
+        "params": "message: str, task=None, author=None",
+        "returns": "int",
+        "description": (
+            "コメントを作成し ID を返す。task 未指定時は現タスク、"
+            "author 未指定時は現タスクの担当者を継承。"
+        ),
+    },
+    {
+        "method": "ctx.update_comment(comment_id, **fields)",
+        "params": "comment_id: int, **fields",
+        "returns": "dict",
+        "description": "コメントを PATCH 更新する。",
+    },
+    {
+        "method": "ctx.delete_comment(comment_id)",
+        "params": "comment_id: int",
+        "returns": "None",
+        "description": "コメントを削除する。",
+    },
+    {
+        "method": "ctx.get_events(project=None)",
+        "params": "project: int（任意）",
+        "returns": "list[dict]",
+        "description": "イベント一覧を取得する（event_app/events/）。",
+    },
+    {
+        "method": "ctx.get_event(event_id)",
+        "params": "event_id: int",
+        "returns": "dict",
+        "description": "イベントを 1 件取得する。",
+    },
+    {
+        "method": "ctx.create_event(event_date, name=None, project=None, ...)",
+        "params": (
+            "event_date: str, name=None, project=None, participant_count=None, "
+            "status=None, previous_event=None"
+        ),
+        "returns": "int",
+        "description": (
+            "イベントを作成し ID を返す。project 未指定時は現タスクから継承。"
+        ),
+    },
+    {
+        "method": "ctx.update_event(event_id, **fields)",
+        "params": "event_id: int, **fields",
+        "returns": "dict",
+        "description": "イベントを PATCH 更新する。",
+    },
+    {
+        "method": "ctx.delete_event(event_id)",
+        "params": "event_id: int",
+        "returns": "None",
+        "description": "イベントを削除する。",
+    },
+    {
+        "method": "ctx.execute_dsl(dsl)",
+        "params": "dsl: str",
+        "returns": "int",
+        "description": (
+            "DSL スクリプトを API 経由で実行し（task_app/dsl/execute/）、"
+            "実行したコマンド数を返す。"
+        ),
     },
     {
         "method": "ctx.branch(task)",
@@ -141,12 +264,34 @@ AGENT_API_REFERENCE = [
         ),
     },
     {
-        "method": "ctx.push(task)",
+        "method": "ctx.implement(task, prompt=None)",
+        "params": "task, prompt: str（省略時は Strategy の approach）",
+        "returns": "list[str]",
+        "description": (
+            "Claude にタスクを実装させ FILE ブロックを適用し、変更ファイル一覧を返す。"
+            "変更がなければ RuntimeError。clone_git_url() 後に呼ぶ。"
+        ),
+    },
+    {
+        "method": "ctx.commit(task)",
         "params": "task",
         "returns": "str (commit SHA)",
+        "description": "変更をステージしてコミットし、commit SHA を返す。",
+    },
+    {
+        "method": "ctx.git_push_only()",
+        "params": "なし",
+        "returns": "None",
+        "description": "現在ブランチを origin に push する。branch() 後に呼ぶ。",
+    },
+    {
+        "method": "ctx.push(task, prompt=None)",
+        "params": "task, prompt: str（任意）",
+        "returns": "str (commit SHA)",
         "description": (
-            "タスクを実装・テスト・コミット・push し、ステータスをレビュー(4)へ更新、"
-            "完了コメントを投稿する。clone_git_url() と branch() の後に呼ぶ。"
+            "implement→commit→git_push_only を順に呼び、ステータスをレビュー(4)へ更新、"
+            "完了コメントを投稿する。後方互換のためのラッパー。"
+            "clone_git_url() と branch() の後に呼ぶ。"
         ),
     },
     {
@@ -223,6 +368,33 @@ AGENT_SAMPLE_SCRIPTS = [
         ),
     },
     {
+        "title": "implement / commit / push を段階的に呼ぶ",
+        "description": (
+            "push() の細分化メソッドを使って、実装・コミット・push を個別に制御する。"
+        ),
+        "code": (
+            "ctx.clone_git_url()\n"
+            "task = ctx.get_task()\n"
+            "ctx.branch(task)\n"
+            "changed = ctx.implement(task, 'README に使い方を追記してください。')\n"
+            "print(changed)\n"
+            "sha = ctx.commit(task)\n"
+            "ctx.git_push_only()\n"
+            "ctx.gh_create_pr(task)\n"
+            "ctx.change_assignee(ctx.get_assignee())\n"
+        ),
+    },
+    {
+        "title": "execute_dsl でタスク関係を操作する",
+        "description": (
+            "DSL を API 経由で実行し、LINK / ASSIGN / EVENT などのコマンドを適用する。"
+        ),
+        "code": (
+            "count = execute_dsl('LINK 1 -> 2\\nASSIGN 1 TO alice')\n"
+            "print(count)\n"
+        ),
+    },
+    {
         "title": "改修規模に応じてサブタスクを分割する",
         "description": (
             "get_modification_level() で規模を判定し、LARGE のときだけサブタスクを生成する。"
@@ -237,23 +409,6 @@ AGENT_SAMPLE_SCRIPTS = [
             "ctx.branch(task)\n"
             "ctx.push(task)\n"
             "ctx.gh_create_pr(task)\n"
-            "ctx.change_assignee(ctx.get_assignee())\n"
-        ),
-    },
-    {
-        "title": "run_agent で個別の改修指示を出す",
-        "description": (
-            "プロンプトを直接渡してコードベースを改修する。"
-            "変更ファイルのパス一覧が返る。"
-        ),
-        "code": (
-            "ctx.clone_git_url()\n"
-            "task = ctx.get_task()\n"
-            "ctx.branch(task)\n"
-            "changed = run_agent('README に使い方を追記してください。')\n"
-            "print(changed)\n"
-            "ctx.push(task)\n"
-            "create_pr(task)\n"
             "ctx.change_assignee(ctx.get_assignee())\n"
         ),
     },
@@ -273,9 +428,9 @@ AGENT_EXECUTION_FLOW = [
     {"step": 4, "title": "ブランチ作成",
      "api": "ctx.branch(task)",
      "description": "タスク種別に応じたブランチを作成/切替する。"},
-    {"step": 5, "title": "実装・テスト・push",
-     "api": "ctx.push(task)",
-     "description": "実装→テスト→コミット→push し、ステータスをレビュー(4)へ更新する。"},
+    {"step": 5, "title": "実装・コミット・push",
+     "api": "ctx.implement(task) / ctx.commit(task) / ctx.git_push_only()（または ctx.push(task)）",
+     "description": "実装→コミット→push し、ステータスをレビュー(4)へ更新する。"},
     {"step": 6, "title": "PR 作成",
      "api": "ctx.gh_create_pr(task)",
      "description": "現在ブランチで PR を作成し、タスク説明にリンクを追記する。"},

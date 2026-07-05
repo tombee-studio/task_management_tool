@@ -92,6 +92,7 @@ def execute_agent_script(script_code, ctx):
         # in addition to ctx.method() style.
         "run_agent": ctx.run_agent,
         "create_pr": ctx.gh_create_pr,
+        "execute_dsl": ctx.execute_dsl,
     }
 
     exec(compile(tree, "<agent_script>", "exec"), namespace)
