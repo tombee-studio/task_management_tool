@@ -25,6 +25,7 @@
 | `LARGE` | `int` (=3) | 改修規模の定数（大）。 |
 | `run_agent` | callable | `ctx.run_agent` へのトップレベル別名。 |
 | `create_pr` | callable | `ctx.gh_create_pr` へのトップレベル別名。 |
+| `execute_dsl` | callable | `ctx.execute_dsl` へのトップレベル別名。 |
 
 ### 利用可能な組み込み関数（`_SAFE_BUILTINS`）
 
@@ -79,23 +80,86 @@
 
 引数 `task` は `TaskInfo` でも生の dict でも受け付けられるメソッドがあります。
 
+### 情報取得
+
 | メソッド | 引数 | 戻り値 | 説明 |
 |----------|------|--------|------|
 | `get_kinds()` | なし | `list[TaskKind]` | プロジェクトのタスク種別一覧を取得。 |
 | `clone_git_url()` | なし | `None` | プロジェクトの `git_url` を一時ディレクトリに clone。git 操作前に必須。`git_url` 未設定時は `RuntimeError`。 |
-| `get_task(task_id=None)` | `task_id: int` (省略時は現在のタスク) | `TaskInfo` | タスクをコメント付きで取得。`task_id` を渡すと任意のタスクを取得できる。 |
+| `get_task(task_id=None)` | `task_id: int` (省略時は現在のタスク) | `TaskInfo` | タスクをコメント付きで取得。 |
 | `decide_strategy(task, kinds)` | `task: TaskInfo`, `kinds: list[TaskKind]` | `Strategy` | Claude に実装方針を計画させ、内部に保存して返す。 |
 | `get_modification_level()` | なし | `int` (`SMALL`/`MIDDLE`/`LARGE`) | Claude に改修規模を判定させる。不明時は `MIDDLE`。 |
-| `create_task(title, ...)` | `title: str`, `project=None`, `status=1`, `assignee=None`, `task_type=None`, `parent=None`, `event=None`, `description=None`, `progress_summary=None`, `reporter=None`, `deadline=None`, `field_values=None` | `int` | タスクを API 作成し ID を返す。各フィールドをキーワード引数で指定。`project`/`assignee`/`event` 未指定時は現タスクから継承。`task_type` は id(int) でも種別名(str) でも可。 |
-| `create_subtasks(strategy)` | `strategy: Strategy` | `list[int]` | `strategy.subtask_titles` のサブタスクを（現タスクの子として）API 作成し、ID を返す。内部で `create_task` に委譲。 |
-| `branch(task)` | `task` | `None` | タスクに応じた git ブランチを作成/切替。`clone_git_url()` 後に呼ぶ。 |
-| `post_comment(task, message)` | `task`, `message: str` | `None` | タスクにコメントを投稿（失敗しても例外を出さない）。 |
-| `change_assignee(assignee_id)` | `assignee_id: int` | `None` | 現在タスクの担当者を変更。 |
 | `get_assignee()` | なし | `int` | `reporter` を優先して返す（なければ `assignee`）。完了時の担当者復元に利用。 |
-| `run_agent(prompt)` | `prompt: str` | `list[str]` | コードベースを読み、`prompt` の改修を Claude に実装させ FILE ブロックを適用。変更ファイルのパス一覧を返す。`clone_git_url()` 後に呼ぶ。 |
-| `push(task)` | `task` | `str` (commit SHA) | タスクを実装・テスト・コミット・push し、ステータスをレビュー(4)へ更新、完了コメントを投稿。`clone_git_url()` と `branch()` の後に呼ぶ。 |
+
+### Task CRUD
+
+| メソッド | 引数 | 戻り値 | 説明 |
+|----------|------|--------|------|
+| `create_task(title, ...)` | `title: str`, `project=None`, `status=1`, `assignee=None`, `task_type=None`, `parent=None`, `event=None`, `description=None`, `progress_summary=None`, `reporter=None`, `deadline=None`, `field_values=None` | `int` | タスクを API 作成し ID を返す。`project`/`assignee`/`event` 未指定時は現タスクから継承。`task_type` は id(int) でも種別名(str) でも可。 |
+| `create_subtasks(strategy)` | `strategy: Strategy` | `list[int]` | `strategy.subtask_titles` のサブタスクを（現タスクの子として）API 作成し、ID を返す。 |
+| `update_task(task_id=None, **fields)` | `task_id: int`（省略時は現在のタスク）, 更新フィールド | `dict` | タスクを PATCH 更新して更新後の dict を返す。 |
+| `delete_task(task_id)` | `task_id: int` | `None` | タスクを削除。 |
+
+### Status CRUD
+
+| メソッド | 引数 | 戻り値 | 説明 |
+|----------|------|--------|------|
+| `create_status(name, is_done=False, project=None)` | `name: str`, `is_done: bool`, `project=None` | `int` | ステータスを作成し ID を返す。`project` 未指定時は現タスクから継承。 |
+| `get_status(status_id)` | `status_id: int` | `dict` | ステータスを取得。 |
+| `update_status(status_id, **fields)` | `status_id: int`, 更新フィールド | `dict` | ステータスを PATCH 更新。 |
+| `delete_status(status_id)` | `status_id: int` | `None` | ステータスを削除。 |
+
+### Comment CRUD
+
+| メソッド | 引数 | 戻り値 | 説明 |
+|----------|------|--------|------|
+| `create_comment(description, task=None, author=None)` | `description: str`, `task=None`, `author=None` | `int` | コメントを作成し ID を返す。`task` 未指定時は現タスク、`author` 未指定時は現タスクの担当者から継承。 |
+| `get_comment(comment_id)` | `comment_id: int` | `dict` | コメントを取得。 |
+| `update_comment(comment_id, **fields)` | `comment_id: int`, 更新フィールド | `dict` | コメントを PATCH 更新。 |
+| `delete_comment(comment_id)` | `comment_id: int` | `None` | コメントを削除。 |
+| `post_comment(task, message)` | `task`, `message: str` | `None` | タスクにコメントを投稿（失敗しても例外を出さない）。 |
+
+### Event CRUD
+
+| メソッド | 引数 | 戻り値 | 説明 |
+|----------|------|--------|------|
+| `create_event(event_date, name=None, project=None, participant_count=None, status=None, previous_event=None)` | `event_date: str`, その他任意 | `int` | イベントを作成し ID を返す。`project` 未指定時は現タスクから継承。 |
+| `get_event(event_id)` | `event_id: int` | `dict` | イベントを取得。 |
+| `update_event(event_id, **fields)` | `event_id: int`, 更新フィールド | `dict` | イベントを PATCH 更新。 |
+| `delete_event(event_id)` | `event_id: int` | `None` | イベントを削除。 |
+
+### DSL
+
+| メソッド | 引数 | 戻り値 | 説明 |
+|----------|------|--------|------|
+| `execute_dsl(dsl)` | `dsl: str` | `int` | DSL スクリプトをサーバ側で実行し、実行したコマンド数を返す。 |
+
+### 担当者操作
+
+| メソッド | 引数 | 戻り値 | 説明 |
+|----------|------|--------|------|
+| `change_assignee(assignee_id)` | `assignee_id: int` | `None` | 現在タスクの担当者を変更。 |
+
+### 実装・git 操作
+
+| メソッド | 引数 | 戻り値 | 説明 |
+|----------|------|--------|------|
+| `branch(task)` | `task` | `None` | タスクに応じた git ブランチを作成/切替。`clone_git_url()` 後に呼ぶ。 |
+| `run_agent(prompt)` | `prompt: str` | `list[str]` | コードベースを読み、`prompt` の改修を Claude に実装させ FILE ブロックを適用。変更ファイルのパス一覧を返す。 |
+| `implement(task, prompt=None)` | `task`, `prompt=None` | `list[str]` | タスクを Claude に実装させ FILE ブロックを適用。`prompt` 省略時はタスク情報から生成。変更なしなら `RuntimeError`。 |
+| `commit(task)` | `task` | `str` (commit SHA) | 変更をステージ・コミットして SHA を返す。`branch()` 後に呼ぶ。 |
+| `git_push_only()` | なし | `None` | 現在ブランチを origin に push。`branch()` 後に呼ぶ。 |
+| `push(task, prompt=None)` | `task`, `prompt=None` | `str` (commit SHA) | `implement()`→`commit()`→`git_push_only()` を順次実行し、ステータスをレビュー(4)へ更新・担当者を reporter に戻し・完了コメントを投稿。後方互換のためのラッパー。 |
 | `git_push(task)` | `task` | `str` | `push()` のエイリアス。 |
 | `gh_create_pr(task)` | `task` | `dict` / `None` | 現在ブランチで GitHub PR を作成し、タスク説明に PR リンクを追記。`branch()` 後に呼ぶ。 |
+| `complete_text(prompt, max_tokens=2048, include_codebase=False)` | `prompt: str` ほか | `str` | Claude に自由記述テキストを生成させて返す。要約・タイトル・説明向け。 |
 
 ### 呼び出し順序の前提
 
+1. `clone_git_url()` — git 操作の前提。
+2. `get_task()` / `get_kinds()` — タスク情報の取得。
+3. `decide_strategy(task, kinds)` — 実装方針の決定（必要なら `create_subtasks`）。
+4. `branch(task)` — ブランチ作成/切替。
+5. `push(task)`（= `implement` + `commit` + `git_push_only`）または個別呼び出し。
+6. `gh_create_pr(task)` — PR 作成。
+7. `change_assignee(ctx.get_assignee())` — 起票者へ担当者を戻す。

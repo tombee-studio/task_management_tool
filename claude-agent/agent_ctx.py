@@ -110,26 +110,19 @@ class AgentCtx:
             self._claude = anthropic.Anthropic(api_key=self._anthropic_api_key)
         return self._claude
 
-    def _complete_code(self, context, prompt):
+    def _complete_code(self, prompt):
         """Run Claude for a code-generation task and return the response text.
 
-        Uses adaptive thinking + high effort (the biggest accuracy lever for
-        Opus on coding) and a generous token budget, streamed so large
-        full-file outputs are not truncated or timed out.  Thinking blocks are
-        skipped; only the visible text is returned.
+        Takes the fully-built system prompt (framing + codebase + FILE-block
+        instructions).  Uses adaptive thinking + high effort (the biggest
+        accuracy lever for Opus on coding) and a generous token budget,
+        streamed so large full-file outputs are not truncated or timed out.
+        Thinking blocks are skipped; only the visible text is returned.
         """
-        full_prompt = (
-            f"{prompt.strip()}\n\n"
-            f"Here is the relevant codebase:\n{context}\n\n"
-            "Provide the complete content of each file you need to create or modify. "
-            "Format each file as:\n"
-            "FILE: <relative/path/to/file>\n```\n<content>\n```\n\n"
-            "Only output FILE blocks. No explanations."
-        )
         with self._client.messages.stream(
             model=self._model,
             max_tokens=_CODE_MAX_TOKENS,
-            system=full_prompt,
+            system=prompt,
             thinking={"type": "adaptive"},
             output_config={"effort": "high"},
             messages=[{"role": "user", "content": prompt}],
@@ -202,6 +195,12 @@ class AgentCtx:
         resp.raise_for_status()
         return resp.json()
 
+    def _delete(self, path):
+        """Issue an HTTP DELETE. Returns None (DELETE has no JSON body)."""
+        resp = requests.delete(f"{self._api_url}/{path}", headers=self._headers)
+        resp.raise_for_status()
+        return None
+
     # ------------------------------------------------------------------
     # Shell / git helpers
     # ------------------------------------------------------------------
@@ -272,6 +271,129 @@ class AgentCtx:
 
         return TaskInfo(data, kind_name=kind_name, comments=comments)
 
+    def update_task(self, task_id=None, **fields):
+        """Update a task via the API. Returns the updated task dict.
+
+        task_id defaults to the current task. Fields are passed as keyword
+        arguments (e.g. update_task(status=4, assignee=3)).
+        """
+        if task_id is None:
+            task_id = self.task_id
+        result = self._patch(f"task_app/tasks/{task_id}/", fields)
+        print(f"[agent] Updated task #{task_id}.")
+        return result
+
+    def delete_task(self, task_id):
+        """Delete a task via the API."""
+        self._delete(f"task_app/tasks/{task_id}/")
+        print(f"[agent] Deleted task #{task_id}.")
+
+    # --- Status CRUD ---------------------------------------------------
+
+    def create_status(self, name, is_done=False, project=None):
+        """Create a status via the API. Returns the created status id.
+
+        `project` defaults to the current task's project.
+        """
+        if project is None:
+            current = self._get(f"task_app/tasks/{self.task_id}/")
+            project = current["project"]
+        payload = {"name": name, "is_done": is_done, "project": project}
+        result = self._post("task_app/statuses/", payload)
+        print(f"[agent] Created status #{result['id']}: {name}")
+        return result["id"]
+
+    def get_status(self, status_id):
+        """Fetch a status. Returns the status dict."""
+        return self._get(f"task_app/statuses/{status_id}/")
+
+    def update_status(self, status_id, **fields):
+        """Update a status via the API. Returns the updated status dict."""
+        return self._patch(f"task_app/statuses/{status_id}/", fields)
+
+    def delete_status(self, status_id):
+        """Delete a status via the API."""
+        self._delete(f"task_app/statuses/{status_id}/")
+
+    # --- Comment CRUD --------------------------------------------------
+
+    def create_comment(self, description, task=None, author=None):
+        """Create a comment via the API. Returns the created comment id.
+
+        `task` defaults to the current task; `author` defaults to the current
+        task's assignee.
+        """
+        if task is None or author is None:
+            current = self._get(f"task_app/tasks/{self.task_id}/")
+            if task is None:
+                task = self.task_id
+            if author is None:
+                author = current.get("assignee")
+        payload = {"description": description, "task": task, "author": author}
+        result = self._post("task_app/comments/", payload)
+        print(f"[agent] Created comment #{result['id']} on task #{task}.")
+        return result["id"]
+
+    def get_comment(self, comment_id):
+        """Fetch a comment. Returns the comment dict."""
+        return self._get(f"task_app/comments/{comment_id}/")
+
+    def update_comment(self, comment_id, **fields):
+        """Update a comment via the API. Returns the updated comment dict."""
+        return self._patch(f"task_app/comments/{comment_id}/", fields)
+
+    def delete_comment(self, comment_id):
+        """Delete a comment via the API."""
+        self._delete(f"task_app/comments/{comment_id}/")
+
+    # --- Event CRUD ----------------------------------------------------
+
+    def create_event(self, event_date, name=None, project=None,
+                     participant_count=None, status=None, previous_event=None):
+        """Create an event via the API. Returns the created event id.
+
+        `project` defaults to the current task's project. Other optional
+        fields are only sent when provided.
+        """
+        if project is None:
+            current = self._get(f"task_app/tasks/{self.task_id}/")
+            project = current["project"]
+        payload = {"event_date": event_date, "project": project}
+        optional = {
+            "name": name,
+            "participant_count": participant_count,
+            "status": status,
+            "previous_event": previous_event,
+        }
+        payload.update({k: v for k, v in optional.items() if v is not None})
+        result = self._post("event_app/events/", payload)
+        print(f"[agent] Created event #{result['id']}.")
+        return result["id"]
+
+    def get_event(self, event_id):
+        """Fetch an event. Returns the event dict."""
+        return self._get(f"event_app/events/{event_id}/")
+
+    def update_event(self, event_id, **fields):
+        """Update an event via the API. Returns the updated event dict."""
+        return self._patch(f"event_app/events/{event_id}/", fields)
+
+    def delete_event(self, event_id):
+        """Delete an event via the API."""
+        self._delete(f"event_app/events/{event_id}/")
+
+    # --- DSL -----------------------------------------------------------
+
+    def execute_dsl(self, dsl):
+        """Execute a DSL script server-side via the API.
+
+        Returns the number of executed commands (executed_count).
+        """
+        result = self._post("task_app/dsl/execute/", {"dsl": dsl})
+        count = result.get("executed_count", 0)
+        print(f"[agent] Executed DSL ({count} command(s)).")
+        return count
+
     def decide_strategy(self, task, kinds):
         """Ask Claude to plan the implementation.
 
@@ -298,440 +420,4 @@ class AgentCtx:
         )
 
         raw = msg.content[0].text.strip()
-        raw = re.sub(r"^```(?:json)?\s*\n?", "", raw)
-        raw = re.sub(r"\n?```\s*$", "", raw)
-
-        try:
-            payload = json.loads(raw)
-        except json.JSONDecodeError:
-            payload = {"approach": raw, "subtask_titles": []}
-
-        strategy = Strategy(
-            approach=payload.get("approach", ""),
-            subtask_titles=payload.get("subtask_titles", []),
-        )
-        self._strategy = strategy
-        return strategy
-
-    def get_modification_level(self):
-        """Ask Claude to assess implementation scope.
-
-        Returns SMALL (1), MIDDLE (2), or LARGE (3).
-        """
-        data = self._get(f"task_app/tasks/{self.task_id}/")
-
-        msg = self._client.messages.create(
-            model=self._model,
-            max_tokens=10,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"Task: {data['title']}\n"
-                    f"Description: {data.get('description', '')}\n\n"
-                    "Reply with exactly one word: SMALL, MIDDLE, or LARGE, "
-                    "based on how much code change is required."
-                ),
-            }],
-        )
-
-        word = msg.content[0].text.strip().upper()
-        return {"SMALL": SMALL, "MIDDLE": MIDDLE, "LARGE": LARGE}.get(word, MIDDLE)
-
-    def _resolve_task_type_id(self, project_id, name):
-        """Resolve a task type name to its id within a project."""
-        types = self._get("task_app/task-types/", params={"project": project_id})
-        for t in types:
-            if t["name"] == name:
-                return t["id"]
-        raise ValueError(f"Task type '{name}' not found in project {project_id}.")
-
-    def create_task(self, title, project=None, status=1, assignee=None,
-                    task_type=None, parent=None, event=None, description=None,
-                    progress_summary=None, reporter=None, deadline=None,
-                    field_values=None):
-        """Create a task via the API. Each task field is a keyword argument.
-
-        Fields left as None inherit sensible defaults from the current task:
-          - project:  the current task's project
-          - assignee: the current task's assignee
-          - event:    the current task's event
-        `status` defaults to 1 (未着手). `parent` defaults to None (top-level task).
-        `task_type` accepts an id (int) or a task type name (str), the latter
-        resolved within the project. `field_values` is a list of
-        {"field": <id>, "value": <str>} for the task type's custom fields.
-
-        Returns the created task's id.
-        """
-        if project is None or assignee is None or event is None:
-            current = self._get(f"task_app/tasks/{self.task_id}/")
-            if project is None:
-                project = current["project"]
-            if assignee is None:
-                assignee = current["assignee"]
-            if event is None:
-                event = current.get("event")
-
-        if isinstance(task_type, str):
-            task_type = self._resolve_task_type_id(project, task_type)
-
-        payload = {
-            "title": title,
-            "project": project,
-            "status": status,
-            "assignee": assignee,
-        }
-        optional = {
-            "task_type": task_type,
-            "parent": parent,
-            "event": event,
-            "description": description,
-            "progress_summary": progress_summary,
-            "reporter": reporter,
-            "deadline": deadline,
-            "field_values": field_values,
-        }
-        payload.update({k: v for k, v in optional.items() if v is not None})
-
-        result = self._post("task_app/tasks/", payload)
-        print(f"[agent] Created task #{result['id']}: {title}")
-        return result["id"]
-
-    def create_subtasks(self, strategy):
-        """Create subtasks listed in strategy.subtask_titles.
-
-        Returns list of created task IDs.
-        """
-        data = self._get(f"task_app/tasks/{self.task_id}/")
-        created = []
-        for title in (strategy.subtask_titles or []):
-            created.append(self.create_task(
-                title=title,
-                parent=self.task_id,
-                project=data["project"],
-                assignee=data["assignee"],
-                event=data.get("event"),
-            ))
-        return created
-
-    def branch(self, task):
-        """Create or switch to the appropriate git branch for the task."""
-        if self._workdir is None:
-            raise RuntimeError("Call clone_git_url() before branch().")
-
-        kind = self._classify_kind(task)
-        self._kind = kind
-        branch_name = self._make_branch_name(kind, task)
-        self._branch = branch_name
-
-        if self._git(["checkout", branch_name], check=False).returncode != 0:
-            self._git(["checkout", "-b", branch_name])
-
-        print(f"[agent] On branch {branch_name}")
-
-    def post_comment(self, task, message):
-        """Post a comment on the task."""
-        task_id = task.id if isinstance(task, TaskInfo) else task["id"]
-        author_id = task.assignee if isinstance(task, TaskInfo) else task["assignee"]
-        try:
-            self._post("task_app/comments/", {
-                "author": author_id,
-                "description": message,
-                "task": task_id,
-            })
-            print(f"[agent] Posted comment on task #{task_id}.")
-        except Exception as e:
-            print(f"[agent] Failed to post comment: {e}", file=sys.stderr)
-
-    def change_assignee(self, assignee_id):
-        """Change the assignee of the current task."""
-        self._patch(f"task_app/tasks/{self.task_id}/", {"assignee": assignee_id})
-        print(f"[agent] Changed assignee to {assignee_id}.")
-
-    def get_assignee(self):
-        """Return the reporter ID (typically restored as assignee on completion)."""
-        data = self._get(f"task_app/tasks/{self.task_id}/")
-        return data.get("reporter") or data.get("assignee")
-
-    def run_agent(self, prompt):
-        """Run Claude with *prompt* in the current working-directory context.
-
-        Reads the codebase, asks Claude to implement the changes described in
-        *prompt*, applies any FILE blocks returned, and returns the list of
-        changed file paths.  Call clone_git_url() before run_agent().
-        """
-        if self._workdir is None:
-            raise RuntimeError("Call clone_git_url() before run_agent().")
-
-        context = self._read_codebase()
-        full_prompt = (
-            f"{prompt.strip()}\n\n"
-            f"Here is the relevant codebase:\n{context}\n\n"
-            "Provide the complete content of each file you need to create or modify. "
-            "Format each file as:\n"
-            "FILE: <relative/path/to/file>\n```\n<content>\n```\n\n"
-            "Only output FILE blocks. No explanations."
-        )
-
-        print("[agent] run_agent: calling Claude...")
-        implementation = self._complete_code(context, full_prompt)
-
-        changed_files = self._apply_files(implementation)
-        print(f"[agent] run_agent: {len(changed_files)} file(s) changed.")
-        return changed_files
-
-    def push(self, task, prompt):
-        """Ask Claude to implement the task, run tests, commit, and push.
-
-        Uses the strategy stored by decide_strategy() if available.
-        Updates task status to レビュー (4) and posts a completion comment.
-        Returns the commit SHA.
-        """
-        if self._workdir is None:
-            raise RuntimeError("Call clone_git_url() before push().")
-        if self._branch is None:
-            raise RuntimeError("Call branch() before push().")
-
-        task_id = task.id if isinstance(task, TaskInfo) else task["id"]
-        title = task.title if isinstance(task, TaskInfo) else task["title"]
-
-        print(f"[agent] Calling Claude for task #{task_id}...")
-        context = self._read_codebase()
-        implementation = self._complete_code(context, prompt)
-
-        changed_files = self._apply_files(implementation)
-        if not changed_files:
-            raise RuntimeError(
-                "No files were changed. The agent could not determine what to implement."
-            )
-
-        prefix = _KIND_PREFIX.get(self._kind, "Ftr")
-        commit_msg = f"{prefix}: {title[:44]} #{task_id}"[:50] + f"\n\nTask: {task_id}"
-        self._git(["add", "-A"])
-        subprocess.run(
-            ["git", "commit", "-m", commit_msg],
-            cwd=self._workdir,
-            env={**os.environ, "TASK_URL": f"{self._api_url}/task_app/tasks"},
-            check=True,
-        )
-
-        commit_sha = self._git(["rev-parse", "HEAD"]).stdout.strip()
-        self._git(["push", "-u", "origin", self._branch])
-
-        review_patch = {"status": 4}
-        task_data = self._get(f"task_app/tasks/{task_id}/")
-        if task_data.get("reporter"):
-            review_patch["assignee"] = task_data["reporter"]
-        self._patch(f"task_app/tasks/{task_id}/", review_patch)
-        print(f"[agent] Task #{task_id} marked as review.")
-
-        commit_url = f"https://github.com/{self._github_repo}/commit/{commit_sha}"
-        self.post_comment(task, f"対応コミット: [{commit_sha[:8]}]({commit_url})")
-        self.post_comment(task, "対応が完了しました。")
-
-        return commit_sha
-
-    def git_push(self, task):
-        """Alias for push()."""
-        return self.push(task)
-
-    def gh_create_pr(self, task):
-        """Create a GitHub PR for the current branch."""
-        if self._branch is None:
-            raise RuntimeError("Call branch() before gh_create_pr().")
-
-        task_id = task.id if isinstance(task, TaskInfo) else task["id"]
-        title = task.title if isinstance(task, TaskInfo) else task["title"]
-
-        project = self._fetch_project()
-        base = self._resolve_base_branch(project)
-        prefix = _KIND_PREFIX.get(self._kind, "Ftr")
-
-        pr_resp = requests.post(
-            f"https://api.github.com/repos/{self._github_repo}/pulls",
-            headers={
-                "Authorization": f"token {self._github_pat}",
-                "Accept": "application/vnd.github.v3+json",
-            },
-            json={
-                "title": f"{prefix}: {title[:60]} #{task_id}",
-                "head": self._branch,
-                "base": base,
-                "body": f"Task: {task_id}",
-            },
-        )
-
-        if pr_resp.status_code == 201:
-            pr_data = pr_resp.json()
-            pr_url = pr_data["html_url"]
-            pr_number = pr_data["number"]
-            print(f"[agent] PR created: {pr_url}")
-
-            task_data = self._get(f"task_app/tasks/{task_id}/")
-            existing_desc = (task_data.get("description") or "").strip()
-            pr_link = f"[PR #{pr_number}]({pr_url})"
-            new_desc = f"{existing_desc}\n\n{pr_link}" if existing_desc else pr_link
-            self._patch(f"task_app/tasks/{task_id}/", {"description": new_desc})
-            return pr_data
-
-        print(f"[agent] PR creation failed: {pr_resp.status_code} {pr_resp.text}", file=sys.stderr)
-        return None
-
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
-
-    def _fetch_project(self):
-        if self._project is None:
-            task = self._get(f"task_app/tasks/{self.task_id}/")
-            self._project = self._get(f"task_app/projects/{task['project']}/")
-        return self._project
-
-    def _resolve_base_branch(self, project):
-        candidates = []
-        dev = (project.get("dev_branch") or "").strip()
-        if dev:
-            candidates.append(dev)
-        main = (project.get("main_branch") or "").strip()
-        if main:
-            candidates.append(main)
-
-        gh_headers = {
-            "Authorization": f"token {self._github_pat}",
-            "Accept": "application/vnd.github.v3+json",
-        }
-
-        repo_resp = requests.get(
-            f"https://api.github.com/repos/{self._github_repo}",
-            headers=gh_headers,
-        )
-        default_branch = repo_resp.json().get("default_branch", "main") if repo_resp.ok else "main"
-
-        for candidate in candidates:
-            check = requests.get(
-                f"https://api.github.com/repos/{self._github_repo}/branches/{candidate}",
-                headers=gh_headers,
-            )
-            if check.status_code == 200:
-                return candidate
-            print(f"[agent] Branch '{candidate}' not found in repo, skipping.")
-
-        print(f"[agent] Falling back to default branch '{default_branch}'.")
-        return default_branch
-
-    def _classify_kind(self, task):
-        for tag in (getattr(task, "_raw", {}).get("tags") or []):
-            name = tag if isinstance(tag, str) else tag.get("name", "")
-            if name in _KIND_MAP:
-                return _KIND_MAP[name]
-
-        if task.kind and task.kind.name:
-            n = task.kind.name.lower()
-            for k, v in _KIND_MAP.items():
-                if k in n:
-                    return v
-
-        msg = self._client.messages.create(
-            model=self._model,
-            max_tokens=10,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"Task title: {task.title}\n"
-                    f"Description: {task.description}\n\n"
-                    "Reply with exactly one word — the git branch kind: "
-                    "feature, bugfix, hotfix, or enhancement."
-                ),
-            }],
-        )
-        word = msg.content[0].text.strip().lower()
-        return word if word in ("feature", "bugfix", "hotfix", "enhancement") else "feature"
-
-    def _make_branch_name(self, kind, task):
-        try:
-            task.title.encode("ascii")
-            slug = re.sub(r"[^a-z0-9]+", "-", task.title.lower()).strip("-")[:40] or "task"
-        except UnicodeEncodeError:
-            msg = self._client.messages.create(
-                model=self._model,
-                max_tokens=30,
-                messages=[{
-                    "role": "user",
-                    "content": (
-                        "Convert this task title to a short English slug for a git branch.\n"
-                        "Rules: lowercase ASCII, digits, hyphens only; max 40 chars.\n"
-                        f"Task title: {task.title}\n\nReply with ONLY the slug."
-                    ),
-                }],
-            )
-            raw = msg.content[0].text.strip().lower()
-            slug = re.sub(r"[^a-z0-9-]", "-", raw)
-            slug = re.sub(r"-{2,}", "-", slug).strip("-")[:40] or "task"
-        return f"{kind}/#{task.id}_{slug}"
-
-    def _read_codebase(self):
-        # Collect matching files in a deterministic (sorted) order so the model
-        # always sees the same context for the same repo, and the relevant files
-        # aren't dropped by arbitrary os.walk ordering.
-        matched = []
-        for root, dirs, files in os.walk(self._workdir):
-            dirs[:] = sorted(d for d in dirs
-                             if d not in {".git", "venv", "__pycache__", ".venv", "node_modules"})
-            for f in sorted(files):
-                if f.endswith((".py", ".tf", ".md", ".lark")) and "migrations" not in root:
-                    path = os.path.join(root, f)
-                    matched.append((os.path.relpath(path, self._workdir), path))
-        matched.sort(key=lambda item: item[0])
-
-        # A full file listing helps the model locate code even when a file's
-        # contents fall outside the included window below.
-        tree = "\n".join(rel for rel, _ in matched)
-
-        context_files = []
-        for rel, path in matched[:80]:
-            try:
-                with open(path) as fh:
-                    content = fh.read()
-                context_files.append(f"### {rel}\n```\n{content}\n```")
-            except Exception:
-                pass
-        return f"Project files:\n{tree}\n\n" + "\n\n".join(context_files)
-
-    def _apply_files(self, implementation):
-        # Tolerate a missing trailing fence (e.g. if the response is cut off):
-        # the final FILE block may end at end-of-string instead of ```.
-        file_pattern = re.compile(r"FILE:\s*(\S+)\n```(?:\w*)\n(.*?)(?:```|\Z)", re.DOTALL)
-        changed = []
-        for match in file_pattern.finditer(implementation):
-            rel_path, content = match.group(1).strip("`"), match.group(2)
-            abs_path = os.path.join(self._workdir, rel_path)
-            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-            with open(abs_path, "w") as fh:
-                fh.write(content)
-            changed.append(rel_path)
-            print(f"[agent] Wrote {rel_path}")
-        return changed
-
-    def _run_tests(self):
-        django_dir = os.path.join(self._workdir, "django-app")
-        if not os.path.isdir(django_dir):
-            print("[agent] No django-app/ — skipping tests.")
-            return
-        self._run(["pip", "install", "-q", "-r", "requirements.txt"], cwd=django_dir, check=False)
-        result = self._run(
-            ["python", "manage.py", "test", "task_app", "event_app", "--verbosity=1"],
-            cwd=django_dir,
-            check=False,
-            env={**os.environ, "DJANGO_SETTINGS_MODULE": "task_management.test_settings"},
-        )
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"Tests failed.\n\n```\n{result.stdout[-2000:]}\n{result.stderr[-1000:]}\n```"
-            )
-        print("[agent] Tests passed.")
-
-    def __del__(self):
-        if self._tmpdir is not None:
-            try:
-                self._tmpdir.cleanup()
-            except Exception:
-                pass
+        raw = re.sub(r"^
