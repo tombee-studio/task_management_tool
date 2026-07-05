@@ -33,15 +33,6 @@ LARGE = 3
 # rewrites mid-output, which was the main cause of broken/inaccurate edits.
 # Large outputs require streaming to avoid SDK HTTP timeouts.
 _CODE_MAX_TOKENS = 64000
-_CODE_SYSTEM_PROMPT = (
-    "You are an expert software engineer working inside an existing codebase. "
-    "Implement exactly what the task asks and nothing more. Match the style and "
-    "conventions of the surrounding code. Make the smallest change that fully "
-    "solves the task; do not refactor unrelated code or add speculative features, "
-    "and preserve all behavior outside the scope of the task. When you output a "
-    "file you MUST output its complete final contents -- never elide code with "
-    "placeholders like '# ... unchanged'. Output only FILE blocks, no prose."
-)
 
 _KIND_PREFIX = {"feature": "Ftr", "bugfix": "Fix", "hotfix": "Fix", "enhancement": "Eta"}
 _KIND_MAP = {"bug": "bugfix", "feature": "feature", "enhancement": "enhancement", "hotfix": "hotfix"}
@@ -119,7 +110,7 @@ class AgentCtx:
             self._claude = anthropic.Anthropic(api_key=self._anthropic_api_key)
         return self._claude
 
-    def _complete_code(self, prompt):
+    def _complete_code(self, context, prompt):
         """Run Claude for a code-generation task and return the response text.
 
         Uses adaptive thinking + high effort (the biggest accuracy lever for
@@ -127,10 +118,18 @@ class AgentCtx:
         full-file outputs are not truncated or timed out.  Thinking blocks are
         skipped; only the visible text is returned.
         """
+        full_prompt = (
+            f"{prompt.strip()}\n\n"
+            f"Here is the relevant codebase:\n{context}\n\n"
+            "Provide the complete content of each file you need to create or modify. "
+            "Format each file as:\n"
+            "FILE: <relative/path/to/file>\n```\n<content>\n```\n\n"
+            "Only output FILE blocks. No explanations."
+        )
         with self._client.messages.stream(
             model=self._model,
             max_tokens=_CODE_MAX_TOKENS,
-            system=_CODE_SYSTEM_PROMPT,
+            system=full_prompt,
             thinking={"type": "adaptive"},
             output_config={"effort": "high"},
             messages=[{"role": "user", "content": prompt}],
@@ -474,7 +473,7 @@ class AgentCtx:
         )
 
         print("[agent] run_agent: calling Claude...")
-        implementation = self._complete_code(full_prompt)
+        implementation = self._complete_code(context, full_prompt)
 
         changed_files = self._apply_files(implementation)
         print(f"[agent] run_agent: {len(changed_files)} file(s) changed.")
@@ -496,7 +495,8 @@ class AgentCtx:
         title = task.title if isinstance(task, TaskInfo) else task["title"]
 
         print(f"[agent] Calling Claude for task #{task_id}...")
-        implementation = self._complete_code(prompt)
+        context = self._read_codebase()
+        implementation = self._complete_code(context, prompt)
 
         changed_files = self._apply_files(implementation)
         if not changed_files:
